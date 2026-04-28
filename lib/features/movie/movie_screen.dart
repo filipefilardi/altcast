@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
@@ -83,21 +84,36 @@ class _MovieBody extends ConsumerWidget {
               Row(
                 children: [
                   PlayButton(
-                    onPressed: () => _playStub(context),
+                    onPressed: () => _play(context, movie, fromStart: false),
                     label: hasResume ? 'Resume' : 'Play',
                   ),
                   if (hasResume) ...[
                     const SizedBox(width: 12),
-                    Text(
-                      'from ${formatDuration(movie.userData!.resumePosition)}',
-                      style:
-                          Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                    TextButton(
+                      onPressed: () =>
+                          _play(context, movie, fromStart: true),
+                      child: Text(
+                        'from start',
+                        style:
+                            Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                      ),
                     ),
                   ],
                 ],
               ),
+              if (hasResume)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Continues from ${formatDuration(movie.userData!.resumePosition)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
+                        ),
+                  ),
+                ),
               if (movie.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 _GenreChips(genres: movie.genres),
@@ -275,10 +291,9 @@ class _BackChip extends StatelessWidget {
   }
 }
 
-void _playStub(BuildContext context) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      const SnackBar(content: Text('Player coming soon')),
-    );
+void _play(BuildContext context, Movie movie, {required bool fromStart}) {
+  final ticks =
+      fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
+  final query = ticks > 0 ? '?resumeTicks=$ticks' : '';
+  context.push('/play/${movie.id}$query');
 }
