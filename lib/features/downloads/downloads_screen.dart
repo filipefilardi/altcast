@@ -30,7 +30,7 @@ class DownloadsScreen extends ConsumerWidget {
                     icon: Icons.download_outlined,
                     title: 'Nothing downloaded yet',
                     message:
-                        'Tap the download icon on a movie to keep it offline.',
+                        'Tap the download icon on a movie or episode to keep it offline.',
                   ),
                 )
               : ListView(
@@ -43,8 +43,8 @@ class DownloadsScreen extends ConsumerWidget {
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 8),
-                      for (final entry in state.progress.entries)
-                        _InProgressRow(itemId: entry.key, progress: entry.value),
+                      for (final entry in state.progress.values)
+                        _InProgressRow(progress: entry),
                       const SizedBox(height: 24),
                     ],
                     if (state.items.isNotEmpty) ...[
@@ -69,7 +69,14 @@ class _DownloadedRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
-    final poster = repo.posterUrl(item.id, item.imageTag);
+    // For episodes, prefer the series poster (set in the queue entry); we
+    // already swapped to it at enqueue time, so [item.imageTag] is correct.
+    final poster = repo.posterUrl(
+      item.kind == DownloadedItemKind.episode
+          ? (item.seriesId ?? item.id)
+          : item.id,
+      item.imageTag,
+    );
     return InkWell(
       onTap: () => context.push('/play/${item.id}'),
       child: Padding(
@@ -102,7 +109,7 @@ class _DownloadedRow extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.name,
+                    _primaryLabel(item),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -111,13 +118,12 @@ class _DownloadedRow extends ConsumerWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (item.year != null || item.runTime != null) ...[
+                  if (_secondaryLabel(item) != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      [
-                        if (item.year != null) '${item.year}',
-                        if (item.runTime != null) formatLongDuration(item.runTime!),
-                      ].join(' • '),
+                      _secondaryLabel(item)!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -139,12 +145,29 @@ class _DownloadedRow extends ConsumerWidget {
       ),
     );
   }
+
+  String _primaryLabel(DownloadedItem item) {
+    if (item.kind == DownloadedItemKind.episode &&
+        item.seriesName != null) {
+      return '${item.seriesName} — ${item.name}';
+    }
+    return item.name;
+  }
+
+  String? _secondaryLabel(DownloadedItem item) {
+    final parts = <String>[
+      if (item.episodeLabel != null) item.episodeLabel!,
+      if (item.year != null && item.kind == DownloadedItemKind.movie)
+        '${item.year}',
+      if (item.runTime != null) formatLongDuration(item.runTime!),
+    ];
+    return parts.isEmpty ? null : parts.join(' • ');
+  }
 }
 
 class _InProgressRow extends ConsumerWidget {
-  const _InProgressRow({required this.itemId, required this.progress});
-  final String itemId;
-  final double progress;
+  const _InProgressRow({required this.progress});
+  final DownloadProgress progress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -164,7 +187,7 @@ class _InProgressRow extends ConsumerWidget {
               width: 22,
               height: 22,
               child: CircularProgressIndicator(
-                value: progress > 0 ? progress : null,
+                value: progress.fraction > 0 ? progress.fraction : null,
                 strokeWidth: 2,
                 color: AppColors.primary,
                 backgroundColor: AppColors.divider,
@@ -177,7 +200,7 @@ class _InProgressRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  itemId,
+                  _label(progress),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -188,7 +211,7 @@ class _InProgressRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${(progress * 100).toStringAsFixed(0)}%',
+                  _secondary(progress),
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -200,11 +223,25 @@ class _InProgressRow extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.close, color: AppColors.textSecondary),
             tooltip: 'Cancel',
-            onPressed: () =>
-                ref.read(downloadManagerProvider.notifier).cancel(itemId),
+            onPressed: () => ref
+                .read(downloadManagerProvider.notifier)
+                .cancel(progress.itemId),
           ),
         ],
       ),
     );
+  }
+
+  String _label(DownloadProgress p) {
+    if (p.kind == DownloadedItemKind.episode && p.seriesName != null) {
+      return '${p.seriesName} — ${p.name}';
+    }
+    return p.name;
+  }
+
+  String _secondary(DownloadProgress p) {
+    final pct = '${(p.fraction * 100).toStringAsFixed(0)}%';
+    if (p.episodeLabel != null) return '${p.episodeLabel} • $pct';
+    return pct;
   }
 }

@@ -234,26 +234,50 @@ class _SessionRow extends ConsumerWidget {
   }
 }
 
-class _NowPlayingControls extends ConsumerWidget {
+/// Inline mini-control rendered under a session row when that session is
+/// playing something. Title + scrubber + transport controls.
+///
+/// The scrubber is the tricky bit: the parent rebuilds every 3 s with fresh
+/// [RemoteSession] data, which would yank the slider out from under the
+/// user's finger. We mirror the polled position into local state and freeze
+/// it while the user is dragging — only the next poll AFTER drag release
+/// is allowed to take over again.
+class _NowPlayingControls extends ConsumerStatefulWidget {
   const _NowPlayingControls({required this.session});
   final RemoteSession session;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NowPlayingControls> createState() =>
+      _NowPlayingControlsState();
+}
+
+class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
+  /// Position the slider should render. `null` → mirror the polled value.
+  double? _scrubOverride;
+
+  @override
+  Widget build(BuildContext context) {
     final repo = ref.watch(remoteSessionsRepositoryProvider);
+    final session = widget.session;
+    final totalTicks = session.runTimeTicks ?? 0;
+    final liveTicks = session.positionTicks ?? 0;
+    final hasDuration = totalTicks > 0;
+    final value =
+        _scrubOverride ?? (hasDuration ? liveTicks / totalTicks : 0.0);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   session.nowPlayingTitle ?? 'Now playing',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -263,49 +287,89 @@ class _NowPlayingControls extends ConsumerWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (session.runTimeTicks != null &&
-                    session.positionTicks != null) ...[
-                  const SizedBox(height: 4),
+              ),
+              IconButton(
+                icon: Icon(
+                  session.isPaused
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded,
+                  color: AppColors.primary,
+                ),
+                tooltip: session.isPaused ? 'Play' : 'Pause',
+                onPressed: () => repo.sendCommand(
+                  sessionId: session.id,
+                  command: 'PlayPause',
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.stop_rounded,
+                    color: AppColors.textSecondary),
+                tooltip: 'Stop',
+                onPressed: () => repo.sendCommand(
+                  sessionId: session.id,
+                  command: 'Stop',
+                ),
+              ),
+            ],
+          ),
+          if (hasDuration) ...[
+            // Scrub bar — Slider.theme honors AppTheme so it picks up the
+            // accent + height we set globally. Using the raw widget so we
+            // can intercept onChanged/onChangeEnd.
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape:
+                    const RoundSliderOverlayShape(overlayRadius: 12),
+              ),
+              child: Slider(
+                value: value.clamp(0, 1),
+                onChanged: (v) => setState(() => _scrubOverride = v),
+                onChangeEnd: (v) async {
+                  final targetTicks = (v * totalTicks).round();
+                  await repo.seekOnSession(
+                    sessionId: session.id,
+                    positionTicks: targetTicks,
+                  );
+                  // Keep the override around briefly so the slider doesn't
+                  // jump back to the (now-stale) polled position before the
+                  // next poll lands.
+                  await Future<void>.delayed(const Duration(seconds: 4));
+                  if (mounted) setState(() => _scrubOverride = null);
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Text(
-                    _formatProgress(session),
+                    formatDuration(Duration(
+                      microseconds: ((value * totalTicks).round()) ~/ 10,
+                    )),
+                    style: const TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    formatDuration(
+                      Duration(microseconds: totalTicks ~/ 10),
+                    ),
                     style: const TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 11,
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(
-              session.isPaused
-                  ? Icons.play_arrow_rounded
-                  : Icons.pause_rounded,
-              color: AppColors.primary,
-            ),
-            tooltip: session.isPaused ? 'Play' : 'Pause',
-            onPressed: () => repo.sendCommand(
-              sessionId: session.id,
-              command: 'PlayPause',
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.stop_rounded, color: AppColors.textSecondary),
-            tooltip: 'Stop',
-            onPressed: () => repo.sendCommand(
-              sessionId: session.id,
-              command: 'Stop',
-            ),
-          ),
+          ],
         ],
       ),
     );
-  }
-
-  String _formatProgress(RemoteSession s) {
-    final pos = Duration(microseconds: (s.positionTicks ?? 0) ~/ 10);
-    final total = Duration(microseconds: (s.runTimeTicks ?? 0) ~/ 10);
-    return '${formatDuration(pos)} / ${formatDuration(total)}';
   }
 }
