@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
@@ -211,7 +211,7 @@ class _ResumeRow extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, i) => ResumeCard(
           item: items[i],
-          onTap: () => _comingSoon(context),
+          onTap: () => _openDetail(context, items[i]),
         ),
       ),
     );
@@ -232,20 +232,25 @@ class _PosterRow extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, i) => PosterCard(
           item: items[i],
-          onTap: () => _comingSoon(context),
+          onTap: () => _openDetail(context, items[i]),
         ),
       ),
     );
   }
 }
 
-void _comingSoon(BuildContext context) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      const SnackBar(
-        content: Text('Detail screen coming soon'),
-        backgroundColor: AppColors.surfaceHighlight,
-      ),
-    );
+/// Routes a Home tap to the right detail screen based on item kind.
+/// Episodes & seasons land on their parent series — there's no per-episode
+/// screen yet (planned for the player phase).
+void _openDetail(BuildContext context, BrowseItem item) {
+  switch (item.kind) {
+    case MediaKind.movie:
+      context.push('/movie/${item.id}');
+    case MediaKind.series:
+      context.push('/series/${item.id}');
+    case MediaKind.episode:
+    case MediaKind.season:
+      final id = item.seriesId ?? item.id;
+      context.push('/series/$id');
+  }
 }
