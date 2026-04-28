@@ -146,6 +146,16 @@ class JellyfinRepository {
     return items;
   }
 
+  /// Direct-stream URL for a movie or episode. Returns the original file via
+  /// `Static=true`, which works for any codec the player can decode natively.
+  /// Files that need transcoding will fail to play with this URL — adding the
+  /// HLS/transcode endpoint is a follow-up.
+  String streamUrl(String itemId) {
+    final s = _session;
+    return '${s.serverUrl}/Videos/$itemId/stream'
+        '?Static=true&api_key=${s.accessToken}';
+  }
+
   /// Build a poster URL (Primary image). For episodes, prefers the series
   /// poster when [seriesId] is provided since per-episode primary images are
   /// stills, not posters.

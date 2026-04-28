@@ -7,6 +7,7 @@ import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/movie/movie_screen.dart';
+import '../features/player/video_player_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/series/series_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -55,6 +56,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/series/:id',
         builder: (_, st) => SeriesScreen(seriesId: st.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/play/:id',
+        builder: (_, st) {
+          final ticks = int.tryParse(
+            st.uri.queryParameters['resumeTicks'] ?? '',
+          );
+          return VideoPlayerScreen(
+            itemId: st.pathParameters['id']!,
+            resumeTicks: ticks,
+          );
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(navigationShell: shell),

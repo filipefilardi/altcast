@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/detail_hero.dart';
@@ -7,6 +8,7 @@ import '../../core/widgets/error_state.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
+import '../../data/jellyfin/models/episode.dart';
 import '../../data/jellyfin/models/series.dart';
 import 'series_providers.dart';
 import 'widgets/episode_tile.dart';
@@ -108,6 +110,20 @@ class _SeriesBody extends ConsumerWidget {
       fallbackPrimaryTag: series.imageTag,
     );
 
+    final seasons = seasonsAsync.value ?? const <Season>[];
+    final activeSeasonId = selectedSeasonId ??
+        (seasons.isNotEmpty ? seasons.first.id : null);
+
+    // Watch episodes for the active season — drives both the Play CTA and
+    // the list rendering, so they can't disagree on which episode is "next".
+    final episodesAsync = activeSeasonId == null
+        ? const AsyncValue<List<Episode>>.data(<Episode>[])
+        : ref.watch(episodesProvider(
+            (seriesId: series.id, seasonId: activeSeasonId),
+          ));
+    final episodes = episodesAsync.value ?? const <Episode>[];
+    final next = _nextEpisode(episodes);
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
@@ -123,10 +139,21 @@ class _SeriesBody extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PlayButton(
-                onPressed: () => _playStub(context),
-                label: _playLabel(series),
+                onPressed: next == null ? null : () => _playEpisode(context, next),
+                label: _playLabel(next),
                 icon: Icons.play_arrow_rounded,
               ),
+              if (next != null && next.shortLabel.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    '${next.shortLabel} • ${next.name}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
+                        ),
+                  ),
+                ),
               if (series.overview != null &&
                   series.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
@@ -146,45 +173,12 @@ class _SeriesBody extends ConsumerWidget {
             ],
           ),
         ),
-        seasonsAsync.when(
-          data: (seasons) {
-            if (seasons.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: Text(
-                  'No seasons available.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              );
-            }
-            final activeId = selectedSeasonId ?? seasons.first.id;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SeasonPicker(
-                  seasons: seasons,
-                  selectedId: activeId,
-                  onSelect: onSelectSeason,
-                ),
-                const SizedBox(height: 8),
-                _EpisodeList(
-                  seriesId: series.id,
-                  seasonId: activeId,
-                ),
-              ],
-            );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: _SeasonSkeleton(),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: ErrorStateView(
-              title: "Couldn't load seasons",
-              onRetry: () => ref.invalidate(seasonsProvider(series.id)),
-            ),
-          ),
+        _SeasonsAndEpisodes(
+          series: series,
+          seasonsAsync: seasonsAsync,
+          selectedSeasonId: selectedSeasonId,
+          onSelectSeason: onSelectSeason,
+          episodesAsync: episodesAsync,
         ),
         const SizedBox(height: 32),
       ],
@@ -199,24 +193,110 @@ class _SeriesBody extends ConsumerWidget {
     return parts.isEmpty ? null : parts.join(' • ');
   }
 
-  String _playLabel(Series s) {
-    final hasResume = (s.userData?.resumePosition ?? Duration.zero) >
-        const Duration(seconds: 5);
+  /// Picks the episode the Play button should target:
+  /// 1. Any episode with a resume position > 5 s (the "continue here" case).
+  /// 2. Otherwise the first not-yet-played episode.
+  /// 3. Otherwise the very first episode.
+  /// Returns null if the list is empty.
+  Episode? _nextEpisode(List<Episode> episodes) {
+    if (episodes.isEmpty) return null;
+    for (final e in episodes) {
+      final ud = e.userData;
+      if (ud != null &&
+          ud.resumePosition > const Duration(seconds: 5) &&
+          !ud.played) {
+        return e;
+      }
+    }
+    for (final e in episodes) {
+      if (!(e.userData?.played ?? false)) return e;
+    }
+    return episodes.first;
+  }
+
+  String _playLabel(Episode? next) {
+    if (next == null) return 'Play';
+    final ud = next.userData;
+    final hasResume = ud != null &&
+        ud.resumePosition > const Duration(seconds: 5);
     return hasResume ? 'Continue' : 'Play';
   }
 }
 
-class _EpisodeList extends ConsumerWidget {
-  const _EpisodeList({required this.seriesId, required this.seasonId});
-  final String seriesId;
-  final String seasonId;
+class _SeasonsAndEpisodes extends ConsumerWidget {
+  const _SeasonsAndEpisodes({
+    required this.series,
+    required this.seasonsAsync,
+    required this.selectedSeasonId,
+    required this.onSelectSeason,
+    required this.episodesAsync,
+  });
+
+  final Series series;
+  final AsyncValue<List<Season>> seasonsAsync;
+  final String? selectedSeasonId;
+  final ValueChanged<String> onSelectSeason;
+  final AsyncValue<List<Episode>> episodesAsync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(episodesProvider(
-      (seriesId: seriesId, seasonId: seasonId),
-    ));
-    return async.when(
+    return seasonsAsync.when(
+      data: (seasons) {
+        if (seasons.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Text(
+              'No seasons available.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          );
+        }
+        final activeId = selectedSeasonId ?? seasons.first.id;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SeasonPicker(
+              seasons: seasons,
+              selectedId: activeId,
+              onSelect: onSelectSeason,
+            ),
+            const SizedBox(height: 8),
+            _EpisodeList(
+              seriesId: series.id,
+              seasonId: activeId,
+              episodesAsync: episodesAsync,
+            ),
+          ],
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: _SeasonSkeleton(),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: ErrorStateView(
+          title: "Couldn't load seasons",
+          onRetry: () => ref.invalidate(seasonsProvider(series.id)),
+        ),
+      ),
+    );
+  }
+}
+
+class _EpisodeList extends ConsumerWidget {
+  const _EpisodeList({
+    required this.seriesId,
+    required this.seasonId,
+    required this.episodesAsync,
+  });
+  final String seriesId;
+  final String seasonId;
+  final AsyncValue<List<Episode>> episodesAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return episodesAsync.when(
       data: (episodes) {
         if (episodes.isEmpty) {
           return const Padding(
@@ -232,7 +312,7 @@ class _EpisodeList extends ConsumerWidget {
             for (final ep in episodes)
               EpisodeTile(
                 episode: ep,
-                onTap: () => _playStub(context),
+                onTap: () => _playEpisode(context, ep),
               ),
           ],
         );
@@ -371,10 +451,8 @@ class _BackChip extends StatelessWidget {
   }
 }
 
-void _playStub(BuildContext context) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      const SnackBar(content: Text('Player coming soon')),
-    );
+void _playEpisode(BuildContext context, Episode ep) {
+  final ticks = ep.userData?.playbackPositionTicks ?? 0;
+  final query = ticks > 0 ? '?resumeTicks=$ticks' : '';
+  context.push('/play/${ep.id}$query');
 }
