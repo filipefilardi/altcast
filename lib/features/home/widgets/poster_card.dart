@@ -32,19 +32,21 @@ class PosterCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: ColoredBox(
-                  color: AppColors.surfaceElevated,
-                  child: LocalOrNetworkImage(
-                    source: url,
-                    errorBuilder: (_) => const Center(
-                      child: Icon(
-                        Icons.movie_outlined,
-                        color: AppColors.textTertiary,
-                        size: 28,
+            Expanded(
+              child: AspectRatio(
+                aspectRatio: 2 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: ColoredBox(
+                    color: AppColors.surfaceElevated,
+                    child: LocalOrNetworkImage(
+                      source: url,
+                      errorBuilder: (_) => const Center(
+                        child: Icon(
+                          Icons.movie_outlined,
+                          color: AppColors.textTertiary,
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
