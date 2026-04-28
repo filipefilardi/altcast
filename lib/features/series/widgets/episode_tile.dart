@@ -6,11 +6,24 @@ import '../../../core/utils/format.dart';
 import '../../../core/widgets/local_or_network_image.dart';
 import '../../../data/jellyfin/jellyfin_repository.dart';
 import '../../../data/jellyfin/models/episode.dart';
+import '../../downloads/widgets/download_button.dart';
 
 class EpisodeTile extends ConsumerWidget {
-  const EpisodeTile({super.key, required this.episode, this.onTap});
+  const EpisodeTile({
+    super.key,
+    required this.episode,
+    required this.seriesName,
+    this.seriesPosterTag,
+    this.onTap,
+  });
 
   final Episode episode;
+
+  /// Threaded down so the download button can label this entry as
+  /// "{Series} · S1·E03 · {Title}" in the offline list.
+  final String seriesName;
+  final String? seriesPosterTag;
+
   final VoidCallback? onTap;
 
   @override
@@ -148,6 +161,11 @@ class EpisodeTile extends ConsumerWidget {
                   ],
                 ],
               ),
+            ),
+            EpisodeDownloadButton(
+              episode: episode,
+              seriesName: seriesName,
+              seriesPosterTag: seriesPosterTag,
             ),
           ],
         ),

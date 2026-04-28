@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,6 +60,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<bool>? _completedSub;
 
+  /// Live source — set as soon as PlaybackInfo (or local-file resolution)
+  /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
+  /// rebuild when the external-subs list arrives, even if it was opened
+  /// during the brief interval before [_open] finishes.
+  final ValueNotifier<StreamSource?> _sourceNotifier =
+      ValueNotifier<StreamSource?>(null);
+
+  /// Mirror of the currently-selected external subtitle id. Same notifier
+  /// pattern so the sheet's "selected" highlight reacts immediately.
+  final ValueNotifier<String?> _selectedExternalSubNotifier =
+      ValueNotifier<String?>(null);
+
+  StreamSource? get _source => _sourceNotifier.value;
+
   @override
   void initState() {
     super.initState();
@@ -78,8 +93,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _open();
   }
 
-  StreamSource? _source;
-
   Future<void> _open() async {
     try {
       // Prefer the local file if this item was downloaded — saves a server
@@ -97,7 +110,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             .read(jellyfinRepositoryProvider)
             .getStreamSource(widget.itemId);
       }
-      _source = source;
+      _sourceNotifier.value = source;
       await _player.open(Media(source.url));
       final ticks = widget.resumeTicks ?? 0;
       if (ticks > 0) {
@@ -178,6 +191,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           .closeActiveEncoding(playSessionId: src.playSessionId!);
     }
     _player.dispose();
+    _sourceNotifier.dispose();
+    _selectedExternalSubNotifier.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -230,11 +245,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
-  // Tracks the currently selected external subtitle URL — media_kit doesn't
-  // store this back on its own SubtitleTrack object reliably, so we mirror it
-  // ourselves to drive the picker's "selected" highlight.
-  String? _selectedExternalSubId;
-
   void _showTracksSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -243,11 +253,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       isScrollControlled: true,
       builder: (_) => _TracksSheet(
         player: _player,
-        externalSubtitles: _source?.externalSubtitles ?? const [],
-        selectedExternalSubId: _selectedExternalSubId,
+        sourceListenable: _sourceNotifier,
+        selectedExternalSubListenable: _selectedExternalSubNotifier,
         onSelectExternalSubtitle: (sub) {
           if (!mounted) return;
-          setState(() => _selectedExternalSubId = sub?.id);
+          _selectedExternalSubNotifier.value = sub?.id;
           if (sub == null) {
             _player.setSubtitleTrack(SubtitleTrack.no());
           } else {
@@ -302,14 +312,21 @@ class _CornerButton extends StatelessWidget {
 class _TracksSheet extends StatelessWidget {
   const _TracksSheet({
     required this.player,
-    required this.externalSubtitles,
-    required this.selectedExternalSubId,
+    required this.sourceListenable,
+    required this.selectedExternalSubListenable,
     required this.onSelectExternalSubtitle,
   });
 
   final Player player;
-  final List<ExternalSubtitle> externalSubtitles;
-  final String? selectedExternalSubId;
+
+  /// Live source — driven by a [ValueNotifier] in the player screen so the
+  /// external-subs list refreshes if the sheet opened *before* PlaybackInfo
+  /// finished resolving (small but real timing window).
+  final ValueListenable<StreamSource?> sourceListenable;
+
+  /// Live external-sub selection. Same pattern.
+  final ValueListenable<String?> selectedExternalSubListenable;
+
   final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
 
   @override
@@ -324,32 +341,48 @@ class _TracksSheet extends StatelessWidget {
             stream: player.stream.track,
             initialData: player.state.track,
             builder: (context, currentSnap) {
-              final tracks = tracksSnap.data ?? player.state.tracks;
-              final current = currentSnap.data ?? player.state.track;
-              return SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _AudioSection(
-                        player: player,
-                        tracks: tracks.audio,
-                        current: current.audio,
-                      ),
-                      const SizedBox(height: 16),
-                      _SubtitleSection(
-                        player: player,
-                        tracks: tracks.subtitle,
-                        current: current.subtitle,
-                        externalSubtitles: externalSubtitles,
-                        selectedExternalSubId: selectedExternalSubId,
-                        onSelectExternalSubtitle: onSelectExternalSubtitle,
-                      ),
-                    ],
-                  ),
-                ),
+              return ValueListenableBuilder<StreamSource?>(
+                valueListenable: sourceListenable,
+                builder: (context, source, _) {
+                  return ValueListenableBuilder<String?>(
+                    valueListenable: selectedExternalSubListenable,
+                    builder: (context, selectedExternalSubId, __) {
+                      final tracks =
+                          tracksSnap.data ?? player.state.tracks;
+                      final current =
+                          currentSnap.data ?? player.state.track;
+                      final externalSubs =
+                          source?.externalSubtitles ?? const [];
+                      return SingleChildScrollView(
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _AudioSection(
+                                player: player,
+                                tracks: tracks.audio,
+                                current: current.audio,
+                              ),
+                              const SizedBox(height: 16),
+                              _SubtitleSection(
+                                player: player,
+                                tracks: tracks.subtitle,
+                                current: current.subtitle,
+                                externalSubtitles: externalSubs,
+                                selectedExternalSubId: selectedExternalSubId,
+                                onSelectExternalSubtitle:
+                                    onSelectExternalSubtitle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               );
             },
           );

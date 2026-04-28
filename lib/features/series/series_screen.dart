@@ -179,6 +179,8 @@ class _SeriesBody extends ConsumerWidget {
           selectedSeasonId: selectedSeasonId,
           onSelectSeason: onSelectSeason,
           episodesAsync: episodesAsync,
+          seriesName: series.name,
+          seriesPosterTag: series.imageTag,
         ),
         const SizedBox(height: 32),
       ],
@@ -230,6 +232,8 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
     required this.selectedSeasonId,
     required this.onSelectSeason,
     required this.episodesAsync,
+    required this.seriesName,
+    required this.seriesPosterTag,
   });
 
   final Series series;
@@ -237,6 +241,8 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
   final String? selectedSeasonId;
   final ValueChanged<String> onSelectSeason;
   final AsyncValue<List<Episode>> episodesAsync;
+  final String seriesName;
+  final String? seriesPosterTag;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -265,6 +271,8 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
               seriesId: series.id,
               seasonId: activeId,
               episodesAsync: episodesAsync,
+              seriesName: seriesName,
+              seriesPosterTag: seriesPosterTag,
             ),
           ],
         );
@@ -289,10 +297,14 @@ class _EpisodeList extends ConsumerWidget {
     required this.seriesId,
     required this.seasonId,
     required this.episodesAsync,
+    required this.seriesName,
+    required this.seriesPosterTag,
   });
   final String seriesId;
   final String seasonId;
   final AsyncValue<List<Episode>> episodesAsync;
+  final String seriesName;
+  final String? seriesPosterTag;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -312,6 +324,8 @@ class _EpisodeList extends ConsumerWidget {
             for (final ep in episodes)
               EpisodeTile(
                 episode: ep,
+                seriesName: seriesName,
+                seriesPosterTag: seriesPosterTag,
                 onTap: () => _playEpisode(context, ep),
               ),
           ],

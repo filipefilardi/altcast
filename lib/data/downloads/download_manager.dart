@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../jellyfin/jellyfin_repository.dart';
+import '../jellyfin/models/episode.dart';
 import '../jellyfin/models/movie.dart';
 import 'downloaded_item.dart';
 
@@ -21,9 +22,9 @@ class DownloadsState {
   /// All completed downloads, keyed by Jellyfin item id.
   final Map<String, DownloadedItem> items;
 
-  /// Active download progress in [0, 1], keyed by Jellyfin item id. An entry
-  /// here means the file is downloading right now or queued.
-  final Map<String, double> progress;
+  /// Active download progress, keyed by Jellyfin item id. An entry here
+  /// means the file is downloading right now or queued.
+  final Map<String, DownloadProgress> progress;
 
   /// Total queue size, including the in-flight item.
   final int queueLength;
@@ -34,7 +35,7 @@ class DownloadsState {
 
   DownloadsState copyWith({
     Map<String, DownloadedItem>? items,
-    Map<String, double>? progress,
+    Map<String, DownloadProgress>? progress,
     int? queueLength,
     bool? bootstrapped,
   }) {
@@ -103,9 +104,32 @@ class DownloadManager extends Notifier<DownloadsState> {
   Future<void> enqueueMovie(Movie movie) async {
     if (state.items.containsKey(movie.id)) return;
     if (state.isDownloading(movie.id)) return;
-    _queue.add(_QueueEntry.movie(movie));
+    final entry = _QueueEntry.movie(movie);
+    _queue.add(entry);
     state = state.copyWith(
-      progress: {...state.progress, movie.id: 0.0},
+      progress: {...state.progress, movie.id: entry.toProgress(0)},
+      queueLength: state.queueLength + 1,
+    );
+    _drain();
+  }
+
+  /// Enqueue a single episode. [seriesName] is required so the downloads list
+  /// can render "{Series} · S1·E03" instead of just the episode title.
+  Future<void> enqueueEpisode(
+    Episode episode, {
+    required String seriesName,
+    String? seriesPosterTag,
+  }) async {
+    if (state.items.containsKey(episode.id)) return;
+    if (state.isDownloading(episode.id)) return;
+    final entry = _QueueEntry.episode(
+      episode,
+      seriesName: seriesName,
+      seriesPosterTag: seriesPosterTag,
+    );
+    _queue.add(entry);
+    state = state.copyWith(
+      progress: {...state.progress, episode.id: entry.toProgress(0)},
       queueLength: state.queueLength + 1,
     );
     _drain();
@@ -117,7 +141,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     if (_queue.isEmpty || _queue.first.itemId == itemId) {
       _activeCancel?.cancel('Cancelled by user');
     }
-    final newProgress = Map<String, double>.from(state.progress)
+    final newProgress = Map<String, DownloadProgress>.from(state.progress)
       ..remove(itemId);
     state = state.copyWith(
       progress: newProgress,
@@ -178,8 +202,13 @@ class DownloadManager extends Notifier<DownloadsState> {
         onReceiveProgress: (received, total) {
           if (total <= 0) return;
           final pct = received / total;
+          final existing = state.progress[entry.itemId];
+          if (existing == null) return;
           state = state.copyWith(
-            progress: {...state.progress, entry.itemId: pct},
+            progress: {
+              ...state.progress,
+              entry.itemId: existing.copyWithFraction(pct),
+            },
           );
         },
       );
@@ -196,7 +225,7 @@ class DownloadManager extends Notifier<DownloadsState> {
 
       final downloaded = entry.toDownloadedItem(filePath: finalPath);
       final newItems = {...state.items, downloaded.id: downloaded};
-      final newProgress = Map<String, double>.from(state.progress)
+      final newProgress = Map<String, DownloadProgress>.from(state.progress)
         ..remove(entry.itemId);
       state = state.copyWith(items: newItems, progress: newProgress);
       await _persist();
@@ -206,7 +235,7 @@ class DownloadManager extends Notifier<DownloadsState> {
         final tempFile = File(tempPath);
         if (tempFile.existsSync()) await tempFile.delete();
       } catch (_) {}
-      final newProgress = Map<String, double>.from(state.progress)
+      final newProgress = Map<String, DownloadProgress>.from(state.progress)
         ..remove(entry.itemId);
       state = state.copyWith(progress: newProgress);
     } finally {
@@ -230,30 +259,91 @@ class DownloadManager extends Notifier<DownloadsState> {
 }
 
 class _QueueEntry {
-  _QueueEntry.movie(Movie m)
-      : itemId = m.id,
-        name = m.name,
-        year = m.year,
-        runTimeTicks = m.runTime?.inMicroseconds == null
-            ? null
-            : m.runTime!.inMicroseconds * 10,
-        imageTag = m.imageTag;
+  _QueueEntry._({
+    required this.itemId,
+    required this.name,
+    required this.kind,
+    this.year,
+    this.runTimeTicks,
+    this.imageTag,
+    this.seriesId,
+    this.seriesName,
+    this.seasonNumber,
+    this.episodeNumber,
+  });
+
+  factory _QueueEntry.movie(Movie m) {
+    return _QueueEntry._(
+      itemId: m.id,
+      name: m.name,
+      kind: DownloadedItemKind.movie,
+      year: m.year,
+      runTimeTicks: m.runTime?.inMicroseconds == null
+          ? null
+          : m.runTime!.inMicroseconds * 10,
+      imageTag: m.imageTag,
+    );
+  }
+
+  factory _QueueEntry.episode(
+    Episode e, {
+    required String seriesName,
+    String? seriesPosterTag,
+  }) {
+    return _QueueEntry._(
+      itemId: e.id,
+      name: e.name,
+      kind: DownloadedItemKind.episode,
+      runTimeTicks: e.runTime?.inMicroseconds == null
+          ? null
+          : e.runTime!.inMicroseconds * 10,
+      // Prefer the series poster — the per-episode primary image is a still,
+      // not a portrait poster, so it looks wrong in the downloads list.
+      imageTag: seriesPosterTag ?? e.imageTag,
+      seriesId: e.seriesId,
+      seriesName: seriesName,
+      seasonNumber: e.parentIndexNumber,
+      episodeNumber: e.indexNumber,
+    );
+  }
 
   final String itemId;
   final String name;
+  final DownloadedItemKind kind;
   final int? year;
   final int? runTimeTicks;
   final String? imageTag;
+  final String? seriesId;
+  final String? seriesName;
+  final int? seasonNumber;
+  final int? episodeNumber;
 
   DownloadedItem toDownloadedItem({required String filePath}) {
     return DownloadedItem(
       id: itemId,
       name: name,
+      filePath: filePath,
+      kind: kind,
       year: year,
       runTimeTicks: runTimeTicks,
       imageTag: imageTag,
-      filePath: filePath,
       serverItemId: itemId,
+      seriesId: seriesId,
+      seriesName: seriesName,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
     );
   }
+
+  DownloadProgress toProgress(double fraction) => DownloadProgress(
+        itemId: itemId,
+        name: name,
+        fraction: fraction,
+        kind: kind,
+        imageTag: imageTag,
+        seriesId: seriesId,
+        seriesName: seriesName,
+        seasonNumber: seasonNumber,
+        episodeNumber: episodeNumber,
+      );
 }
