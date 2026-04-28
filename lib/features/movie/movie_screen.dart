@@ -10,6 +10,8 @@ import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/movie.dart';
+import '../downloads/widgets/download_button.dart';
+import '../remote/remote_sessions_sheet.dart';
 import 'movie_providers.dart';
 
 class MovieScreen extends ConsumerWidget {
@@ -101,6 +103,18 @@ class _MovieBody extends ConsumerWidget {
                       ),
                     ),
                   ],
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.cast),
+                    tooltip: 'Play on…',
+                    onPressed: () => showRemoteSessionsSheet(
+                      context,
+                      itemId: movie.id,
+                      startPositionTicks:
+                          movie.userData?.playbackPositionTicks ?? 0,
+                    ),
+                  ),
+                  MovieDownloadButton(movie: movie),
                 ],
               ),
               if (hasResume)

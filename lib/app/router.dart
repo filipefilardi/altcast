@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
+import '../features/downloads/downloads_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/movie/movie_screen.dart';
@@ -49,6 +50,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path: '/downloads',
+        builder: (_, __) => const DownloadsScreen(),
+      ),
       GoRoute(
         path: '/movie/:id',
         builder: (_, st) => MovieScreen(movieId: st.pathParameters['id']!),

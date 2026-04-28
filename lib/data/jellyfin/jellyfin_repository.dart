@@ -67,6 +67,31 @@ class JellyfinRepository {
         .toList();
   }
 
+  /// Search across movies and series. Returns a single mixed list ordered
+  /// by Jellyfin's relevance (the API doesn't expose a finer signal).
+  /// Empty/blank queries short-circuit to an empty list — callers shouldn't
+  /// have to special-case it.
+  Future<List<BrowseItem>> search(String query, {int limit = 50}) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'searchTerm': trimmed,
+        'IncludeItemTypes': 'Movie,Series',
+        'Recursive': true,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+  }
+
   Future<List<BrowseItem>> recentlyAddedShows({int limit = 16}) async {
     final s = _session;
     final res = await _api.dio.get<List<dynamic>>(
@@ -216,6 +241,7 @@ class JellyfinRepository {
       final playSessionId = (src['PlaySessionId'] as String?) ??
           (data['PlaySessionId'] as String?) ??
           const Uuid().v4();
+      final externalSubs = _externalSubtitles(src, itemId);
 
       if (supportsDirectPlay || supportsDirectStream) {
         return StreamSource(
@@ -223,6 +249,7 @@ class JellyfinRepository {
           isTranscoding: false,
           playSessionId: playSessionId,
           mediaSourceId: mediaSourceId,
+          externalSubtitles: externalSubs,
         );
       }
 
@@ -236,6 +263,7 @@ class JellyfinRepository {
           isTranscoding: true,
           playSessionId: playSessionId,
           mediaSourceId: mediaSourceId,
+          externalSubtitles: externalSubs,
         );
       }
 
@@ -245,6 +273,7 @@ class JellyfinRepository {
         isTranscoding: false,
         playSessionId: playSessionId,
         mediaSourceId: mediaSourceId,
+        externalSubtitles: externalSubs,
       );
     } catch (_) {
       // Negotiation failed — fall back to the simple static URL. Better to
@@ -253,6 +282,72 @@ class JellyfinRepository {
         url: streamUrl(itemId),
         isTranscoding: false,
       );
+    }
+  }
+
+  /// Pulls external subtitle streams from a `MediaSources[]` entry. Embedded
+  /// subs are skipped — media_kit/libmpv detects those automatically.
+  ///
+  /// Jellyfin reports each MediaStream with a `Type` and an `IsExternal`
+  /// flag; for external ones it also gives a `DeliveryUrl` we can hand to
+  /// the player. We construct one ourselves when DeliveryUrl is missing,
+  /// since older servers omit it.
+  List<ExternalSubtitle> _externalSubtitles(
+    Map<String, dynamic> src,
+    String itemId,
+  ) {
+    final s = _session;
+    final streams = (src['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
+    if (streams == null) return const [];
+
+    final out = <ExternalSubtitle>[];
+    for (final st in streams) {
+      if (st['Type'] != 'Subtitle') continue;
+      if (st['IsExternal'] != true) continue;
+
+      final codec = (st['Codec'] as String?)?.toLowerCase();
+      final index = st['Index'] as int?;
+      final deliveryUrl = st['DeliveryUrl'] as String?;
+      String? url;
+      if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
+        final base = deliveryUrl.startsWith('http') ? '' : s.serverUrl;
+        final sep = deliveryUrl.contains('?') ? '&' : '?';
+        url = '$base$deliveryUrl${sep}api_key=${s.accessToken}';
+      } else if (codec != null && index != null) {
+        // Format expected by Jellyfin's subtitle endpoint:
+        //   /Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.{codec}
+        // We pass the same id for source — Jellyfin accepts that for the
+        // primary source.
+        url = '${s.serverUrl}/Videos/$itemId/$itemId/Subtitles/'
+            '$index/Stream.$codec?api_key=${s.accessToken}';
+      }
+      if (url == null) continue;
+
+      out.add(ExternalSubtitle(
+        id: url,
+        url: url,
+        title: st['DisplayTitle'] as String? ?? st['Title'] as String?,
+        language: st['Language'] as String?,
+        codec: codec,
+      ));
+    }
+    return out;
+  }
+
+  /// Tells the server to release a transcoding session so it can stop the
+  /// FFmpeg process and free the segment cache. Best-effort; we never block
+  /// dispose on this.
+  Future<void> closeActiveEncoding({required String playSessionId}) async {
+    try {
+      await _api.dio.delete<void>(
+        '/Videos/ActiveEncodings',
+        queryParameters: {
+          'DeviceId': _api.deviceId,
+          'PlaySessionId': playSessionId,
+        },
+      );
+    } catch (_) {
+      // Swallow — the server cleans up idle transcoders on its own anyway.
     }
   }
 

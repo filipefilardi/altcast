@@ -12,6 +12,7 @@ class StreamSource {
     required this.isTranscoding,
     this.playSessionId,
     this.mediaSourceId,
+    this.externalSubtitles = const [],
   });
 
   final String url;
@@ -19,6 +20,41 @@ class StreamSource {
   final String? playSessionId;
   final String? mediaSourceId;
 
+  /// Sidecar subtitle files (`.srt`/`.vtt`/etc.) Jellyfin serves separately
+  /// from the main stream. media_kit doesn't auto-discover these, so the
+  /// player layer has to register each one and surface it in the picker.
+  final List<ExternalSubtitle> externalSubtitles;
+
   /// What the scrobbler should report as `PlayMethod` to Jellyfin.
   String get playMethod => isTranscoding ? 'Transcode' : 'DirectStream';
+}
+
+/// A subtitle stream that lives outside the main media file. Carries enough
+/// info for media_kit's `SubtitleTrack.uri(...)` plus a stable [id] we can
+/// match against the player's reported current subtitle.
+class ExternalSubtitle {
+  const ExternalSubtitle({
+    required this.id,
+    required this.url,
+    this.title,
+    this.language,
+    this.codec,
+  });
+
+  /// Stable identifier (we use the absolute URL — unique per source).
+  final String id;
+  final String url;
+  final String? title;
+  final String? language;
+  final String? codec;
+
+  /// Display label combining title + language, with sensible fallbacks.
+  String get displayLabel {
+    final pieces = <String>[
+      if (title != null && title!.isNotEmpty) title!,
+      if (language != null && language!.isNotEmpty) language!,
+    ];
+    if (pieces.isEmpty) return codec ?? 'External subtitles';
+    return pieces.join(' · ');
+  }
 }

@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
@@ -81,9 +82,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   Future<void> _open() async {
     try {
-      final source = await ref
-          .read(jellyfinRepositoryProvider)
-          .getStreamSource(widget.itemId);
+      // Prefer the local file if this item was downloaded — saves a server
+      // round-trip and lets playback work fully offline.
+      final localPath =
+          ref.read(downloadManagerProvider).localPath(widget.itemId);
+      final StreamSource source;
+      if (localPath != null) {
+        source = StreamSource(
+          url: Uri.file(localPath).toString(),
+          isTranscoding: false,
+        );
+      } else {
+        source = await ref
+            .read(jellyfinRepositoryProvider)
+            .getStreamSource(widget.itemId);
+      }
       _source = source;
       await _player.open(Media(source.url));
       final ticks = widget.resumeTicks ?? 0;
@@ -155,6 +168,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _scrobbler?.stop(
       positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
     );
+    // Release the server-side transcoder if we were transcoding. Fire-and-
+    // forget — `_player.dispose` doesn't wait for it, but we don't need to
+    // either; the server times out idle encodings anyway.
+    final src = _source;
+    if (src != null && src.isTranscoding && src.playSessionId != null) {
+      ref
+          .read(jellyfinRepositoryProvider)
+          .closeActiveEncoding(playSessionId: src.playSessionId!);
+    }
     _player.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -208,13 +230,35 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
   }
 
+  // Tracks the currently selected external subtitle URL — media_kit doesn't
+  // store this back on its own SubtitleTrack object reliably, so we mirror it
+  // ourselves to drive the picker's "selected" highlight.
+  String? _selectedExternalSubId;
+
   void _showTracksSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => _TracksSheet(player: _player),
+      builder: (_) => _TracksSheet(
+        player: _player,
+        externalSubtitles: _source?.externalSubtitles ?? const [],
+        selectedExternalSubId: _selectedExternalSubId,
+        onSelectExternalSubtitle: (sub) {
+          if (!mounted) return;
+          setState(() => _selectedExternalSubId = sub?.id);
+          if (sub == null) {
+            _player.setSubtitleTrack(SubtitleTrack.no());
+          } else {
+            _player.setSubtitleTrack(SubtitleTrack.uri(
+              sub.url,
+              title: sub.title,
+              language: sub.language,
+            ));
+          }
+        },
+      ),
     );
   }
 }
@@ -256,8 +300,17 @@ class _CornerButton extends StatelessWidget {
 /// will show up automatically the next time the sheet is opened (or while
 /// it's open, since [StreamBuilder] rebuilds).
 class _TracksSheet extends StatelessWidget {
-  const _TracksSheet({required this.player});
+  const _TracksSheet({
+    required this.player,
+    required this.externalSubtitles,
+    required this.selectedExternalSubId,
+    required this.onSelectExternalSubtitle,
+  });
+
   final Player player;
+  final List<ExternalSubtitle> externalSubtitles;
+  final String? selectedExternalSubId;
+  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -290,6 +343,9 @@ class _TracksSheet extends StatelessWidget {
                         player: player,
                         tracks: tracks.subtitle,
                         current: current.subtitle,
+                        externalSubtitles: externalSubtitles,
+                        selectedExternalSubId: selectedExternalSubId,
+                        onSelectExternalSubtitle: onSelectExternalSubtitle,
                       ),
                     ],
                   ),
@@ -355,19 +411,27 @@ class _SubtitleSection extends StatelessWidget {
     required this.player,
     required this.tracks,
     required this.current,
+    required this.externalSubtitles,
+    required this.selectedExternalSubId,
+    required this.onSelectExternalSubtitle,
   });
 
   final Player player;
   final List<SubtitleTrack> tracks;
   final SubtitleTrack current;
+  final List<ExternalSubtitle> externalSubtitles;
+  final String? selectedExternalSubId;
+  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
 
   @override
   Widget build(BuildContext context) {
-    final real = tracks
+    final embedded = tracks
         .where((t) =>
             t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id)
         .toList();
-    final isOff = current.id == SubtitleTrack.no().id;
+    final hasExternal = selectedExternalSubId != null;
+    final isOff = current.id == SubtitleTrack.no().id && !hasExternal;
+    final hasAny = embedded.isNotEmpty || externalSubtitles.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -377,33 +441,43 @@ class _SubtitleSection extends StatelessWidget {
           label: 'Off',
           selected: isOff,
           onTap: () {
-            player.setSubtitleTrack(SubtitleTrack.no());
+            onSelectExternalSubtitle(null);
             Navigator.of(context).pop();
           },
         ),
-        if (real.isEmpty)
+        if (!hasAny)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Text(
               'No subtitle tracks available.',
               style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
             ),
-          )
-        else
-          for (final t in real)
-            _TrackRow(
-              label: _subtitleLabel(t),
-              selected: !isOff && t.id == current.id,
-              onTap: () {
-                player.setSubtitleTrack(t);
-                Navigator.of(context).pop();
-              },
-            ),
+          ),
+        for (final t in embedded)
+          _TrackRow(
+            label: _embeddedLabel(t),
+            selected: !hasExternal && !isOff && t.id == current.id,
+            onTap: () {
+              // Picking an embedded track clears any external selection.
+              onSelectExternalSubtitle(null);
+              player.setSubtitleTrack(t);
+              Navigator.of(context).pop();
+            },
+          ),
+        for (final sub in externalSubtitles)
+          _TrackRow(
+            label: '${sub.displayLabel} (external)',
+            selected: hasExternal && sub.id == selectedExternalSubId,
+            onTap: () {
+              onSelectExternalSubtitle(sub);
+              Navigator.of(context).pop();
+            },
+          ),
       ],
     );
   }
 
-  String _subtitleLabel(SubtitleTrack t) {
+  String _embeddedLabel(SubtitleTrack t) {
     final pieces = <String>[
       if (t.title != null && t.title!.isNotEmpty) t.title!,
       if (t.language != null && t.language!.isNotEmpty) t.language!,

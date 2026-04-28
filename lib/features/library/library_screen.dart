@@ -1,20 +1,127 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/widgets/empty_state.dart';
+import '../../core/theme/app_colors.dart';
+import '../../data/downloads/download_manager.dart';
+import '../remote/remote_sessions_sheet.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final downloads = ref.watch(downloadManagerProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Library')),
-      body: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        child: EmptyState(
-          icon: Icons.video_library_outlined,
-          title: 'Your library lives here',
-          message: 'Coming soon — browse movies and shows by collection.',
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        children: [
+          _LibraryTile(
+            icon: Icons.download_outlined,
+            label: 'Downloads',
+            subtitle: _downloadsSubtitle(downloads),
+            onTap: () => context.push('/downloads'),
+          ),
+          _LibraryTile(
+            icon: Icons.cast,
+            label: 'Cast control',
+            subtitle: 'Manage playback on other devices',
+            onTap: () => showRemoteSessionsSheet(context),
+          ),
+          // Placeholder for future entries — Movies / Shows / Collections.
+          _LibraryTile(
+            icon: Icons.movie_outlined,
+            label: 'Movies',
+            subtitle: 'Browse all movies',
+            onTap: null, // Coming in a follow-up.
+          ),
+          _LibraryTile(
+            icon: Icons.tv_outlined,
+            label: 'TV Shows',
+            subtitle: 'Browse all shows',
+            onTap: null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _downloadsSubtitle(DownloadsState s) {
+    if (!s.bootstrapped) return 'Loading…';
+    final pending = s.progress.length;
+    final done = s.items.length;
+    if (done == 0 && pending == 0) return 'Nothing offline yet';
+    final parts = [
+      if (done > 0) '$done available offline',
+      if (pending > 0) '$pending downloading',
+    ];
+    return parts.join(' • ');
+  }
+}
+
+class _LibraryTile extends StatelessWidget {
+  const _LibraryTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Opacity(
+              opacity: disabled ? 0.55 : 1,
+              child: Row(
+                children: [
+                  Icon(icon, color: AppColors.primary),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!disabled)
+                    const Icon(Icons.chevron_right,
+                        color: AppColors.textTertiary),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
