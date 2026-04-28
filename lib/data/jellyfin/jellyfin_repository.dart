@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_repository.dart';
 import 'jellyfin_api.dart';
 import 'models/browse_item.dart';
+import 'models/episode.dart';
 import 'models/jellyfin_session.dart';
+import 'models/movie.dart';
+import 'models/series.dart';
 
 class _NoSession implements Exception {
   @override
@@ -76,6 +79,71 @@ class JellyfinRepository {
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
         .toList();
+  }
+
+  /// Full movie metadata for the detail screen.
+  Future<Movie> getMovie(String id) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$id',
+    );
+    final data = res.data;
+    if (data == null) {
+      throw StateError('Empty response for movie $id');
+    }
+    return Movie.fromJson(data);
+  }
+
+  /// Full series metadata for the detail screen.
+  Future<Series> getSeries(String id) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$id',
+    );
+    final data = res.data;
+    if (data == null) {
+      throw StateError('Empty response for series $id');
+    }
+    return Series.fromJson(data);
+  }
+
+  /// Seasons for a given series, ordered by season number.
+  Future<List<Season>> getSeasons(String seriesId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Shows/$seriesId/Seasons',
+      queryParameters: {
+        'UserId': s.userId,
+        'Fields': 'ChildCount',
+      },
+    );
+    final items = ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(Season.fromJson)
+        .toList();
+    items.sort((a, b) =>
+        (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30));
+    return items;
+  }
+
+  /// Episodes belonging to a season, ordered by episode number.
+  Future<List<Episode>> getEpisodes(String seriesId, String seasonId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Shows/$seriesId/Episodes',
+      queryParameters: {
+        'UserId': s.userId,
+        'SeasonId': seasonId,
+        'Fields': 'Overview,UserData,RunTimeTicks',
+      },
+    );
+    final items = ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(Episode.fromJson)
+        .toList();
+    items.sort((a, b) =>
+        (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30));
+    return items;
   }
 
   /// Build a poster URL (Primary image). For episodes, prefers the series
