@@ -11,6 +11,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
+import '../../data/jellyfin/models/stream_source.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
@@ -76,10 +77,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _open();
   }
 
+  StreamSource? _source;
+
   Future<void> _open() async {
     try {
-      final url = ref.read(jellyfinRepositoryProvider).streamUrl(widget.itemId);
-      await _player.open(Media(url));
+      final source = await ref
+          .read(jellyfinRepositoryProvider)
+          .getStreamSource(widget.itemId);
+      _source = source;
+      await _player.open(Media(source.url));
       final ticks = widget.resumeTicks ?? 0;
       if (ticks > 0) {
         final at = Duration(microseconds: ticks ~/ 10);
@@ -97,7 +103,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// so resume positions, "played" state, and Continue Watching update.
   void _attachScrobbler() {
     final api = ref.read(jellyfinApiProvider);
-    final scrobbler = _Scrobbler(api: api, itemId: widget.itemId);
+    final scrobbler = _Scrobbler(
+      api: api,
+      itemId: widget.itemId,
+      playMethod: _source?.playMethod ?? 'DirectStream',
+      playSessionId: _source?.playSessionId,
+    );
     _scrobbler = scrobbler;
 
     // Notify start with the resume offset (or 0).
@@ -202,17 +213,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 /// instance — there's no global scrobbler today (unlike AltSound, where
 /// audio plays outside the now-playing screen).
 class _Scrobbler {
-  _Scrobbler({required this.api, required this.itemId});
+  _Scrobbler({
+    required this.api,
+    required this.itemId,
+    required this.playMethod,
+    this.playSessionId,
+  });
 
   final JellyfinApi api;
   final String itemId;
+
+  /// `'DirectStream'` or `'Transcode'` — comes from the negotiated
+  /// [StreamSource]. Some Jellyfin housekeeping (e.g. transcoder cleanup
+  /// on stop) keys off this value.
+  final String playMethod;
+
+  final String? playSessionId;
 
   Future<void> start({required int positionTicks}) {
     return _post('/Sessions/Playing', {
       'ItemId': itemId,
       'PositionTicks': positionTicks,
       'IsPaused': false,
-      'PlayMethod': 'DirectStream',
+      'PlayMethod': playMethod,
+      if (playSessionId != null) 'PlaySessionId': playSessionId,
     });
   }
 
@@ -226,6 +250,8 @@ class _Scrobbler {
       'PositionTicks': positionTicks,
       'IsPaused': isPaused,
       'EventName': eventName,
+      'PlayMethod': playMethod,
+      if (playSessionId != null) 'PlaySessionId': playSessionId,
     });
   }
 
@@ -233,6 +259,7 @@ class _Scrobbler {
     return _post('/Sessions/Playing/Stopped', {
       'ItemId': itemId,
       'PositionTicks': positionTicks,
+      if (playSessionId != null) 'PlaySessionId': playSessionId,
     });
   }
 
