@@ -186,18 +186,282 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             Positioned(
               top: 8,
               left: 8,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
+              child: _CornerButton(
+                icon: Icons.close,
+                tooltip: 'Close',
+                onPressed: () => context.pop(),
+              ),
+            ),
+            if (_openError == null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: _CornerButton(
+                  icon: Icons.subtitles_outlined,
+                  tooltip: 'Audio & Subtitles',
+                  onPressed: () => _showTracksSheet(context),
                 ),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  tooltip: 'Close',
-                  onPressed: () => context.pop(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTracksSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _TracksSheet(player: _player),
+    );
+  }
+}
+
+/// Round translucent button used for the always-visible top-corner overlays.
+class _CornerButton extends StatelessWidget {
+  const _CornerButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white),
+        tooltip: tooltip,
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listing the audio and subtitle tracks the [Player] has
+/// detected. Tapping a row tells media_kit to switch tracks and pops the
+/// sheet. The selected row is highlighted via a check mark.
+///
+/// We watch [Player.stream.tracks] / [Player.stream.track] so the list and
+/// selection stay live: e.g. an HLS stream that adds tracks mid-playback
+/// will show up automatically the next time the sheet is opened (or while
+/// it's open, since [StreamBuilder] rebuilds).
+class _TracksSheet extends StatelessWidget {
+  const _TracksSheet({required this.player});
+  final Player player;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: StreamBuilder<Tracks>(
+        stream: player.stream.tracks,
+        initialData: player.state.tracks,
+        builder: (context, tracksSnap) {
+          return StreamBuilder<Track>(
+            stream: player.stream.track,
+            initialData: player.state.track,
+            builder: (context, currentSnap) {
+              final tracks = tracksSnap.data ?? player.state.tracks;
+              final current = currentSnap.data ?? player.state.track;
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _AudioSection(
+                        player: player,
+                        tracks: tracks.audio,
+                        current: current.audio,
+                      ),
+                      const SizedBox(height: 16),
+                      _SubtitleSection(
+                        player: player,
+                        tracks: tracks.subtitle,
+                        current: current.subtitle,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AudioSection extends StatelessWidget {
+  const _AudioSection({
+    required this.player,
+    required this.tracks,
+    required this.current,
+  });
+
+  final Player player;
+  final List<AudioTrack> tracks;
+  final AudioTrack current;
+
+  @override
+  Widget build(BuildContext context) {
+    // Drop the synthetic auto/no entries — for audio we always have a real
+    // track playing, so showing "Auto" is just noise.
+    final real = tracks
+        .where((t) => t.id != AudioTrack.auto().id && t.id != AudioTrack.no().id)
+        .toList();
+    if (real.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(label: 'Audio'),
+        for (final t in real)
+          _TrackRow(
+            label: _audioLabel(t),
+            selected: t.id == current.id,
+            onTap: () {
+              player.setAudioTrack(t);
+              Navigator.of(context).pop();
+            },
+          ),
+      ],
+    );
+  }
+
+  String _audioLabel(AudioTrack t) {
+    final pieces = <String>[
+      if (t.title != null && t.title!.isNotEmpty) t.title!,
+      if (t.language != null && t.language!.isNotEmpty) t.language!,
+    ];
+    if (pieces.isEmpty) return 'Track ${t.id}';
+    return pieces.join(' · ');
+  }
+}
+
+class _SubtitleSection extends StatelessWidget {
+  const _SubtitleSection({
+    required this.player,
+    required this.tracks,
+    required this.current,
+  });
+
+  final Player player;
+  final List<SubtitleTrack> tracks;
+  final SubtitleTrack current;
+
+  @override
+  Widget build(BuildContext context) {
+    final real = tracks
+        .where((t) =>
+            t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id)
+        .toList();
+    final isOff = current.id == SubtitleTrack.no().id;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(label: 'Subtitles'),
+        _TrackRow(
+          label: 'Off',
+          selected: isOff,
+          onTap: () {
+            player.setSubtitleTrack(SubtitleTrack.no());
+            Navigator.of(context).pop();
+          },
+        ),
+        if (real.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Text(
+              'No subtitle tracks available.',
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+            ),
+          )
+        else
+          for (final t in real)
+            _TrackRow(
+              label: _subtitleLabel(t),
+              selected: !isOff && t.id == current.id,
+              onTap: () {
+                player.setSubtitleTrack(t);
+                Navigator.of(context).pop();
+              },
+            ),
+      ],
+    );
+  }
+
+  String _subtitleLabel(SubtitleTrack t) {
+    final pieces = <String>[
+      if (t.title != null && t.title!.isNotEmpty) t.title!,
+      if (t.language != null && t.language!.isNotEmpty) t.language!,
+    ];
+    if (pieces.isEmpty) return 'Track ${t.id}';
+    return pieces.join(' · ');
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+    );
+  }
+}
+
+class _TrackRow extends StatelessWidget {
+  const _TrackRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ),
+            if (selected)
+              const Icon(Icons.check, size: 18, color: AppColors.primary),
           ],
         ),
       ),
