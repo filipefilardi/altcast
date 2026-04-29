@@ -72,7 +72,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<bool>? _completedSub;
-  StreamSubscription<String>? _errorSub;
 
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
   /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
@@ -101,11 +100,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final impl = _player.platform as dynamic;
       impl?.setProperty('sub-visibility', 'yes');
     } catch (_) {}
-
-    _errorSub = _player.stream.error.listen((message) {
-      if (!mounted || message.trim().isEmpty) return;
-      setState(() => _openError ??= message);
-    });
 
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
@@ -300,7 +294,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
-    _errorSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
     _scrobbler?.stop(
       positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
