@@ -345,20 +345,23 @@ class JellyfinRepository {
 
   /// Builds a fully-authenticated URL the player can fetch directly.
   ///
-  /// We always ask Jellyfin to deliver the subtitle as **VTT**, even when
-  /// the source is SRT/ASS/PGS — this is what the official jellyfin-web
-  /// client does, and it's the only format mpv renders consistently across
-  /// platforms (some PGS/ASS subs fail silently on iOS/Android). The server
-  /// transcodes text-based subs on the fly; bitmap subs that can't be
-  /// converted to text simply won't appear, which matches every other
-  /// browser-based client's behaviour.
+  /// Mirrors the exact shape the official jellyfin-web client uses, which
+  /// is the most-tested combination across server versions:
   ///
-  /// We use the `/{startPositionTicks}/Stream.vtt` endpoint shape (with 0
-  /// for full subs) since older Jellyfin versions don't recognize the
-  /// shorter form without a position segment.
+  ///   /Videos/{itemId}/{mediaSourceId}/Subtitles/{index}/Stream.vtt?api_key=…
   ///
-  /// Always ensures `api_key` is present without doubling up — some Jellyfin
-  /// versions inline it in `DeliveryUrl`, others don't.
+  /// We always request **VTT**, even when the source is SRT/ASS — Jellyfin
+  /// converts text subs on the fly, and VTT is the only format the Flutter
+  /// SubtitleView reliably renders across iOS/Android. Bitmap subs (PGS)
+  /// can't be text-converted and won't appear, matching jellyfin-web.
+  ///
+  /// We don't trust `DeliveryUrl` for the format — newer servers sometimes
+  /// hand back a URL pointing to the source codec (PGS), which mpv won't
+  /// decode for SubtitleView consumption. Forcing the path keeps us
+  /// independent of that.
+  ///
+  /// `api_key` is URL-encoded (Jellyfin tokens are usually plain hex but
+  /// we encode defensively) and only injected once.
   String? _resolveSubtitleUrl({
     required String? deliveryUrl,
     required String itemId,
@@ -370,11 +373,7 @@ class JellyfinRepository {
   }) {
     String? raw;
     if (index != null) {
-      // Construct directly — bypassing DeliveryUrl gives us full control over
-      // the format (vtt) and ensures broken/legacy DeliveryUrls don't lead
-      // mpv astray. We still keep DeliveryUrl-based fallback below for the
-      // (rare) case where Index is missing.
-      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/0/'
+      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/'
           'Stream.vtt';
     } else if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
       raw = deliveryUrl.startsWith('http')
@@ -384,7 +383,7 @@ class JellyfinRepository {
     if (raw == null) return null;
     if (raw.contains('api_key=')) return raw;
     final sep = raw.contains('?') ? '&' : '?';
-    return '$raw${sep}api_key=$token';
+    return '$raw${sep}api_key=${Uri.encodeQueryComponent(token)}';
   }
 
   /// Fetches just the audio + subtitle stream listing for an item — used by
