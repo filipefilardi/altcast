@@ -31,6 +31,8 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     super.key,
     required this.itemId,
     this.resumeTicks,
+    this.preferredAudioLang,
+    this.preferredSubLang,
   });
 
   final String itemId;
@@ -38,6 +40,16 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   /// Jellyfin tick count (100 ns units) — converts to a [Duration] via
   /// `microseconds = ticks ~/ 10`.
   final int? resumeTicks;
+
+  /// ISO 639 language code chosen on the detail screen. The player picks
+  /// the first matching audio track after open. `null` → leave the player's
+  /// default selection alone.
+  final String? preferredAudioLang;
+
+  /// ISO 639 code for the preferred subtitle, or the literal `"off"` to
+  /// explicitly disable. Matches both embedded and external subs by
+  /// language. `null` → no override.
+  final String? preferredSubLang;
 
   @override
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -120,9 +132,70 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         _lastPosition = at;
       }
       _attachScrobbler();
+      // Wait one frame so media_kit has populated the `tracks` lists, then
+      // apply the user's pre-play picks. Cheaper than awaiting a stream.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      if (mounted) _applyTrackPreferences();
     } catch (e) {
       if (!mounted) return;
       setState(() => _openError = e);
+    }
+  }
+
+  /// Applies the audio/subtitle language preferences passed via /play/:id
+  /// query params. No-op when neither was set, when the matching track
+  /// isn't available, or after dispose.
+  ///
+  /// Audio: first track whose `language` matches (case-insensitive).
+  /// Subtitle: `"off"` → disable. Otherwise prefer an embedded match, then
+  /// fall back to an external one, then leave alone.
+  void _applyTrackPreferences() {
+    final wantAudio = widget.preferredAudioLang;
+    if (wantAudio != null && wantAudio.isNotEmpty) {
+      final tracks = _player.state.tracks.audio;
+      final match = tracks.firstWhere(
+        (t) => (t.language ?? '').toLowerCase() == wantAudio.toLowerCase(),
+        orElse: () => AudioTrack.auto(),
+      );
+      if (match.id != AudioTrack.auto().id) {
+        _player.setAudioTrack(match);
+      }
+    }
+
+    final wantSub = widget.preferredSubLang;
+    if (wantSub == null || wantSub.isEmpty) return;
+    if (wantSub.toLowerCase() == 'off') {
+      _selectedExternalSubNotifier.value = null;
+      _player.setSubtitleTrack(SubtitleTrack.no());
+      return;
+    }
+
+    // Try embedded first.
+    final embedded = _player.state.tracks.subtitle.firstWhere(
+      (t) =>
+          t.id != SubtitleTrack.auto().id &&
+          t.id != SubtitleTrack.no().id &&
+          (t.language ?? '').toLowerCase() == wantSub.toLowerCase(),
+      orElse: () => SubtitleTrack.no(),
+    );
+    if (embedded.id != SubtitleTrack.no().id) {
+      _selectedExternalSubNotifier.value = null;
+      _player.setSubtitleTrack(embedded);
+      return;
+    }
+
+    // Then external — comes from the StreamSource we just resolved.
+    final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
+    for (final ext in externals) {
+      if ((ext.language ?? '').toLowerCase() == wantSub.toLowerCase()) {
+        _selectedExternalSubNotifier.value = ext.id;
+        _player.setSubtitleTrack(SubtitleTrack.uri(
+          ext.url,
+          title: ext.title,
+          language: ext.language,
+        ));
+        return;
+      }
     }
   }
 
@@ -217,6 +290,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 controller: _controller,
                 controls: AdaptiveVideoControls,
                 fit: BoxFit.contain,
+                // Force the Flutter-side subtitle overlay on with a clear
+                // style. media_kit defaults this to visible, but on iOS the
+                // libmpv-rendered overlay sometimes loses the compositor
+                // race against the Flutter video texture — drawing subs as
+                // Text widgets on top sidesteps that.
+                subtitleViewConfiguration: const SubtitleViewConfiguration(
+                  visible: true,
+                  textAlign: TextAlign.center,
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                    letterSpacing: 0,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                        color: Color(0xCC000000),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             // Always-visible close button — the built-in controls auto-hide,
             // and a video that's failed to open has no controls at all, so

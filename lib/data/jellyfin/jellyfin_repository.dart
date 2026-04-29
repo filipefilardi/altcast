@@ -7,6 +7,7 @@ import 'jellyfin_api.dart';
 import 'models/browse_item.dart';
 import 'models/episode.dart';
 import 'models/jellyfin_session.dart';
+import 'models/media_stream.dart';
 import 'models/movie.dart';
 import 'models/series.dart';
 import 'models/stream_source.dart';
@@ -342,12 +343,22 @@ class JellyfinRepository {
     return out;
   }
 
-  /// Builds a fully-authenticated URL the player can fetch directly. Prefers
-  /// the server-provided [deliveryUrl] (it carries the correct codec/format
-  /// hints) and falls back to constructing one ourselves.
+  /// Builds a fully-authenticated URL the player can fetch directly.
+  ///
+  /// We always ask Jellyfin to deliver the subtitle as **VTT**, even when
+  /// the source is SRT/ASS/PGS — this is what the official jellyfin-web
+  /// client does, and it's the only format mpv renders consistently across
+  /// platforms (some PGS/ASS subs fail silently on iOS/Android). The server
+  /// transcodes text-based subs on the fly; bitmap subs that can't be
+  /// converted to text simply won't appear, which matches every other
+  /// browser-based client's behaviour.
+  ///
+  /// We use the `/{startPositionTicks}/Stream.vtt` endpoint shape (with 0
+  /// for full subs) since older Jellyfin versions don't recognize the
+  /// shorter form without a position segment.
   ///
   /// Always ensures `api_key` is present without doubling up — some Jellyfin
-  /// versions inline it, others don't.
+  /// versions inline it in `DeliveryUrl`, others don't.
   String? _resolveSubtitleUrl({
     required String? deliveryUrl,
     required String itemId,
@@ -358,19 +369,65 @@ class JellyfinRepository {
     required String serverUrl,
   }) {
     String? raw;
-    if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
+    if (index != null) {
+      // Construct directly — bypassing DeliveryUrl gives us full control over
+      // the format (vtt) and ensures broken/legacy DeliveryUrls don't lead
+      // mpv astray. We still keep DeliveryUrl-based fallback below for the
+      // (rare) case where Index is missing.
+      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/0/'
+          'Stream.vtt';
+    } else if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
       raw = deliveryUrl.startsWith('http')
           ? deliveryUrl
           : '$serverUrl$deliveryUrl';
-    } else if (index != null && codec != null) {
-      // Newer Jellyfin endpoint shape — works with all known versions.
-      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/'
-          '$index/Stream.$codec';
     }
     if (raw == null) return null;
     if (raw.contains('api_key=')) return raw;
     final sep = raw.contains('?') ? '&' : '?';
     return '$raw${sep}api_key=$token';
+  }
+
+  /// Fetches just the audio + subtitle stream listing for an item — used by
+  /// the pre-play picker on detail screens. Read-only; doesn't touch
+  /// PlaybackInfo, so no transcoder is spun up as a side effect.
+  Future<ItemMediaStreams> getMediaStreams(String itemId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$itemId',
+      queryParameters: {
+        'Fields': 'MediaSources,MediaStreams',
+      },
+    );
+    final data = res.data;
+    if (data == null) {
+      return const ItemMediaStreams(audio: [], subtitle: []);
+    }
+
+    // MediaStreams can come either flat at the item level or nested under the
+    // first MediaSource — check both for robustness across server versions.
+    final flat = (data['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
+    final fromSources = ((data['MediaSources'] as List?)
+                ?.cast<Map<String, dynamic>>()
+                .firstOrNull?['MediaStreams'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        const [];
+    final raw = flat ?? fromSources;
+
+    final audio = <MediaStream>[];
+    final subs = <MediaStream>[];
+    for (final json in raw) {
+      final stream = MediaStream.fromJson(json);
+      switch (stream.kind) {
+        case MediaStreamKind.audio:
+          audio.add(stream);
+        case MediaStreamKind.subtitle:
+          subs.add(stream);
+        case MediaStreamKind.video:
+        case MediaStreamKind.unknown:
+          break;
+      }
+    }
+    return ItemMediaStreams(audio: audio, subtitle: subs);
   }
 
   /// Tells the server to release a transcoding session so it can stop the

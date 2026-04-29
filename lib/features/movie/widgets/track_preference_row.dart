@@ -1,0 +1,375 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/language.dart';
+import '../../../data/jellyfin/jellyfin_repository.dart';
+import '../../../data/jellyfin/models/media_stream.dart';
+
+/// Per-play user preferences captured by [TrackPreferenceRow] and forwarded
+/// to the player as query params on `/play/:id`.
+///
+/// Conventions:
+///  - `audioLang == null` → server/player default (no override).
+///  - `subKind == _SubKind.off` → explicitly disable subtitles.
+///  - `subKind == _SubKind.byLang` → match the first sub track with this
+///    language (case-insensitive). Works for embedded and external alike.
+class TrackPreference {
+  const TrackPreference({
+    this.audioLang,
+    this.subKind = SubPreferenceKind.serverDefault,
+    this.subLang,
+  });
+
+  final String? audioLang;
+  final SubPreferenceKind subKind;
+  final String? subLang;
+
+  /// Encode into the `?audioLang=...&subLang=...` query string the player
+  /// reads. Empty pieces are omitted.
+  Map<String, String> toQuery() {
+    final q = <String, String>{};
+    if (audioLang != null && audioLang!.isNotEmpty) {
+      q['audioLang'] = audioLang!;
+    }
+    switch (subKind) {
+      case SubPreferenceKind.serverDefault:
+        break;
+      case SubPreferenceKind.off:
+        q['subLang'] = 'off';
+      case SubPreferenceKind.byLang:
+        if (subLang != null && subLang!.isNotEmpty) {
+          q['subLang'] = subLang!;
+        }
+    }
+    return q;
+  }
+}
+
+enum SubPreferenceKind { serverDefault, off, byLang }
+
+/// Two compact pills under the Play button: "🔊 Audio: English" /
+/// "💬 Subtitles: Off". Tapping opens a bottom sheet picker filled from
+/// [JellyfinRepository.getMediaStreams].
+///
+/// Quietly renders nothing while streams are loading, and skips the audio
+/// pill entirely when there's only a single audio track (no choice to make).
+class TrackPreferenceRow extends ConsumerWidget {
+  const TrackPreferenceRow({
+    super.key,
+    required this.itemId,
+    required this.preference,
+    required this.onChanged,
+  });
+
+  final String itemId;
+  final TrackPreference preference;
+  final ValueChanged<TrackPreference> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streamsAsync = ref.watch(_streamsProvider(itemId));
+    return streamsAsync.when(
+      data: (streams) {
+        final showAudio = streams.audio.length > 1;
+        final showSubs = streams.subtitle.isNotEmpty;
+        if (!showAudio && !showSubs) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (showAudio)
+                _Pill(
+                  icon: Icons.volume_up_outlined,
+                  label: _audioLabel(streams),
+                  onTap: () => _pickAudio(context, streams),
+                ),
+              if (showSubs)
+                _Pill(
+                  icon: Icons.subtitles_outlined,
+                  label: _subLabel(),
+                  onTap: () => _pickSub(context, streams),
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      // Streams fetch is cosmetic — if it fails, the in-player picker still
+      // works. Don't show an error state on the detail screen.
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  String _audioLabel(ItemMediaStreams streams) {
+    final lang = preference.audioLang;
+    if (lang == null) {
+      final def = streams.defaultAudio();
+      return 'Audio: ${_streamLabel(def, fallback: 'Default')}';
+    }
+    final match = streams.audio.firstWhere(
+      (s) => (s.language ?? '').toLowerCase() == lang.toLowerCase(),
+      orElse: () => streams.audio.first,
+    );
+    return 'Audio: ${_streamLabel(match, fallback: lang)}';
+  }
+
+  String _subLabel() {
+    switch (preference.subKind) {
+      case SubPreferenceKind.serverDefault:
+        return 'Subtitles: Off';
+      case SubPreferenceKind.off:
+        return 'Subtitles: Off';
+      case SubPreferenceKind.byLang:
+        final mapped = languageDisplay(preference.subLang) ??
+            preference.subLang ??
+            'On';
+        return 'Subtitles: $mapped';
+    }
+  }
+
+  String _streamLabel(MediaStream? s, {required String fallback}) {
+    if (s == null) return fallback;
+    final mapped = languageDisplay(s.language);
+    if (mapped != null) {
+      if (s.channels != null && s.channels! > 2) return '$mapped ${s.channels}.0';
+      return mapped;
+    }
+    final raw = (s.displayTitle ?? s.title ?? '').trim();
+    if (raw.isNotEmpty) return raw;
+    return fallback;
+  }
+
+  Future<void> _pickAudio(
+    BuildContext context,
+    ItemMediaStreams streams,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      showDragHandle: true,
+      builder: (sheetCtx) => _PickerSheet(
+        title: 'Audio',
+        rows: [
+          _PickerRow(
+            label: 'Server default',
+            selected: preference.audioLang == null,
+            onTap: () {
+              onChanged(TrackPreference(
+                audioLang: null,
+                subKind: preference.subKind,
+                subLang: preference.subLang,
+              ));
+              Navigator.of(sheetCtx).pop();
+            },
+          ),
+          for (final s in streams.audio)
+            _PickerRow(
+              label: _audioRowLabel(s),
+              selected: preference.audioLang != null &&
+                  preference.audioLang!.toLowerCase() ==
+                      (s.language ?? '').toLowerCase(),
+              onTap: () {
+                onChanged(TrackPreference(
+                  audioLang: s.language,
+                  subKind: preference.subKind,
+                  subLang: preference.subLang,
+                ));
+                Navigator.of(sheetCtx).pop();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickSub(
+    BuildContext context,
+    ItemMediaStreams streams,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      showDragHandle: true,
+      builder: (sheetCtx) => _PickerSheet(
+        title: 'Subtitles',
+        rows: [
+          _PickerRow(
+            label: 'Off',
+            selected: preference.subKind != SubPreferenceKind.byLang,
+            onTap: () {
+              onChanged(TrackPreference(
+                audioLang: preference.audioLang,
+                subKind: SubPreferenceKind.off,
+              ));
+              Navigator.of(sheetCtx).pop();
+            },
+          ),
+          for (final s in streams.subtitle)
+            _PickerRow(
+              label: _subRowLabel(s),
+              selected: preference.subKind == SubPreferenceKind.byLang &&
+                  preference.subLang != null &&
+                  preference.subLang!.toLowerCase() ==
+                      (s.language ?? '').toLowerCase(),
+              onTap: () {
+                onChanged(TrackPreference(
+                  audioLang: preference.audioLang,
+                  subKind: SubPreferenceKind.byLang,
+                  subLang: s.language,
+                ));
+                Navigator.of(sheetCtx).pop();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _audioRowLabel(MediaStream s) {
+    final mapped = languageDisplay(s.language) ?? s.language ?? 'Track';
+    final extra = <String>[
+      if (s.channels != null) '${s.channels}.0',
+      if (s.codec != null) s.codec!,
+    ];
+    if (extra.isEmpty) return mapped;
+    return '$mapped · ${extra.join(' · ')}';
+  }
+
+  String _subRowLabel(MediaStream s) {
+    final mapped = languageDisplay(s.language) ?? s.language ?? 'Track';
+    final extra = <String>[
+      if (s.codec != null) s.codec!,
+      if (s.isExternal) 'external',
+    ];
+    if (extra.isEmpty) return mapped;
+    return '$mapped · ${extra.join(' · ')}';
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.expand_more,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerSheet extends StatelessWidget {
+  const _PickerSheet({required this.title, required this.rows});
+  final String title;
+  final List<_PickerRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Text(
+                  title.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              ...rows,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check, size: 18, color: AppColors.primary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final _streamsProvider =
+    FutureProvider.autoDispose.family<ItemMediaStreams, String>((ref, id) {
+  return ref.watch(jellyfinRepositoryProvider).getMediaStreams(id);
+});
