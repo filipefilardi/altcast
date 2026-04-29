@@ -120,11 +120,13 @@ class BrowseItem {
 class UserData {
   const UserData({
     this.played = false,
+    this.isFavorite = false,
     this.playbackPositionTicks = 0,
     this.playedPercentage,
   });
 
   final bool played;
+  final bool isFavorite;
   final int playbackPositionTicks;
   final double? playedPercentage;
 
@@ -141,6 +143,7 @@ class UserData {
   factory UserData.fromJson(Map<String, dynamic> json) {
     return UserData(
       played: json['Played'] as bool? ?? false,
+      isFavorite: json['IsFavorite'] as bool? ?? false,
       playbackPositionTicks: json['PlaybackPositionTicks'] as int? ?? 0,
       playedPercentage: (json['PlayedPercentage'] as num?)?.toDouble(),
     );

@@ -9,6 +9,7 @@ import '../../core/widgets/error_state.dart';
 import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
+import '../../core/widgets/user_data_actions.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/movie.dart';
@@ -70,27 +71,39 @@ class _MovieBody extends ConsumerStatefulWidget {
 }
 
 class _MovieBodyState extends ConsumerState<_MovieBody> {
-  TrackPreference _preference = const TrackPreference();
-  bool _initializedFromDefaults = false;
+  late TrackPreference _preference;
+
+  @override
+  void initState() {
+    super.initState();
+    _preference = _preferenceFromDefaults(widget.movie);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MovieBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.movie.id != widget.movie.id) {
+      _preference = _preferenceFromDefaults(widget.movie);
+    }
+  }
+
+  TrackPreference _preferenceFromDefaults(Movie movie) {
+    final pb = ref.read(playbackPreferencesProvider);
+    return TrackPreference(
+      audioLang: pb.resolvedAudioLanguage(movie.originalLanguage),
+      subKind: switch (pb.defaultSubtitleMode) {
+        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+        DefaultSubtitleMode.off => SubPreferenceKind.off,
+        DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
+      },
+      subLang: pb.defaultSubtitleLanguage,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final movie = widget.movie;
     final repo = ref.watch(jellyfinRepositoryProvider);
-    final playbackPrefs = ref.watch(playbackPreferencesProvider);
-    if (!_initializedFromDefaults) {
-      _preference = TrackPreference(
-        audioLang:
-            playbackPrefs.resolvedAudioLanguage(movie.originalLanguage),
-        subKind: switch (playbackPrefs.defaultSubtitleMode) {
-          DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
-          DefaultSubtitleMode.off => SubPreferenceKind.off,
-          DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
-        },
-        subLang: playbackPrefs.defaultSubtitleLanguage,
-      );
-      _initializedFromDefaults = true;
-    }
     final similarAsync = ref.watch(similarMoviesProvider(movie.id));
     final backdrop = repo.backdropUrl(
       movie.id,
@@ -126,21 +139,19 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                     onPressed: () => _play(context, movie, fromStart: false),
                     label: hasResume ? 'Resume' : 'Play',
                   ),
-                  if (hasResume) ...[
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: () =>
-                          _play(context, movie, fromStart: true),
-                      child: Text(
-                        'from start',
-                        style:
-                            Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                      ),
-                    ),
-                  ],
                   const Spacer(),
+                  UserDataActions(
+                    initialFavorite: movie.userData?.isFavorite ?? false,
+                    initialPlayed: movie.userData?.played ?? false,
+                    onSetFavorite: (v) async {
+                      await repo.setFavorite(movie.id, favorite: v);
+                      ref.invalidate(movieProvider(movie.id));
+                    },
+                    onSetPlayed: (v) async {
+                      await repo.setPlayed(movie.id, played: v);
+                      ref.invalidate(movieProvider(movie.id));
+                    },
+                  ),
                   IconButton(
                     icon: const Icon(Icons.cast),
                     tooltip: 'Play on…',
@@ -154,23 +165,41 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   MovieDownloadButton(movie: movie),
                 ],
               ),
+              if (hasResume)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    children: [
+                      Text(
+                        'Continues from ${formatDuration(movie.userData!.resumePosition)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textTertiary,
+                              fontSize: 12,
+                            ),
+                      ),
+                      InkWell(
+                        onTap: () => _play(context, movie, fromStart: true),
+                        child: Text(
+                          'Play from start',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               TrackPreferenceRow(
                 itemId: movie.id,
                 preference: _preference,
                 originalLanguageHint: movie.originalLanguage,
                 onChanged: (next) => setState(() => _preference = next),
               ),
-              if (hasResume)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Continues from ${formatDuration(movie.userData!.resumePosition)}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                        ),
-                  ),
-                ),
               if (movie.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 _GenreChips(
