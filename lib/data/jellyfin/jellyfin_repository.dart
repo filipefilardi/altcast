@@ -421,7 +421,8 @@ class JellyfinRepository {
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$episodeId',
       queryParameters: const {
-        'Fields': 'Overview,UserData,RunTimeTicks,SeriesId,SeasonId',
+        'Fields':
+            'Overview,UserData,RunTimeTicks,SeriesId,SeasonId,People,PremiereDate,CommunityRating',
       },
     );
     final data = res.data;

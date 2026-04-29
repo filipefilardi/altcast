@@ -4,19 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
+import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
-import '../../core/widgets/local_or_network_image.dart';
+import '../../core/widgets/genre_chips.dart';
+import '../../core/widgets/more_like_this_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/user_data_actions.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/movie.dart';
-import '../../data/jellyfin/models/person_credit.dart';
 import '../../data/local/playback_preferences.dart';
 import '../downloads/widgets/download_button.dart';
-import '../home/widgets/poster_card.dart';
 import '../remote/remote_sessions_sheet.dart';
 import 'movie_providers.dart';
 import 'widgets/track_preference_row.dart';
@@ -202,7 +202,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
               ),
               if (movie.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                _GenreChips(
+                GenreChips(
                   genres: movie.genres,
                   onTapGenre: (genre) => context.push(
                     Uri(
@@ -231,7 +231,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const SizedBox(height: 8),
-                _CastCrewRow(people: movie.artists),
+                CastCrewRow(people: movie.artists),
               ],
               const SizedBox(height: 24),
               Text(
@@ -239,7 +239,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 12),
-              _MoreLikeThisRow(itemsAsync: similarAsync, currentItemId: movie.id),
+              MoreLikeThisRow(itemsAsync: similarAsync, currentItemId: movie.id),
               const SizedBox(height: 32),
             ],
           ),
@@ -313,195 +313,6 @@ class _MetaRow extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _GenreChips extends StatelessWidget {
-  const _GenreChips({required this.genres, required this.onTapGenre});
-  final List<String> genres;
-  final ValueChanged<String> onTapGenre;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final g in genres)
-          InkWell(
-            onTap: () => onTapGenre(g),
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Text(
-                g,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _CastCrewRow extends ConsumerWidget {
-  const _CastCrewRow({required this.people});
-
-  final List<PersonCredit> people;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(jellyfinRepositoryProvider);
-    final shown = people.take(14).toList(growable: false);
-    return SizedBox(
-      height: 114,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: shown.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, i) {
-          final person = shown[i];
-          final imageUrl = repo.personImageUrl(person.id, person.primaryImageTag);
-          return InkWell(
-            onTap: person.id == null || person.id!.isEmpty
-                ? null
-                : () => context.push('/person/${person.id}'),
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 86,
-              child: Column(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: const BoxDecoration(
-                      color: AppColors.surfaceElevated,
-                      shape: BoxShape.circle,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: LocalOrNetworkImage(
-                      source: imageUrl,
-                      errorBuilder: (_) => const Icon(
-                        Icons.person_outline,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    person.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    person.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MoreLikeThisRow extends StatelessWidget {
-  const _MoreLikeThisRow({
-    required this.itemsAsync,
-    required this.currentItemId,
-  });
-
-  final AsyncValue<List<BrowseItem>> itemsAsync;
-  final String currentItemId;
-
-  @override
-  Widget build(BuildContext context) {
-    return itemsAsync.when(
-      data: (items) {
-        final filtered = items
-            .where((item) => item.id != currentItemId)
-            .toList(growable: false);
-        if (filtered.isEmpty) {
-          return const Text(
-            'No recommendations yet.',
-            style: TextStyle(color: AppColors.textSecondary),
-          );
-        }
-        return SizedBox(
-          height: 248,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: filtered.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => PosterCard(
-              item: filtered[i],
-              onTap: () => _openDetail(context, filtered[i]),
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox(
-        height: 248,
-        child: _PosterRowSkeleton(),
-      ),
-      error: (_, _) => const Text(
-        'Could not load recommendations.',
-        style: TextStyle(color: AppColors.textSecondary),
-      ),
-    );
-  }
-}
-
-class _PosterRowSkeleton extends StatelessWidget {
-  const _PosterRowSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Skeleton.group(
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 4,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, _) => Skeleton.box(width: 132, height: 240),
-      ),
-    );
-  }
-}
-
-void _openDetail(BuildContext context, BrowseItem item) {
-  switch (item.kind) {
-    case MediaKind.movie:
-      context.push('/movie/${item.id}');
-    case MediaKind.series:
-      context.push('/series/${item.id}');
-    case MediaKind.season:
-      context.push('/season/${item.id}');
-    case MediaKind.episode:
-      context.push('/episode/${item.id}');
-    case MediaKind.person:
-      context.push('/person/${item.id}');
   }
 }
 
