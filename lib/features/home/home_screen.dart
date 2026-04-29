@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_gradients.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
@@ -17,17 +18,16 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
-    final username =
-        auth is AuthAuthenticated ? auth.session.username : null;
+    final username = auth is AuthAuthenticated ? auth.session.username : null;
 
     final resumeAsync = ref.watch(continueWatchingProvider);
     final moviesAsync = ref.watch(recentMoviesProvider);
     final showsAsync = ref.watch(recentShowsProvider);
 
-    final everythingFailed = resumeAsync.hasError &&
-        moviesAsync.hasError &&
-        showsAsync.hasError;
-    final everythingEmpty = resumeAsync.value?.isEmpty == true &&
+    final everythingFailed =
+        resumeAsync.hasError && moviesAsync.hasError && showsAsync.hasError;
+    final everythingEmpty =
+        resumeAsync.value?.isEmpty == true &&
         moviesAsync.value?.isEmpty == true &&
         showsAsync.value?.isEmpty == true;
 
@@ -36,7 +36,9 @@ class HomeScreen extends ConsumerWidget {
       ref.invalidate(recentMoviesProvider);
       ref.invalidate(recentShowsProvider);
       await Future.wait([
-        ref.read(continueWatchingProvider.future).catchError((_) => <BrowseItem>[]),
+        ref
+            .read(continueWatchingProvider.future)
+            .catchError((_) => <BrowseItem>[]),
         ref.read(recentMoviesProvider.future).catchError((_) => <BrowseItem>[]),
         ref.read(recentShowsProvider.future).catchError((_) => <BrowseItem>[]),
       ]);
@@ -108,14 +110,18 @@ class _Greeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = Theme.of(
+      context,
+    ).textTheme.displayMedium!.copyWith(color: Colors.white);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'AltCast',
-          style: Theme.of(context).textTheme.displayMedium,
+        ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
+          child: Text('AltCast', style: displayTitle),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
           username == null ? 'Welcome' : 'Welcome back, $username',
           style: Theme.of(context).textTheme.bodyMedium,
@@ -189,8 +195,7 @@ class _SkeletonRow extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           itemCount: 4,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) =>
-              Skeleton.box(width: 132, height: height - 8),
+          itemBuilder: (_, __) => Skeleton.box(width: 132, height: height - 8),
         ),
       ),
     );

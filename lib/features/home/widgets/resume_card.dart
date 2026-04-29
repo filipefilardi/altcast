@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_gradients.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/widgets/local_or_network_image.dart';
 import '../../../data/jellyfin/jellyfin_repository.dart';
@@ -42,39 +43,84 @@ class ResumeCard extends ConsumerWidget {
             Expanded(
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ColoredBox(
-                        color: AppColors.surfaceElevated,
-                        child: LocalOrNetworkImage(
-                          source: url,
-                          errorBuilder: (_) => const Center(
-                            child: Icon(
-                              Icons.movie_outlined,
-                              color: AppColors.textTertiary,
-                              size: 28,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColoredBox(
+                          color: AppColors.surfaceElevated,
+                          child: LocalOrNetworkImage(
+                            source: url,
+                            errorBuilder: (_) => const Center(
+                              child: Icon(
+                                Icons.movie_outlined,
+                                color: AppColors.textTertiary,
+                                size: 28,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          height: 4,
-                          color: AppColors.background.withValues(alpha: 0.5),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: progress.clamp(0, 1).toDouble(),
-                            child: Container(color: AppColors.primary),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.42),
+                                ],
+                                stops: const [0.52, 1],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          left: 8,
+                          right: 8,
+                          bottom: 8,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: SizedBox(
+                              height: 4,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ColoredBox(
+                                    color: AppColors.background.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                  ),
+                                  FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: progress
+                                        .clamp(0, 1)
+                                        .toDouble(),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: AppGradients.accentHorizontal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

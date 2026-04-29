@@ -80,6 +80,7 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: const ColorScheme.dark(
         surface: AppColors.background,
+        surfaceContainerHighest: AppColors.surfaceElevated,
         primary: AppColors.primary,
         secondary: AppColors.accent,
         error: AppColors.error,
@@ -87,6 +88,25 @@ class AppTheme {
         onPrimary: Color(0xFF0E0820),
       ),
       textTheme: textTheme,
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.surfaceElevated,
+        elevation: 0,
+        shadowColor: Colors.black.withValues(alpha: 0.45),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+        ),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -97,9 +117,11 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.18),
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.22),
         elevation: 0,
-        height: 64,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
+        height: 68,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: AppColors.primary);
@@ -114,10 +136,7 @@ class AppTheme {
               fontWeight: FontWeight.w600,
             );
           }
-          return const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-          );
+          return const TextStyle(color: AppColors.textSecondary, fontSize: 12);
         }),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -138,8 +157,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceElevated,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -165,9 +186,7 @@ class AppTheme {
         backgroundColor: AppColors.surfaceHighlight,
         contentTextStyle: textTheme.bodyLarge,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surfaceElevated,

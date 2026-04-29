@@ -24,16 +24,44 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceElevated,
+            DecoratedBox(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.45),
+                    AppColors.surfaceElevated,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: AppColors.textSecondary, size: 28),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceElevated,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    color: AppColors.primary.withValues(alpha: 0.9),
+                    size: 30,
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -47,10 +75,7 @@ class EmptyState extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
       ),

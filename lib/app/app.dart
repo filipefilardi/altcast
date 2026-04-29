@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_gradients.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/auth_controller.dart';
 import 'router.dart';
@@ -33,8 +35,35 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+    final displayTitle = Theme.of(
+      context,
+    ).textTheme.displayMedium!.copyWith(color: Colors.white);
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppGradients.loginBackdrop),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) =>
+                    AppGradients.accent.createShader(bounds),
+                child: Text('AltCast', style: displayTitle),
+              ),
+              const SizedBox(height: 28),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
