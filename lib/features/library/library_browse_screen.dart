@@ -13,11 +13,13 @@ class LibraryBrowseScreen extends ConsumerStatefulWidget {
   const LibraryBrowseScreen({
     required this.title,
     required this.itemType,
+    this.initialGenre,
     super.key,
   });
 
   final String title;
   final String itemType; // Movie or Series
+  final String? initialGenre;
 
   @override
   ConsumerState<LibraryBrowseScreen> createState() =>
@@ -41,6 +43,9 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
   @override
   void initState() {
     super.initState();
+    _genre = widget.initialGenre?.trim().isEmpty ?? true
+        ? null
+        : widget.initialGenre!.trim();
     _reload();
   }
 

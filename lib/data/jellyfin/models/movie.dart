@@ -1,4 +1,5 @@
 import 'browse_item.dart';
+import 'person_credit.dart';
 
 class Movie {
   const Movie({
@@ -13,6 +14,7 @@ class Movie {
     this.imageTag,
     this.backdropTag,
     this.userData,
+    this.artists = const [],
   });
 
   final String id;
@@ -29,11 +31,13 @@ class Movie {
   final String? imageTag;
   final String? backdropTag;
   final UserData? userData;
+  final List<PersonCredit> artists;
 
   factory Movie.fromJson(Map<String, dynamic> json) {
     final ticks = json['RunTimeTicks'] as int?;
     final tags = json['ImageTags'];
     final backdrops = json['BackdropImageTags'];
+    final people = (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     return Movie(
       id: json['Id'] as String,
       name: json['Name'] as String? ?? 'Untitled',
@@ -54,6 +58,10 @@ class Movie {
       userData: json['UserData'] is Map<String, dynamic>
           ? UserData.fromJson(json['UserData'] as Map<String, dynamic>)
           : null,
+      artists: people
+          .map(PersonCredit.fromJson)
+          .where((person) => person.name.isNotEmpty)
+          .toList(growable: false),
     );
   }
 }

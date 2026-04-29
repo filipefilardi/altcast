@@ -10,6 +10,7 @@ import '../features/home/home_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/library/library_browse_screen.dart';
 import '../features/movie/movie_screen.dart';
+import '../features/person/person_screen.dart';
 import '../features/player/video_player_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/season/season_screen.dart';
@@ -64,6 +65,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, st) => SeriesScreen(seriesId: st.pathParameters['id']!),
       ),
       GoRoute(
+        path: '/person/:id',
+        builder: (_, st) => PersonScreen(personId: st.pathParameters['id']!),
+      ),
+      GoRoute(
         path: '/season/:id',
         builder: (_, st) => SeasonScreen(seasonId: st.pathParameters['id']!),
       ),
@@ -96,13 +101,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/library/movies',
-        builder: (_, _) =>
-            const LibraryBrowseScreen(title: 'Movies', itemType: 'Movie'),
+        builder: (_, st) {
+          final genre = st.uri.queryParameters['genre'];
+          return LibraryBrowseScreen(
+            title: genre == null || genre.isEmpty ? 'Movies' : '$genre Movies',
+            itemType: 'Movie',
+            initialGenre: genre,
+          );
+        },
       ),
       GoRoute(
         path: '/library/shows',
-        builder: (_, _) =>
-            const LibraryBrowseScreen(title: 'TV Shows', itemType: 'Series'),
+        builder: (_, st) {
+          final genre = st.uri.queryParameters['genre'];
+          return LibraryBrowseScreen(
+            title: genre == null || genre.isEmpty ? 'TV Shows' : '$genre TV Shows',
+            itemType: 'Series',
+            initialGenre: genre,
+          );
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => AppShell(navigationShell: shell),
