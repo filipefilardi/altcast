@@ -1,4 +1,5 @@
 import 'browse_item.dart';
+import 'original_language.dart';
 import 'person_credit.dart';
 
 class Movie {
@@ -15,6 +16,7 @@ class Movie {
     this.backdropTag,
     this.userData,
     this.artists = const [],
+    this.originalLanguage,
   });
 
   final String id;
@@ -32,6 +34,9 @@ class Movie {
   final String? backdropTag;
   final UserData? userData;
   final List<PersonCredit> artists;
+
+  /// ISO language code from metadata when available (TMDB original language).
+  final String? originalLanguage;
 
   factory Movie.fromJson(Map<String, dynamic> json) {
     final ticks = json['RunTimeTicks'] as int?;
@@ -62,6 +67,7 @@ class Movie {
           .map(PersonCredit.fromJson)
           .where((person) => person.name.isNotEmpty)
           .toList(growable: false),
+      originalLanguage: parseOriginalLanguageFromItemJson(json),
     );
   }
 }

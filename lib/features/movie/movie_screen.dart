@@ -13,6 +13,7 @@ import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/movie.dart';
 import '../../data/jellyfin/models/person_credit.dart';
+import '../../data/local/playback_preferences.dart';
 import '../downloads/widgets/download_button.dart';
 import '../home/widgets/poster_card.dart';
 import '../remote/remote_sessions_sheet.dart';
@@ -70,11 +71,26 @@ class _MovieBody extends ConsumerStatefulWidget {
 
 class _MovieBodyState extends ConsumerState<_MovieBody> {
   TrackPreference _preference = const TrackPreference();
+  bool _initializedFromDefaults = false;
 
   @override
   Widget build(BuildContext context) {
     final movie = widget.movie;
     final repo = ref.watch(jellyfinRepositoryProvider);
+    final playbackPrefs = ref.watch(playbackPreferencesProvider);
+    if (!_initializedFromDefaults) {
+      _preference = TrackPreference(
+        audioLang:
+            playbackPrefs.resolvedAudioLanguage(movie.originalLanguage),
+        subKind: switch (playbackPrefs.defaultSubtitleMode) {
+          DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+          DefaultSubtitleMode.off => SubPreferenceKind.off,
+          DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
+        },
+        subLang: playbackPrefs.defaultSubtitleLanguage,
+      );
+      _initializedFromDefaults = true;
+    }
     final similarAsync = ref.watch(similarMoviesProvider(movie.id));
     final backdrop = repo.backdropUrl(
       movie.id,
@@ -141,6 +157,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
               TrackPreferenceRow(
                 itemId: movie.id,
                 preference: _preference,
+                originalLanguageHint: movie.originalLanguage,
                 onChanged: (next) => setState(() => _preference = next),
               ),
               if (hasResume)
@@ -454,6 +471,8 @@ void _openDetail(BuildContext context, BrowseItem item) {
       context.push('/season/${item.id}');
     case MediaKind.episode:
       context.push('/episode/${item.id}');
+    case MediaKind.person:
+      context.push('/person/${item.id}');
   }
 }
 

@@ -275,5 +275,7 @@ void _openDetail(BuildContext context, BrowseItem item) {
       context.push('/season/${item.id}');
     case MediaKind.episode:
       context.push('/episode/${item.id}');
+    case MediaKind.person:
+      context.push('/person/${item.id}');
   }
 }

@@ -20,24 +20,67 @@ class PlaybackPreferences {
   const PlaybackPreferences({
     this.streamingQuality = StreamingQuality.auto,
     this.wifiOnlyStreaming = false,
+    this.defaultAudioMode = DefaultAudioMode.auto,
+    this.defaultAudioLanguage,
+    this.defaultSubtitleMode = DefaultSubtitleMode.auto,
+    this.defaultSubtitleLanguage,
   });
 
   final StreamingQuality streamingQuality;
   final bool wifiOnlyStreaming;
+  final DefaultAudioMode defaultAudioMode;
+
+  /// Used when [defaultAudioMode] is [DefaultAudioMode.fixedLanguage].
+  final String? defaultAudioLanguage;
+  final DefaultSubtitleMode defaultSubtitleMode;
+  final String? defaultSubtitleLanguage;
+
+  /// Effective audio language code for playback prefs, from settings mode plus
+  /// optional per-item metadata ([itemOriginalLanguage] from Jellyfin).
+  String? resolvedAudioLanguage(String? itemOriginalLanguage) {
+    switch (defaultAudioMode) {
+      case DefaultAudioMode.auto:
+        return null;
+      case DefaultAudioMode.fixedLanguage:
+        final code = defaultAudioLanguage?.trim();
+        return (code == null || code.isEmpty) ? null : code;
+      case DefaultAudioMode.originalLanguage:
+        final code = itemOriginalLanguage?.trim();
+        return (code == null || code.isEmpty) ? null : code;
+    }
+  }
 
   PlaybackPreferences copyWith({
     StreamingQuality? streamingQuality,
     bool? wifiOnlyStreaming,
+    DefaultAudioMode? defaultAudioMode,
+    String? defaultAudioLanguage,
+    bool clearDefaultAudioLanguage = false,
+    DefaultSubtitleMode? defaultSubtitleMode,
+    String? defaultSubtitleLanguage,
+    bool clearDefaultSubtitleLanguage = false,
   }) {
     return PlaybackPreferences(
       streamingQuality: streamingQuality ?? this.streamingQuality,
       wifiOnlyStreaming: wifiOnlyStreaming ?? this.wifiOnlyStreaming,
+      defaultAudioMode: defaultAudioMode ?? this.defaultAudioMode,
+      defaultAudioLanguage: clearDefaultAudioLanguage
+          ? null
+          : (defaultAudioLanguage ?? this.defaultAudioLanguage),
+      defaultSubtitleMode: defaultSubtitleMode ?? this.defaultSubtitleMode,
+      defaultSubtitleLanguage: clearDefaultSubtitleLanguage
+          ? null
+          : (defaultSubtitleLanguage ?? this.defaultSubtitleLanguage),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'streamingQuality': streamingQuality.name,
     'wifiOnlyStreaming': wifiOnlyStreaming,
+    'defaultAudioMode': defaultAudioMode.name,
+    'defaultAudioLanguage': defaultAudioLanguage,
+    'defaultSubtitleMode': defaultSubtitleMode.name,
+    'defaultSubtitleLanguage': defaultSubtitleLanguage,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> json) {
@@ -46,12 +89,43 @@ class PlaybackPreferences {
       (q) => q.name == qualityName,
       orElse: () => StreamingQuality.auto,
     );
+    final subtitleModeName = json['defaultSubtitleMode'] as String?;
+    final subtitleMode = DefaultSubtitleMode.values.firstWhere(
+      (m) => m.name == subtitleModeName,
+      orElse: () => DefaultSubtitleMode.auto,
+    );
+    final legacyLang = json['defaultAudioLanguage'] as String?;
+    final modeName = json['defaultAudioMode'] as String?;
+    final audioMode = DefaultAudioMode.values.firstWhere(
+      (m) => m.name == modeName,
+      orElse: () {
+        if (legacyLang != null && legacyLang.trim().isNotEmpty) {
+          return DefaultAudioMode.fixedLanguage;
+        }
+        return DefaultAudioMode.auto;
+      },
+    );
+    final trimmedLegacy = legacyLang?.trim();
+    final langForFixed =
+        audioMode == DefaultAudioMode.fixedLanguage &&
+            trimmedLegacy != null &&
+            trimmedLegacy.isNotEmpty
+        ? trimmedLegacy
+        : null;
     return PlaybackPreferences(
       streamingQuality: quality,
       wifiOnlyStreaming: json['wifiOnlyStreaming'] as bool? ?? false,
+      defaultAudioMode: audioMode,
+      defaultAudioLanguage: langForFixed,
+      defaultSubtitleMode: subtitleMode,
+      defaultSubtitleLanguage: json['defaultSubtitleLanguage'] as String?,
     );
   }
 }
+
+enum DefaultAudioMode { auto, originalLanguage, fixedLanguage }
+
+enum DefaultSubtitleMode { auto, off, byLanguage }
 
 final playbackPreferencesProvider =
     NotifierProvider<PlaybackPreferencesNotifier, PlaybackPreferences>(
@@ -81,6 +155,54 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
 
   Future<void> setWifiOnlyStreaming(bool enabled) async {
     state = state.copyWith(wifiOnlyStreaming: enabled);
+    await _persist();
+  }
+
+  Future<void> setDefaultAudioAuto() async {
+    state = state.copyWith(
+      defaultAudioMode: DefaultAudioMode.auto,
+      clearDefaultAudioLanguage: true,
+    );
+    await _persist();
+  }
+
+  Future<void> setDefaultAudioOriginalLanguage() async {
+    state = state.copyWith(
+      defaultAudioMode: DefaultAudioMode.originalLanguage,
+      clearDefaultAudioLanguage: true,
+    );
+    await _persist();
+  }
+
+  Future<void> setDefaultAudioFixedLanguage(String languageCode) async {
+    state = state.copyWith(
+      defaultAudioMode: DefaultAudioMode.fixedLanguage,
+      defaultAudioLanguage: languageCode.trim(),
+    );
+    await _persist();
+  }
+
+  Future<void> setDefaultSubtitleAuto() async {
+    state = state.copyWith(
+      defaultSubtitleMode: DefaultSubtitleMode.auto,
+      clearDefaultSubtitleLanguage: true,
+    );
+    await _persist();
+  }
+
+  Future<void> setDefaultSubtitleOff() async {
+    state = state.copyWith(
+      defaultSubtitleMode: DefaultSubtitleMode.off,
+      clearDefaultSubtitleLanguage: true,
+    );
+    await _persist();
+  }
+
+  Future<void> setDefaultSubtitleLanguage(String languageCode) async {
+    state = state.copyWith(
+      defaultSubtitleMode: DefaultSubtitleMode.byLanguage,
+      defaultSubtitleLanguage: languageCode.trim(),
+    );
     await _persist();
   }
 

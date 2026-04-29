@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
@@ -105,6 +106,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         bool unwatched = current.unwatchedOnly;
         bool movies = current.includeMovies;
         bool shows = current.includeShows;
+        bool people = current.includePeople;
         LibrarySort sort = current.sort;
         final yearController = TextEditingController(
           text: year?.toString() ?? '',
@@ -178,6 +180,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       value: shows,
                       onChanged: (v) => setModalState(() => shows = v ?? true),
                     ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('People'),
+                      value: people,
+                      onChanged: (v) => setModalState(() => people = v ?? true),
+                    ),
                     Row(
                       children: [
                         TextButton(
@@ -199,6 +207,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                     unwatchedOnly: unwatched,
                                     includeMovies: movies,
                                     includeShows: shows,
+                                    includePeople: people,
                                     sort: sort,
                                   ),
                                 );
@@ -272,6 +281,9 @@ class _Body extends StatelessWidget {
         final shows = sorted
             .where((i) => i.kind == MediaKind.series)
             .toList(growable: false);
+        final people = sorted
+            .where((i) => i.kind == MediaKind.person)
+            .toList(growable: false);
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
@@ -287,6 +299,12 @@ class _Body extends StatelessWidget {
               _SectionHeader(label: 'TV Shows', count: shows.length),
               const SizedBox(height: 12),
               _PosterGrid(items: shows),
+              const SizedBox(height: 24),
+            ],
+            if (people.isNotEmpty) ...[
+              _SectionHeader(label: 'People', count: people.length),
+              const SizedBox(height: 12),
+              _PeopleList(items: people),
               const SizedBox(height: 24),
             ],
           ],
@@ -316,6 +334,7 @@ class _SearchFilterSummary extends StatelessWidget {
       if (filters.unwatchedOnly) 'Unwatched',
       if (!filters.includeMovies) 'No Movies',
       if (!filters.includeShows) 'No Shows',
+      if (!filters.includePeople) 'No People',
       switch (filters.sort) {
         LibrarySort.nameAsc => 'A-Z',
         LibrarySort.nameDesc => 'Z-A',
@@ -434,6 +453,63 @@ class _SearchSkeleton extends StatelessWidget {
   }
 }
 
+class _PeopleList extends StatelessWidget {
+  const _PeopleList({required this.items});
+
+  final List<BrowseItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _PersonTile(item: item),
+          ),
+      ],
+    );
+  }
+}
+
+class _PersonTile extends ConsumerWidget {
+  const _PersonTile({required this.item});
+
+  final BrowseItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.watch(jellyfinRepositoryProvider);
+    final image = repo.personImageUrl(item.id, item.imageTag, width: 140);
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        onTap: () => _openDetail(context, item),
+        leading: ClipOval(
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: ColoredBox(
+              color: AppColors.surfaceHighlight,
+              child: LocalOrNetworkImage(
+                source: image,
+                errorBuilder: (_) => const Icon(
+                  Icons.person_outline,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        title: Text(item.name),
+        trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
 void _openDetail(BuildContext context, BrowseItem item) {
   switch (item.kind) {
     case MediaKind.movie:
@@ -444,5 +520,7 @@ void _openDetail(BuildContext context, BrowseItem item) {
       context.push('/season/${item.id}');
     case MediaKind.episode:
       context.push('/episode/${item.id}');
+    case MediaKind.person:
+      context.push('/person/${item.id}');
   }
 }
