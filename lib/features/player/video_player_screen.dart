@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
@@ -429,14 +430,8 @@ class _AudioSection extends StatelessWidget {
     );
   }
 
-  String _audioLabel(AudioTrack t) {
-    final pieces = <String>[
-      if (t.title != null && t.title!.isNotEmpty) t.title!,
-      if (t.language != null && t.language!.isNotEmpty) t.language!,
-    ];
-    if (pieces.isEmpty) return 'Track ${t.id}';
-    return pieces.join(' · ');
-  }
+  String _audioLabel(AudioTrack t) =>
+      _trackDisplayLabel(title: t.title, language: t.language, fallbackId: t.id);
 }
 
 class _SubtitleSection extends StatelessWidget {
@@ -499,7 +494,7 @@ class _SubtitleSection extends StatelessWidget {
           ),
         for (final sub in externalSubtitles)
           _TrackRow(
-            label: '${sub.displayLabel} (external)',
+            label: '${_externalLabel(sub)} (external)',
             selected: hasExternal && sub.id == selectedExternalSubId,
             onTap: () {
               onSelectExternalSubtitle(sub);
@@ -510,14 +505,45 @@ class _SubtitleSection extends StatelessWidget {
     );
   }
 
-  String _embeddedLabel(SubtitleTrack t) {
-    final pieces = <String>[
-      if (t.title != null && t.title!.isNotEmpty) t.title!,
-      if (t.language != null && t.language!.isNotEmpty) t.language!,
-    ];
-    if (pieces.isEmpty) return 'Track ${t.id}';
-    return pieces.join(' · ');
+  String _embeddedLabel(SubtitleTrack t) =>
+      _trackDisplayLabel(title: t.title, language: t.language, fallbackId: t.id);
+
+  String _externalLabel(ExternalSubtitle sub) {
+    return _trackDisplayLabel(
+      title: sub.title,
+      language: sub.language,
+      fallbackId: sub.codec ?? 'subs',
+    );
   }
+}
+
+/// Builds a friendly label for an audio/subtitle track.
+///
+/// Priority: server-provided title → ISO 639 → raw language code → "Track {id}".
+/// Returns the placeholder for empty everything so the row is never blank.
+String _trackDisplayLabel({
+  required String? title,
+  required String? language,
+  required String fallbackId,
+}) {
+  final t = title?.trim();
+  if (t != null && t.isNotEmpty) {
+    // If the title already encodes the language (mpv often emits "English (eng)"),
+    // skip the redundant trailing code.
+    final mapped = languageDisplay(language);
+    if (mapped != null && t.toLowerCase() != mapped.toLowerCase()) {
+      return '$t · $mapped';
+    }
+    return t;
+  }
+  final mapped = languageDisplay(language);
+  if (mapped != null) return mapped;
+  // Last-resort: a normalised raw code, never the literal "und".
+  final raw = language?.trim();
+  if (raw != null && raw.isNotEmpty && raw.toLowerCase() != 'und') {
+    return raw;
+  }
+  return fallbackId.isEmpty ? 'Track' : 'Track $fallbackId';
 }
 
 class _SectionHeader extends StatelessWidget {

@@ -44,17 +44,14 @@ class ExternalSubtitle {
   /// Stable identifier (we use the absolute URL — unique per source).
   final String id;
   final String url;
-  final String? title;
-  final String? language;
-  final String? codec;
 
-  /// Display label combining title + language, with sensible fallbacks.
-  String get displayLabel {
-    final pieces = <String>[
-      if (title != null && title!.isNotEmpty) title!,
-      if (language != null && language!.isNotEmpty) language!,
-    ];
-    if (pieces.isEmpty) return codec ?? 'External subtitles';
-    return pieces.join(' · ');
-  }
+  /// Server-provided display title (e.g. "English (SDH)"). Often null.
+  final String? title;
+
+  /// Raw ISO 639 code (e.g. `"eng"`, `"spa"`). Pass through
+  /// [languageDisplay] before showing in UI.
+  final String? language;
+
+  /// `srt` / `vtt` / `ass` / etc. — handy as a last-resort label.
+  final String? codec;
 }

@@ -285,53 +285,92 @@ class JellyfinRepository {
     }
   }
 
-  /// Pulls external subtitle streams from a `MediaSources[]` entry. Embedded
-  /// subs are skipped — media_kit/libmpv detects those automatically.
+  /// Pulls subtitle streams Jellyfin can serve as a sidecar from a
+  /// `MediaSources[]` entry. Truly-embedded subs (those mpv detects from the
+  /// container itself) are intentionally skipped — they'd duplicate what
+  /// libmpv already reports via `player.stream.tracks`.
   ///
-  /// Jellyfin reports each MediaStream with a `Type` and an `IsExternal`
-  /// flag; for external ones it also gives a `DeliveryUrl` we can hand to
-  /// the player. We construct one ourselves when DeliveryUrl is missing,
-  /// since older servers omit it.
+  /// Filter criteria — broader than just `IsExternal`:
+  ///   - `DeliveryMethod == 'External'`, OR
+  ///   - `DeliveryUrl` is present (server is willing to extract on demand).
+  ///
+  /// This catches both true sidecar files (`movie.eng.srt` next to the .mkv)
+  /// AND text subtitles embedded in the container that the server can pull
+  /// out as VTT/SRT — which mpv often *can't* render correctly itself for
+  /// HLS-transcoded streams.
   List<ExternalSubtitle> _externalSubtitles(
     Map<String, dynamic> src,
     String itemId,
   ) {
     final s = _session;
+    final mediaSourceId = (src['Id'] as String?) ?? itemId;
     final streams = (src['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
     if (streams == null) return const [];
 
     final out = <ExternalSubtitle>[];
     for (final st in streams) {
       if (st['Type'] != 'Subtitle') continue;
-      if (st['IsExternal'] != true) continue;
+      final deliveryMethod = st['DeliveryMethod'] as String?;
+      final deliveryUrl = st['DeliveryUrl'] as String?;
+      final isExternal = st['IsExternal'] == true;
+      final isExtractable = deliveryMethod == 'External' ||
+          (deliveryUrl != null && deliveryUrl.isNotEmpty) ||
+          isExternal;
+      if (!isExtractable) continue;
 
       final codec = (st['Codec'] as String?)?.toLowerCase();
       final index = st['Index'] as int?;
-      final deliveryUrl = st['DeliveryUrl'] as String?;
-      String? url;
-      if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
-        final base = deliveryUrl.startsWith('http') ? '' : s.serverUrl;
-        final sep = deliveryUrl.contains('?') ? '&' : '?';
-        url = '$base$deliveryUrl${sep}api_key=${s.accessToken}';
-      } else if (codec != null && index != null) {
-        // Format expected by Jellyfin's subtitle endpoint:
-        //   /Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.{codec}
-        // We pass the same id for source — Jellyfin accepts that for the
-        // primary source.
-        url = '${s.serverUrl}/Videos/$itemId/$itemId/Subtitles/'
-            '$index/Stream.$codec?api_key=${s.accessToken}';
-      }
+      final url = _resolveSubtitleUrl(
+        deliveryUrl: deliveryUrl,
+        itemId: itemId,
+        mediaSourceId: mediaSourceId,
+        index: index,
+        codec: codec,
+        token: s.accessToken,
+        serverUrl: s.serverUrl,
+      );
       if (url == null) continue;
 
       out.add(ExternalSubtitle(
         id: url,
         url: url,
-        title: st['DisplayTitle'] as String? ?? st['Title'] as String?,
+        title: (st['DisplayTitle'] as String?) ?? (st['Title'] as String?),
         language: st['Language'] as String?,
         codec: codec,
       ));
     }
     return out;
+  }
+
+  /// Builds a fully-authenticated URL the player can fetch directly. Prefers
+  /// the server-provided [deliveryUrl] (it carries the correct codec/format
+  /// hints) and falls back to constructing one ourselves.
+  ///
+  /// Always ensures `api_key` is present without doubling up — some Jellyfin
+  /// versions inline it, others don't.
+  String? _resolveSubtitleUrl({
+    required String? deliveryUrl,
+    required String itemId,
+    required String mediaSourceId,
+    required int? index,
+    required String? codec,
+    required String token,
+    required String serverUrl,
+  }) {
+    String? raw;
+    if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
+      raw = deliveryUrl.startsWith('http')
+          ? deliveryUrl
+          : '$serverUrl$deliveryUrl';
+    } else if (index != null && codec != null) {
+      // Newer Jellyfin endpoint shape — works with all known versions.
+      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/'
+          '$index/Stream.$codec';
+    }
+    if (raw == null) return null;
+    if (raw.contains('api_key=')) return raw;
+    final sep = raw.contains('?') ? '&' : '?';
+    return '$raw${sep}api_key=$token';
   }
 
   /// Tells the server to release a transcoding session so it can stop the
