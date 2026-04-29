@@ -69,8 +69,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           const _PlaybackGroup(),
-          const SizedBox(height: 24),
-          const _ConnectionGroup(),
           const SizedBox(height: 28),
           const _SignOutTile(),
           const SizedBox(height: 28),
@@ -126,49 +124,6 @@ class _PlaybackGroup extends ConsumerWidget {
           onChanged: (v) => ref
               .read(playbackPreferencesProvider.notifier)
               .setWifiOnlyStreaming(v),
-        ),
-      ],
-    );
-  }
-}
-
-class _ConnectionGroup extends ConsumerWidget {
-  const _ConnectionGroup();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return _SettingsGroup(
-      label: 'Connection',
-      children: [
-        ListTile(
-          leading: const Icon(Icons.network_check_outlined),
-          title: const Text('Test server connection'),
-          subtitle: const Text(
-            'Checks that your Jellyfin server is reachable.',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          trailing: const Icon(
-            Icons.play_arrow_rounded,
-            color: AppColors.textSecondary,
-          ),
-          onTap: () async {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Testing connection...')),
-            );
-            final info = await ref.read(_serverInfoProvider.future);
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  info == null
-                      ? 'Server unreachable'
-                      : 'Connected to ${info['ServerName'] ?? 'Jellyfin'}',
-                ),
-              ),
-            );
-          },
         ),
       ],
     );
