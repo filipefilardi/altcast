@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_gradients.dart';
 import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
@@ -118,8 +119,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     try {
       // Prefer the local file if this item was downloaded — saves a server
       // round-trip and lets playback work fully offline.
-      final localPath =
-          ref.read(downloadManagerProvider).localPath(widget.itemId);
+      final localPath = ref
+          .read(downloadManagerProvider)
+          .localPath(widget.itemId);
       final StreamSource source;
       if (localPath != null) {
         source = StreamSource(
@@ -134,12 +136,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _sourceNotifier.value = source;
       final api = ref.read(jellyfinApiProvider);
       final auth = api.dio.options.headers['Authorization'];
-      await _player.open(Media(
-        source.url,
-        httpHeaders: auth is String && auth.isNotEmpty
-            ? {'Authorization': auth}
-            : null,
-      ));
+      await _player.open(
+        Media(
+          source.url,
+          httpHeaders: auth is String && auth.isNotEmpty
+              ? {'Authorization': auth}
+              : null,
+        ),
+      );
       final ticks = widget.resumeTicks ?? 0;
       if (ticks > 0) {
         final at = Duration(microseconds: ticks ~/ 10);
@@ -231,11 +235,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           (languageDisplay(ext.language) ?? '').toLowerCase() ==
               wantSub.toLowerCase()) {
         _selectedExternalSubNotifier.value = ext.id;
-        _player.setSubtitleTrack(SubtitleTrack.uri(
-          ext.url,
-          title: ext.title,
-          language: ext.language,
-        ));
+        _player.setSubtitleTrack(
+          SubtitleTrack.uri(ext.url, title: ext.title, language: ext.language),
+        );
         _setSubVisibility(true);
         return;
       }
@@ -295,9 +297,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _playingSub?.cancel();
     _completedSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
-    _scrobbler?.stop(
-      positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
-    );
+    _scrobbler?.stop(positionTicks: _lastPosition.inMilliseconds * _ticksPerMs);
     // Release the server-side transcoder if we were transcoding. Fire-and-
     // forget — `_player.dispose` doesn't wait for it, but we don't need to
     // either; the server times out idle encodings anyway.
@@ -324,10 +324,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           fit: StackFit.expand,
           children: [
             if (_openError != null)
-              _PlaybackError(
-                error: _openError!,
-                onClose: () => context.pop(),
-              )
+              _PlaybackError(error: _openError!, onClose: () => context.pop())
             else
               Video(
                 controller: _controller,
@@ -359,6 +356,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   ),
                 ),
               ),
+            const _EdgeScrim(top: true, height: 110),
+            const _EdgeScrim(top: false, height: 86),
             // Always-visible close button — the built-in controls auto-hide,
             // and a video that's failed to open has no controls at all, so
             // we keep this anchored.
@@ -405,11 +404,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _player.setSubtitleTrack(SubtitleTrack.no());
             _setSubVisibility(false);
           } else {
-            _player.setSubtitleTrack(SubtitleTrack.uri(
-              sub.url,
-              title: sub.title,
-              language: sub.language,
-            ));
+            _player.setSubtitleTrack(
+              SubtitleTrack.uri(
+                sub.url,
+                title: sub.title,
+                language: sub.language,
+              ),
+            );
             _setSubVisibility(true);
           }
         },
@@ -432,15 +433,61 @@ class _CornerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
         shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.2),
+            Colors.black.withValues(alpha: 0.48),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: Colors.white),
+        icon: Icon(icon, color: Colors.white.withValues(alpha: 0.95)),
         tooltip: tooltip,
         onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+class _EdgeScrim extends StatelessWidget {
+  const _EdgeScrim({required this.top, required this.height});
+
+  final bool top;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: top ? Alignment.topCenter : Alignment.bottomCenter,
+      child: IgnorePointer(
+        child: SizedBox(
+          height: height,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [
+                  Colors.black.withValues(alpha: top ? 0.55 : 0.45),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -493,17 +540,14 @@ class _TracksSheet extends StatelessWidget {
                 builder: (context, source, _) {
                   return ValueListenableBuilder<String?>(
                     valueListenable: selectedExternalSubListenable,
-                    builder: (context, selectedExternalSubId, __) {
-                      final tracks =
-                          tracksSnap.data ?? player.state.tracks;
-                      final current =
-                          currentSnap.data ?? player.state.track;
+                    builder: (context, selectedExternalSubId, child) {
+                      final tracks = tracksSnap.data ?? player.state.tracks;
+                      final current = currentSnap.data ?? player.state.track;
                       final externalSubs =
                           source?.externalSubtitles ?? const [];
                       return SingleChildScrollView(
                         child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                          padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             mainAxisSize: MainAxisSize.min,
@@ -556,7 +600,9 @@ class _AudioSection extends StatelessWidget {
     // Drop the synthetic auto/no entries — for audio we always have a real
     // track playing, so showing "Auto" is just noise.
     final real = tracks
-        .where((t) => t.id != AudioTrack.auto().id && t.id != AudioTrack.no().id)
+        .where(
+          (t) => t.id != AudioTrack.auto().id && t.id != AudioTrack.no().id,
+        )
         .toList();
     if (real.isEmpty) return const SizedBox.shrink();
 
@@ -577,8 +623,11 @@ class _AudioSection extends StatelessWidget {
     );
   }
 
-  String _audioLabel(AudioTrack t) =>
-      _trackDisplayLabel(title: t.title, language: t.language, fallbackId: t.id);
+  String _audioLabel(AudioTrack t) => _trackDisplayLabel(
+    title: t.title,
+    language: t.language,
+    fallbackId: t.id,
+  );
 }
 
 class _SubtitleSection extends StatelessWidget {
@@ -603,8 +652,10 @@ class _SubtitleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final embedded = tracks
-        .where((t) =>
-            t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id)
+        .where(
+          (t) =>
+              t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id,
+        )
         .toList();
     final hasExternal = selectedExternalSubId != null;
     final isOff = current.id == SubtitleTrack.no().id && !hasExternal;
@@ -657,8 +708,11 @@ class _SubtitleSection extends StatelessWidget {
     );
   }
 
-  String _embeddedLabel(SubtitleTrack t) =>
-      _trackDisplayLabel(title: t.title, language: t.language, fallbackId: t.id);
+  String _embeddedLabel(SubtitleTrack t) => _trackDisplayLabel(
+    title: t.title,
+    language: t.language,
+    fallbackId: t.id,
+  );
 
   String _externalLabel(ExternalSubtitle sub) {
     return _trackDisplayLabel(
@@ -706,9 +760,15 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      child: Text(
-        label.toUpperCase(),
-        style: Theme.of(context).textTheme.labelLarge,
+      child: ShaderMask(
+        blendMode: BlendMode.srcIn,
+        shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
+        child: Text(
+          label.toUpperCase(),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: Colors.white),
+        ),
       ),
     );
   }
@@ -727,27 +787,39 @@ class _TrackRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? AppColors.primary : AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Material(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.16)
+            : AppColors.surfaceHighlight.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
                 ),
-              ),
+                if (selected)
+                  const Icon(Icons.check, size: 18, color: AppColors.primary),
+              ],
             ),
-            if (selected)
-              const Icon(Icons.check, size: 18, color: AppColors.primary),
-          ],
+          ),
         ),
       ),
     );
@@ -835,8 +907,7 @@ class _PlaybackError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline,
-                color: AppColors.error, size: 40),
+            const Icon(Icons.error_outline, color: AppColors.error, size: 40),
             const SizedBox(height: 16),
             const Text(
               'Playback failed',
@@ -856,10 +927,7 @@ class _PlaybackError extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: onClose,
-              child: const Text('Back'),
-            ),
+            OutlinedButton(onPressed: onClose, child: const Text('Back')),
           ],
         ),
       ),
