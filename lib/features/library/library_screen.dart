@@ -13,7 +13,16 @@ class LibraryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final downloads = ref.watch(downloadManagerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Library')),
+      appBar: AppBar(
+        title: const Text('Library'),
+        actions: [
+          IconButton(
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         children: [
@@ -116,8 +125,10 @@ class _LibraryTile extends StatelessWidget {
                     ),
                   ),
                   if (!disabled)
-                    const Icon(Icons.chevron_right,
-                        color: AppColors.textTertiary),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textTertiary,
+                    ),
                 ],
               ),
             ),

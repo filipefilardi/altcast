@@ -11,6 +11,7 @@ import '../features/movie/movie_screen.dart';
 import '../features/player/video_player_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/series/series_screen.dart';
+import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
 
 class _AuthListenable extends ChangeNotifier {
@@ -50,10 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(
-        path: '/downloads',
-        builder: (_, __) => const DownloadsScreen(),
-      ),
+      GoRoute(path: '/downloads', builder: (_, __) => const DownloadsScreen()),
       GoRoute(
         path: '/movie/:id',
         builder: (_, st) => MovieScreen(movieId: st.pathParameters['id']!),
@@ -77,6 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(navigationShell: shell),
         branches: [
