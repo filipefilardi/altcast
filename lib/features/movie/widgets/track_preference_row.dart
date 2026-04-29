@@ -60,18 +60,26 @@ class TrackPreferenceRow extends ConsumerWidget {
     required this.itemId,
     required this.preference,
     required this.onChanged,
+    this.originalLanguageHint,
   });
 
   final String itemId;
   final TrackPreference preference;
   final ValueChanged<TrackPreference> onChanged;
 
+  /// ISO language code from Jellyfin metadata (TMDB original language / tags).
+  final String? originalLanguageHint;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streamsAsync = ref.watch(_streamsProvider(itemId));
     return streamsAsync.when(
       data: (streams) {
-        final showAudio = streams.audio.length > 1;
+        final hint = originalLanguageHint?.trim();
+        final hasOriginalHint = hint != null && hint.isNotEmpty;
+        final showAudio =
+            streams.audio.length > 1 ||
+            (hasOriginalHint && streams.audio.isNotEmpty);
         final showSubs = streams.subtitle.isNotEmpty;
         if (!showAudio && !showSubs) return const SizedBox.shrink();
         return Padding(
@@ -90,6 +98,16 @@ class TrackPreferenceRow extends ConsumerWidget {
                   'AUDIO & SUBTITLES',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
+                if (hasOriginalHint) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Original audio: ${languageDisplay(hint) ?? hint}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -170,12 +188,25 @@ class TrackPreferenceRow extends ConsumerWidget {
     BuildContext context,
     ItemMediaStreams streams,
   ) async {
+    final hint = originalLanguageHint?.trim();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
       showDragHandle: true,
       builder: (sheetCtx) => _PickerSheet(
         title: 'Audio',
+        header: hint != null && hint.isNotEmpty
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  'Original language (metadata): ${languageDisplay(hint) ?? hint}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              )
+            : null,
         rows: [
           _PickerRow(
             label: 'Server default',
@@ -191,6 +222,22 @@ class TrackPreferenceRow extends ConsumerWidget {
               Navigator.of(sheetCtx).pop();
             },
           ),
+          if (hint != null && hint.isNotEmpty)
+            _PickerRow(
+              label: 'Original (${languageDisplay(hint) ?? hint})',
+              selected: preference.audioLang != null &&
+                  preference.audioLang!.toLowerCase() == hint.toLowerCase(),
+              onTap: () {
+                onChanged(
+                  TrackPreference(
+                    audioLang: hint,
+                    subKind: preference.subKind,
+                    subLang: preference.subLang,
+                  ),
+                );
+                Navigator.of(sheetCtx).pop();
+              },
+            ),
           for (final s in streams.audio)
             _PickerRow(
               label: _audioRowLabel(s),
@@ -356,9 +403,14 @@ class _TrackTile extends StatelessWidget {
 }
 
 class _PickerSheet extends StatelessWidget {
-  const _PickerSheet({required this.title, required this.rows});
+  const _PickerSheet({
+    required this.title,
+    required this.rows,
+    this.header,
+  });
   final String title;
   final List<_PickerRow> rows;
+  final Widget? header;
 
   @override
   Widget build(BuildContext context) {
@@ -378,6 +430,8 @@ class _PickerSheet extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
               ),
+              // ignore: use_null_aware_elements
+              if (header != null) header!,
               ...rows,
             ],
           ),

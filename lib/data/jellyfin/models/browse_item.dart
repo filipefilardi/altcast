@@ -1,4 +1,4 @@
-enum MediaKind { movie, series, season, episode }
+enum MediaKind { movie, series, season, episode, person }
 
 MediaKind? _kindFromJellyfinType(String? type) {
   switch (type) {
@@ -10,6 +10,8 @@ MediaKind? _kindFromJellyfinType(String? type) {
       return MediaKind.season;
     case 'Episode':
       return MediaKind.episode;
+    case 'Person':
+      return MediaKind.person;
     default:
       return null;
   }
@@ -87,6 +89,8 @@ class BrowseItem {
           final padded = episode.toString().padLeft(2, '0');
           subtitle = 'S$season · E$padded';
         }
+      case MediaKind.person:
+        subtitle = null;
     }
 
     return BrowseItem(

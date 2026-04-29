@@ -260,7 +260,9 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
-      queryParameters: const {'Fields': 'People'},
+      queryParameters: const {
+        'Fields': 'People,OriginalLanguage,Tags',
+      },
     );
     final data = res.data;
     if (data == null) {
@@ -274,7 +276,9 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
-      queryParameters: const {'Fields': 'People'},
+      queryParameters: const {
+        'Fields': 'People,OriginalLanguage,Tags',
+      },
     );
     final data = res.data;
     if (data == null) {

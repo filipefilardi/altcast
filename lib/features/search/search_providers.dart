@@ -24,6 +24,7 @@ class SearchFilterState {
     this.unwatchedOnly = false,
     this.includeMovies = true,
     this.includeShows = true,
+    this.includePeople = true,
     this.sort = LibrarySort.recentlyAdded,
   });
 
@@ -32,6 +33,7 @@ class SearchFilterState {
   final bool unwatchedOnly;
   final bool includeMovies;
   final bool includeShows;
+  final bool includePeople;
   final LibrarySort sort;
 
   SearchFilterState copyWith({
@@ -40,6 +42,7 @@ class SearchFilterState {
     bool? unwatchedOnly,
     bool? includeMovies,
     bool? includeShows,
+    bool? includePeople,
     LibrarySort? sort,
     bool clearGenre = false,
     bool clearYear = false,
@@ -50,6 +53,7 @@ class SearchFilterState {
       unwatchedOnly: unwatchedOnly ?? this.unwatchedOnly,
       includeMovies: includeMovies ?? this.includeMovies,
       includeShows: includeShows ?? this.includeShows,
+      includePeople: includePeople ?? this.includePeople,
       sort: sort ?? this.sort,
     );
   }
@@ -80,6 +84,7 @@ final searchResultsProvider = FutureProvider.autoDispose<List<BrowseItem>>((
   final itemTypes = [
     if (filters.includeMovies) 'Movie',
     if (filters.includeShows) 'Series',
+    if (filters.includePeople) 'Person',
   ].join(',');
   if (itemTypes.isEmpty) return Future.value(const <BrowseItem>[]);
   return ref

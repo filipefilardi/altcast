@@ -1,4 +1,5 @@
 import 'browse_item.dart';
+import 'original_language.dart';
 import 'person_credit.dart';
 
 class Series {
@@ -16,6 +17,7 @@ class Series {
     this.backdropTag,
     this.userData,
     this.artists = const [],
+    this.originalLanguage,
   });
 
   final String id;
@@ -33,6 +35,9 @@ class Series {
   final String? backdropTag;
   final UserData? userData;
   final List<PersonCredit> artists;
+
+  /// ISO language code from metadata when available (series original language).
+  final String? originalLanguage;
 
   String get yearLabel {
     if (year == null) return '';
@@ -72,6 +77,7 @@ class Series {
           .map(PersonCredit.fromJson)
           .where((person) => person.name.isNotEmpty)
           .toList(growable: false),
+      originalLanguage: parseOriginalLanguageFromItemJson(json),
     );
   }
 }

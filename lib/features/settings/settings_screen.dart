@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
+import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/local/playback_preferences.dart';
@@ -125,8 +126,61 @@ class _PlaybackGroup extends ConsumerWidget {
               .read(playbackPreferencesProvider.notifier)
               .setWifiOnlyStreaming(v),
         ),
+        ListTile(
+          leading: const Icon(Icons.volume_up_outlined),
+          title: const Text('Default audio'),
+          subtitle: Text(
+            _audioDefaultLabel(prefs),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showDefaultAudioSheet(context),
+        ),
+        ListTile(
+          leading: const Icon(Icons.subtitles_outlined),
+          title: const Text('Default subtitles'),
+          subtitle: Text(
+            _subtitleDefaultLabel(
+              prefs.defaultSubtitleMode,
+              prefs.defaultSubtitleLanguage,
+            ),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showDefaultSubtitleSheet(context),
+        ),
       ],
     );
+  }
+
+  String _audioDefaultLabel(PlaybackPreferences prefs) {
+    switch (prefs.defaultAudioMode) {
+      case DefaultAudioMode.auto:
+        return 'Auto (server default)';
+      case DefaultAudioMode.originalLanguage:
+        return 'Original language (from metadata)';
+      case DefaultAudioMode.fixedLanguage:
+        final code = prefs.defaultAudioLanguage;
+        return languageDisplay(code) ??
+            (code == null || code.isEmpty ? '—' : code);
+    }
+  }
+
+  String _subtitleDefaultLabel(DefaultSubtitleMode mode, String? code) {
+    switch (mode) {
+      case DefaultSubtitleMode.auto:
+        return 'Auto';
+      case DefaultSubtitleMode.off:
+        return 'Off';
+      case DefaultSubtitleMode.byLanguage:
+        return languageDisplay(code) ?? (code == null || code.isEmpty ? 'Auto' : code);
+    }
   }
 }
 
@@ -422,6 +476,183 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
     ),
   );
 }
+
+Future<void> _showDefaultAudioSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final prefs = ref.watch(playbackPreferencesProvider);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            children: [
+              Text(
+                'Default audio',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Uses TMDB “original language” from Jellyfin when available.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ),
+              _defaultTrackOption(
+                context: context,
+                selected: prefs.defaultAudioMode == DefaultAudioMode.auto,
+                label: 'Auto (server default)',
+                onTap: () async {
+                  await ref
+                      .read(playbackPreferencesProvider.notifier)
+                      .setDefaultAudioAuto();
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+              ),
+              _defaultTrackOption(
+                context: context,
+                selected:
+                    prefs.defaultAudioMode == DefaultAudioMode.originalLanguage,
+                label: 'Original language (metadata)',
+                subtitle:
+                    'When unknown for a title, behaves like Auto.',
+                onTap: () async {
+                  await ref
+                      .read(playbackPreferencesProvider.notifier)
+                      .setDefaultAudioOriginalLanguage();
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Always use language',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 8),
+              for (final code in _commonLanguageCodes)
+                _defaultTrackOption(
+                  context: context,
+                  selected:
+                      prefs.defaultAudioMode == DefaultAudioMode.fixedLanguage &&
+                      prefs.defaultAudioLanguage == code,
+                  label: languageDisplay(code) ?? code,
+                  onTap: () async {
+                    await ref
+                        .read(playbackPreferencesProvider.notifier)
+                        .setDefaultAudioFixedLanguage(code);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Future<void> _showDefaultSubtitleSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final prefs = ref.watch(playbackPreferencesProvider);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            children: [
+              Text(
+                'Default subtitles',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              _defaultTrackOption(
+                context: context,
+                selected: prefs.defaultSubtitleMode == DefaultSubtitleMode.auto,
+                label: 'Auto',
+                onTap: () async {
+                  await ref
+                      .read(playbackPreferencesProvider.notifier)
+                      .setDefaultSubtitleAuto();
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+              ),
+              _defaultTrackOption(
+                context: context,
+                selected: prefs.defaultSubtitleMode == DefaultSubtitleMode.off,
+                label: 'Off',
+                onTap: () async {
+                  await ref
+                      .read(playbackPreferencesProvider.notifier)
+                      .setDefaultSubtitleOff();
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+              ),
+              const SizedBox(height: 4),
+              for (final code in _commonLanguageCodes)
+                _defaultTrackOption(
+                  context: context,
+                  selected:
+                      prefs.defaultSubtitleMode == DefaultSubtitleMode.byLanguage &&
+                      prefs.defaultSubtitleLanguage == code,
+                  label: languageDisplay(code) ?? code,
+                  onTap: () async {
+                    await ref
+                        .read(playbackPreferencesProvider.notifier)
+                        .setDefaultSubtitleLanguage(code);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget _defaultTrackOption({
+  required BuildContext context,
+  required bool selected,
+  required String label,
+  required Future<void> Function() onTap,
+  String? subtitle,
+}) {
+  return ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label),
+    subtitle: subtitle == null
+        ? null
+        : Text(
+            subtitle,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+    trailing: selected
+        ? const Icon(Icons.check, color: AppColors.primary, size: 18)
+        : null,
+    onTap: () {
+      onTap();
+    },
+  );
+}
+
+const _commonLanguageCodes = <String>[
+  'en',
+  'pt',
+  'es',
+  'fr',
+  'de',
+  'it',
+  'ja',
+  'ko',
+  'zh',
+  'ru',
+];
 
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup({required this.label, required this.children});

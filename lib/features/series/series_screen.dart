@@ -13,6 +13,7 @@ import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/jellyfin/models/person_credit.dart';
 import '../../data/jellyfin/models/series.dart';
+import '../../data/local/playback_preferences.dart';
 import '../home/widgets/poster_card.dart';
 import 'series_providers.dart';
 import 'widgets/episode_tile.dart';
@@ -29,7 +30,6 @@ class SeriesScreen extends ConsumerStatefulWidget {
 
 class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   String? _selectedSeasonId;
-  TrackPreference _preference = const TrackPreference();
 
   @override
   Widget build(BuildContext context) {
@@ -79,9 +79,6 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
             seasonsAsync: seasonsAsync,
             selectedSeasonId: _selectedSeasonId,
             onSelectSeason: (id) => setState(() => _selectedSeasonId = id),
-            preference: _preference,
-            onPreferenceChanged: (next) =>
-                setState(() => _preference = next),
           ),
           loading: () => const _SeriesSkeleton(),
           error: (e, _) => ListView(
@@ -102,25 +99,64 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   }
 }
 
-class _SeriesBody extends ConsumerWidget {
+class _SeriesBody extends ConsumerStatefulWidget {
   const _SeriesBody({
     required this.series,
     required this.seasonsAsync,
     required this.selectedSeasonId,
     required this.onSelectSeason,
-    required this.preference,
-    required this.onPreferenceChanged,
   });
 
   final Series series;
   final AsyncValue<List<Season>> seasonsAsync;
   final String? selectedSeasonId;
   final ValueChanged<String> onSelectSeason;
-  final TrackPreference preference;
-  final ValueChanged<TrackPreference> onPreferenceChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SeriesBody> createState() => _SeriesBodyState();
+}
+
+class _SeriesBodyState extends ConsumerState<_SeriesBody> {
+  late TrackPreference _preference;
+
+  @override
+  void initState() {
+    super.initState();
+    final pb = ref.read(playbackPreferencesProvider);
+    _preference = TrackPreference(
+      audioLang: pb.resolvedAudioLanguage(widget.series.originalLanguage),
+      subKind: switch (pb.defaultSubtitleMode) {
+        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+        DefaultSubtitleMode.off => SubPreferenceKind.off,
+        DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
+      },
+      subLang: pb.defaultSubtitleLanguage,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _SeriesBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.series.id != widget.series.id) {
+      final pb = ref.read(playbackPreferencesProvider);
+      _preference = TrackPreference(
+        audioLang: pb.resolvedAudioLanguage(widget.series.originalLanguage),
+        subKind: switch (pb.defaultSubtitleMode) {
+          DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+          DefaultSubtitleMode.off => SubPreferenceKind.off,
+          DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
+        },
+        subLang: pb.defaultSubtitleLanguage,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final series = widget.series;
+    final seasonsAsync = widget.seasonsAsync;
+    final selectedSeasonId = widget.selectedSeasonId;
+    final onSelectSeason = widget.onSelectSeason;
     final repo = ref.watch(jellyfinRepositoryProvider);
     final similarAsync = ref.watch(similarSeriesProvider(series.id));
     final backdrop = repo.backdropUrl(
@@ -163,15 +199,16 @@ class _SeriesBody extends ConsumerWidget {
                     : () => _playEpisode(
                         context,
                         next,
-                        preference: preference,
+                        preference: _preference,
                       ),
                 label: _playLabel(next),
                 icon: Icons.play_arrow_rounded,
               ),
               TrackPreferenceRow(
                 itemId: next?.id ?? series.id,
-                preference: preference,
-                onChanged: onPreferenceChanged,
+                preference: _preference,
+                originalLanguageHint: series.originalLanguage,
+                onChanged: (next) => setState(() => _preference = next),
               ),
               if (next != null && next.shortLabel.isNotEmpty)
                 Padding(
@@ -238,7 +275,7 @@ class _SeriesBody extends ConsumerWidget {
           episodesAsync: episodesAsync,
           seriesName: series.name,
           seriesPosterTag: series.imageTag,
-          preference: preference,
+          preference: _preference,
         ),
         const SizedBox(height: 32),
       ],
@@ -734,5 +771,7 @@ void _openDetail(BuildContext context, BrowseItem item) {
       context.push('/season/${item.id}');
     case MediaKind.episode:
       context.push('/episode/${item.id}');
+    case MediaKind.person:
+      context.push('/person/${item.id}');
   }
 }
