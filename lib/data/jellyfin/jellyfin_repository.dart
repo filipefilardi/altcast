@@ -325,6 +325,30 @@ class JellyfinRepository {
     return items;
   }
 
+  /// Toggle favorite (heart) for an item. Maps to Jellyfin's
+  /// `POST/DELETE /Users/{userId}/FavoriteItems/{itemId}`.
+  Future<void> setFavorite(String itemId, {required bool favorite}) async {
+    final s = _session;
+    final path = '/Users/${s.userId}/FavoriteItems/$itemId';
+    if (favorite) {
+      await _api.dio.post<void>(path);
+    } else {
+      await _api.dio.delete<void>(path);
+    }
+  }
+
+  /// Mark an item as played / unplayed. Maps to Jellyfin's
+  /// `POST/DELETE /Users/{userId}/PlayedItems/{itemId}`.
+  Future<void> setPlayed(String itemId, {required bool played}) async {
+    final s = _session;
+    final path = '/Users/${s.userId}/PlayedItems/$itemId';
+    if (played) {
+      await _api.dio.post<void>(path);
+    } else {
+      await _api.dio.delete<void>(path);
+    }
+  }
+
   Future<List<BrowseItem>> getSimilarItems(String itemId, {int limit = 16}) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(

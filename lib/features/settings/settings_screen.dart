@@ -346,7 +346,7 @@ class _StatusDot extends StatelessWidget {
     final color = online == null
         ? AppColors.textTertiary
         : online!
-        ? const Color(0xFF66CC8A)
+        ? AppColors.success
         : AppColors.error;
     return Container(
       width: 8,
@@ -404,8 +404,29 @@ class _SignOutTile extends ConsumerWidget {
         leading: const Icon(Icons.logout, color: AppColors.error),
         title: const Text('Sign out', style: TextStyle(color: AppColors.error)),
         onTap: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogCtx) => AlertDialog(
+              title: const Text('Sign out?'),
+              content: const Text(
+                'You will need to enter your server URL and credentials again to sign back in.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(true),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+          // Auth-state change drives the router redirect; no manual pop needed.
           await ref.read(authControllerProvider.notifier).logout();
-          if (context.mounted) context.pop();
         },
       ),
     );

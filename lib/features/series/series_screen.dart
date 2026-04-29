@@ -8,6 +8,7 @@ import '../../core/widgets/error_state.dart';
 import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
+import '../../core/widgets/user_data_actions.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/episode.dart';
@@ -193,16 +194,33 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              PlayButton(
-                onPressed: next == null
-                    ? null
-                    : () => _playEpisode(
-                        context,
-                        next,
-                        preference: _preference,
-                      ),
-                label: _playLabel(next),
-                icon: Icons.play_arrow_rounded,
+              Row(
+                children: [
+                  PlayButton(
+                    onPressed: next == null
+                        ? null
+                        : () => _playEpisode(
+                            context,
+                            next,
+                            preference: _preference,
+                          ),
+                    label: _playLabel(next),
+                    icon: Icons.play_arrow_rounded,
+                  ),
+                  const Spacer(),
+                  UserDataActions(
+                    initialFavorite: series.userData?.isFavorite ?? false,
+                    initialPlayed: series.userData?.played ?? false,
+                    onSetFavorite: (v) async {
+                      await repo.setFavorite(series.id, favorite: v);
+                      ref.invalidate(seriesProvider(series.id));
+                    },
+                    onSetPlayed: (v) async {
+                      await repo.setPlayed(series.id, played: v);
+                      ref.invalidate(seriesProvider(series.id));
+                    },
+                  ),
+                ],
               ),
               TrackPreferenceRow(
                 itemId: next?.id ?? series.id,

@@ -21,6 +21,7 @@ class AppColors {
 
   static const divider = Color(0xFF2A2438);
   static const error = Color(0xFFE5635A);
+  static const success = Color(0xFF66CC8A);
 
   /// "Liked songs" heart color. Same hex as [error] today but kept separate so
   /// the two can diverge without coupling failure UI to favorites UI.
