@@ -72,6 +72,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<bool>? _completedSub;
+  StreamSubscription<String>? _errorSub;
 
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
   /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
@@ -93,25 +94,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _player = Player();
     _controller = VideoController(_player);
 
-    final session = ref.read(jellyfinApiProvider).session;
-    if (session != null) {
-      // For native platforms, we can talk to libmpv via the platform object.
-      // We inject the Jellyfin auth header so libmpv can fetch sidecar VTTs
-      // that might require more than just the api_key query param.
-      try {
-        // NativePlayer exposes libmpv setProperty; PlatformPlayer does not.
-        final impl = _player.platform as dynamic;
-        if (impl != null) {
-          impl.setProperty('sub-visibility', 'yes');
-          impl.setProperty(
-            'http-header-fields',
-            'Authorization: MediaBrowser Client="AltCast", Device="Flutter", DeviceId="${ref.read(jellyfinApiProvider).deviceId}", Version="0.0.1", Token="${session.accessToken}"',
-          );
-        }
-      } catch (_) {
-        // Fallback for platforms where this isn't supported or fails.
-      }
-    }
+    // Subtitle overlay on — Jellyfin sidecar URLs carry api_key; main stream
+    // auth is passed via [Media.httpHeaders] in [_open] (mpv expects structured
+    // headers there — a raw `http-header-fields` string can break HTTP).
+    try {
+      final impl = _player.platform as dynamic;
+      impl?.setProperty('sub-visibility', 'yes');
+    } catch (_) {}
+
+    _errorSub = _player.stream.error.listen((message) {
+      if (!mounted || message.trim().isEmpty) return;
+      setState(() => _openError ??= message);
+    });
 
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
@@ -144,7 +138,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             .getStreamSource(widget.itemId);
       }
       _sourceNotifier.value = source;
-      await _player.open(Media(source.url));
+      final api = ref.read(jellyfinApiProvider);
+      final auth = api.dio.options.headers['Authorization'];
+      await _player.open(Media(
+        source.url,
+        httpHeaders: auth is String && auth.isNotEmpty
+            ? {'Authorization': auth}
+            : null,
+      ));
       final ticks = widget.resumeTicks ?? 0;
       if (ticks > 0) {
         final at = Duration(microseconds: ticks ~/ 10);
@@ -299,6 +300,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
+    _errorSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
     _scrobbler?.stop(
       positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
