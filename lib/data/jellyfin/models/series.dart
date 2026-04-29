@@ -1,4 +1,5 @@
 import 'browse_item.dart';
+import 'person_credit.dart';
 
 class Series {
   const Series({
@@ -14,6 +15,7 @@ class Series {
     this.imageTag,
     this.backdropTag,
     this.userData,
+    this.artists = const [],
   });
 
   final String id;
@@ -30,6 +32,7 @@ class Series {
   final String? imageTag;
   final String? backdropTag;
   final UserData? userData;
+  final List<PersonCredit> artists;
 
   String get yearLabel {
     if (year == null) return '';
@@ -40,6 +43,7 @@ class Series {
   factory Series.fromJson(Map<String, dynamic> json) {
     final tags = json['ImageTags'];
     final backdrops = json['BackdropImageTags'];
+    final people = (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final endDate = json['EndDate'] as String?;
     int? endYear;
     if (endDate != null) {
@@ -64,6 +68,10 @@ class Series {
       userData: json['UserData'] is Map<String, dynamic>
           ? UserData.fromJson(json['UserData'] as Map<String, dynamic>)
           : null,
+      artists: people
+          .map(PersonCredit.fromJson)
+          .where((person) => person.name.isNotEmpty)
+          .toList(growable: false),
     );
   }
 }

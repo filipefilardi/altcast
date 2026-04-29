@@ -9,6 +9,7 @@ import 'models/episode.dart';
 import 'models/jellyfin_session.dart';
 import 'models/media_stream.dart';
 import 'models/movie.dart';
+import 'models/person_details.dart';
 import 'models/series.dart';
 import 'models/stream_source.dart';
 
@@ -259,6 +260,7 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
+      queryParameters: const {'Fields': 'People'},
     );
     final data = res.data;
     if (data == null) {
@@ -272,6 +274,7 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
+      queryParameters: const {'Fields': 'People'},
     );
     final data = res.data;
     if (data == null) {
@@ -316,6 +319,60 @@ class JellyfinRepository {
       (a, b) => (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30),
     );
     return items;
+  }
+
+  Future<List<BrowseItem>> getSimilarItems(String itemId, {int limit = 16}) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Items/$itemId/Similar',
+      queryParameters: {
+        'UserId': s.userId,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<PersonDetails> getPerson(String personId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$personId',
+      queryParameters: const {'Fields': 'Overview'},
+    );
+    final data = res.data;
+    if (data == null) {
+      throw StateError('Empty response for person $personId');
+    }
+    return PersonDetails.fromJson(data);
+  }
+
+  Future<List<BrowseItem>> getItemsByPerson(
+    String personId, {
+    int limit = 36,
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'PersonIds': personId,
+        'IncludeItemTypes': 'Movie,Series',
+        'Recursive': true,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+        'SortBy': 'PremiereDate,SortName',
+        'SortOrder': 'Descending',
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
   }
 
   Future<Season> getSeason(String seasonId) async {
@@ -683,6 +740,18 @@ class JellyfinRepository {
         ? '&tag=$fallbackPrimaryTag'
         : '';
     return '${s.serverUrl}/Items/$itemId/Images/Primary'
+        '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
+  }
+
+  String? personImageUrl(
+    String? personId,
+    String? imageTag, {
+    int width = 160,
+  }) {
+    if (personId == null || personId.isEmpty) return null;
+    final s = _session;
+    final tagParam = (imageTag != null && imageTag.isNotEmpty) ? '&tag=$imageTag' : '';
+    return '${s.serverUrl}/Items/$personId/Images/Primary'
         '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
   }
 }
