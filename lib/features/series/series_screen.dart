@@ -17,6 +17,7 @@ import '../home/widgets/poster_card.dart';
 import 'series_providers.dart';
 import 'widgets/episode_tile.dart';
 import 'widgets/season_picker.dart';
+import '../movie/widgets/track_preference_row.dart';
 
 class SeriesScreen extends ConsumerStatefulWidget {
   const SeriesScreen({required this.seriesId, super.key});
@@ -28,6 +29,7 @@ class SeriesScreen extends ConsumerStatefulWidget {
 
 class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   String? _selectedSeasonId;
+  TrackPreference _preference = const TrackPreference();
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +79,9 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
             seasonsAsync: seasonsAsync,
             selectedSeasonId: _selectedSeasonId,
             onSelectSeason: (id) => setState(() => _selectedSeasonId = id),
+            preference: _preference,
+            onPreferenceChanged: (next) =>
+                setState(() => _preference = next),
           ),
           loading: () => const _SeriesSkeleton(),
           error: (e, _) => ListView(
@@ -103,12 +108,16 @@ class _SeriesBody extends ConsumerWidget {
     required this.seasonsAsync,
     required this.selectedSeasonId,
     required this.onSelectSeason,
+    required this.preference,
+    required this.onPreferenceChanged,
   });
 
   final Series series;
   final AsyncValue<List<Season>> seasonsAsync;
   final String? selectedSeasonId;
   final ValueChanged<String> onSelectSeason;
+  final TrackPreference preference;
+  final ValueChanged<TrackPreference> onPreferenceChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -151,9 +160,18 @@ class _SeriesBody extends ConsumerWidget {
               PlayButton(
                 onPressed: next == null
                     ? null
-                    : () => _playEpisode(context, next),
+                    : () => _playEpisode(
+                        context,
+                        next,
+                        preference: preference,
+                      ),
                 label: _playLabel(next),
                 icon: Icons.play_arrow_rounded,
+              ),
+              TrackPreferenceRow(
+                itemId: next?.id ?? series.id,
+                preference: preference,
+                onChanged: onPreferenceChanged,
               ),
               if (next != null && next.shortLabel.isNotEmpty)
                 Padding(
@@ -220,6 +238,7 @@ class _SeriesBody extends ConsumerWidget {
           episodesAsync: episodesAsync,
           seriesName: series.name,
           seriesPosterTag: series.imageTag,
+          preference: preference,
         ),
         const SizedBox(height: 32),
       ],
@@ -273,6 +292,7 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
     required this.episodesAsync,
     required this.seriesName,
     required this.seriesPosterTag,
+    required this.preference,
   });
 
   final Series series;
@@ -282,6 +302,7 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
   final AsyncValue<List<Episode>> episodesAsync;
   final String seriesName;
   final String? seriesPosterTag;
+  final TrackPreference preference;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -312,6 +333,7 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
               episodesAsync: episodesAsync,
               seriesName: seriesName,
               seriesPosterTag: seriesPosterTag,
+              preference: preference,
             ),
           ],
         );
@@ -338,12 +360,14 @@ class _EpisodeList extends ConsumerWidget {
     required this.episodesAsync,
     required this.seriesName,
     required this.seriesPosterTag,
+    required this.preference,
   });
   final String seriesId;
   final String seasonId;
   final AsyncValue<List<Episode>> episodesAsync;
   final String seriesName;
   final String? seriesPosterTag;
+  final TrackPreference preference;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -365,7 +389,11 @@ class _EpisodeList extends ConsumerWidget {
                 episode: ep,
                 seriesName: seriesName,
                 seriesPosterTag: seriesPosterTag,
-                onTap: () => _playEpisode(context, ep),
+                onTap: () => _playEpisode(
+                  context,
+                  ep,
+                  preference: preference,
+                ),
               ),
           ],
         );
@@ -676,13 +704,18 @@ class _BackChip extends StatelessWidget {
   }
 }
 
-void _playEpisode(BuildContext context, Episode ep) {
+void _playEpisode(
+  BuildContext context,
+  Episode ep, {
+  TrackPreference preference = const TrackPreference(),
+}) {
   final ticks = ep.userData?.playbackPositionTicks ?? 0;
   final query = <String, String>{
     if (ticks > 0) 'resumeTicks': '$ticks',
     if (ep.seriesId.isNotEmpty) 'seriesId': ep.seriesId,
     if (ep.parentIndexNumber != null) 'seasonNumber': '${ep.parentIndexNumber}',
     if (ep.indexNumber != null) 'episodeNumber': '${ep.indexNumber}',
+    ...preference.toQuery(),
   };
   final uri = Uri(
     path: '/play/${ep.id}',
