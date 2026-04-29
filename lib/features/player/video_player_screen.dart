@@ -93,6 +93,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _player = Player();
     _controller = VideoController(_player);
 
+    final session = ref.read(jellyfinApiProvider).session;
+    if (session != null) {
+      // For native platforms, we can talk to libmpv via the platform object.
+      // We inject the Jellyfin auth header so libmpv can fetch sidecar VTTs
+      // that might require more than just the api_key query param.
+      try {
+        // NativePlayer exposes libmpv setProperty; PlatformPlayer does not.
+        final impl = _player.platform as dynamic;
+        if (impl != null) {
+          impl.setProperty('sub-visibility', 'yes');
+          impl.setProperty(
+            'http-header-fields',
+            'Authorization: MediaBrowser Client="AltCast", Device="Flutter", DeviceId="${ref.read(jellyfinApiProvider).deviceId}", Version="0.0.1", Token="${session.accessToken}"',
+          );
+        }
+      } catch (_) {
+        // Fallback for platforms where this isn't supported or fails.
+      }
+    }
+
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
     SystemChrome.setPreferredOrientations(const [
@@ -132,14 +152,32 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         _lastPosition = at;
       }
       _attachScrobbler();
-      // Wait one frame so media_kit has populated the `tracks` lists, then
-      // apply the user's pre-play picks. Cheaper than awaiting a stream.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      // Wait until media_kit has populated the tracks lists. This is more
+      // robust than a fixed delay, especially for slow network streams
+      // or HLS manifests that take a moment to parse.
+      for (int i = 0; i < 20; i++) {
+        if (_player.state.tracks.audio.isNotEmpty ||
+            _player.state.tracks.subtitle.isNotEmpty) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+
       if (mounted) _applyTrackPreferences();
     } catch (e) {
       if (!mounted) return;
       setState(() => _openError = e);
     }
+  }
+
+  void _setSubVisibility(bool visible) {
+    try {
+      final impl = _player.platform as dynamic;
+      if (impl != null) {
+        impl.setProperty('sub-visibility', visible ? 'yes' : 'no');
+      }
+    } catch (_) {}
   }
 
   /// Applies the audio/subtitle language preferences passed via /play/:id
@@ -154,7 +192,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (wantAudio != null && wantAudio.isNotEmpty) {
       final tracks = _player.state.tracks.audio;
       final match = tracks.firstWhere(
-        (t) => (t.language ?? '').toLowerCase() == wantAudio.toLowerCase(),
+        (t) =>
+            (t.language ?? '').toLowerCase() == wantAudio.toLowerCase() ||
+            (languageDisplay(t.language) ?? '').toLowerCase() ==
+                wantAudio.toLowerCase(),
         orElse: () => AudioTrack.auto(),
       );
       if (match.id != AudioTrack.auto().id) {
@@ -167,6 +208,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (wantSub.toLowerCase() == 'off') {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(SubtitleTrack.no());
+      _setSubVisibility(false);
       return;
     }
 
@@ -175,25 +217,31 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       (t) =>
           t.id != SubtitleTrack.auto().id &&
           t.id != SubtitleTrack.no().id &&
-          (t.language ?? '').toLowerCase() == wantSub.toLowerCase(),
+          ((t.language ?? '').toLowerCase() == wantSub.toLowerCase() ||
+              (languageDisplay(t.language) ?? '').toLowerCase() ==
+                  wantSub.toLowerCase()),
       orElse: () => SubtitleTrack.no(),
     );
     if (embedded.id != SubtitleTrack.no().id) {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(embedded);
+      _setSubVisibility(true);
       return;
     }
 
     // Then external — comes from the StreamSource we just resolved.
     final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
     for (final ext in externals) {
-      if ((ext.language ?? '').toLowerCase() == wantSub.toLowerCase()) {
+      if ((ext.language ?? '').toLowerCase() == wantSub.toLowerCase() ||
+          (languageDisplay(ext.language) ?? '').toLowerCase() ==
+              wantSub.toLowerCase()) {
         _selectedExternalSubNotifier.value = ext.id;
         _player.setSubtitleTrack(SubtitleTrack.uri(
           ext.url,
           title: ext.title,
           language: ext.language,
         ));
+        _setSubVisibility(true);
         return;
       }
     }
@@ -298,18 +346,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
                   visible: true,
                   textAlign: TextAlign.center,
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 18,
                     color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
                     letterSpacing: 0,
+                    backgroundColor: Colors.black26,
                     shadows: [
                       Shadow(
                         offset: Offset(0, 1),
-                        blurRadius: 4,
-                        color: Color(0xCC000000),
+                        blurRadius: 2,
+                        color: Colors.black,
                       ),
                     ],
                   ),
@@ -353,17 +402,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         player: _player,
         sourceListenable: _sourceNotifier,
         selectedExternalSubListenable: _selectedExternalSubNotifier,
+        onSetSubVisibility: _setSubVisibility,
         onSelectExternalSubtitle: (sub) {
           if (!mounted) return;
           _selectedExternalSubNotifier.value = sub?.id;
           if (sub == null) {
             _player.setSubtitleTrack(SubtitleTrack.no());
+            _setSubVisibility(false);
           } else {
             _player.setSubtitleTrack(SubtitleTrack.uri(
               sub.url,
               title: sub.title,
               language: sub.language,
             ));
+            _setSubVisibility(true);
           }
         },
       ),
@@ -413,6 +465,7 @@ class _TracksSheet extends StatelessWidget {
     required this.sourceListenable,
     required this.selectedExternalSubListenable,
     required this.onSelectExternalSubtitle,
+    required this.onSetSubVisibility,
   });
 
   final Player player;
@@ -426,6 +479,7 @@ class _TracksSheet extends StatelessWidget {
   final ValueListenable<String?> selectedExternalSubListenable;
 
   final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
+  final ValueChanged<bool> onSetSubVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -473,6 +527,7 @@ class _TracksSheet extends StatelessWidget {
                                 selectedExternalSubId: selectedExternalSubId,
                                 onSelectExternalSubtitle:
                                     onSelectExternalSubtitle,
+                                onSetSubVisibility: onSetSubVisibility,
                               ),
                             ],
                           ),
@@ -539,6 +594,7 @@ class _SubtitleSection extends StatelessWidget {
     required this.externalSubtitles,
     required this.selectedExternalSubId,
     required this.onSelectExternalSubtitle,
+    required this.onSetSubVisibility,
   });
 
   final Player player;
@@ -547,6 +603,7 @@ class _SubtitleSection extends StatelessWidget {
   final List<ExternalSubtitle> externalSubtitles;
   final String? selectedExternalSubId;
   final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
+  final ValueChanged<bool> onSetSubVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -567,6 +624,8 @@ class _SubtitleSection extends StatelessWidget {
           selected: isOff,
           onTap: () {
             onSelectExternalSubtitle(null);
+            player.setSubtitleTrack(SubtitleTrack.no());
+            onSetSubVisibility(false);
             Navigator.of(context).pop();
           },
         ),
@@ -586,6 +645,7 @@ class _SubtitleSection extends StatelessWidget {
               // Picking an embedded track clears any external selection.
               onSelectExternalSubtitle(null);
               player.setSubtitleTrack(t);
+              onSetSubVisibility(true);
               Navigator.of(context).pop();
             },
           ),
