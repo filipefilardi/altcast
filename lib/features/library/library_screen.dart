@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/downloads/download_manager.dart';
-import '../remote/remote_sessions_sheet.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -31,12 +30,6 @@ class LibraryScreen extends ConsumerWidget {
             label: 'Downloads',
             subtitle: _downloadsSubtitle(downloads),
             onTap: () => context.push('/downloads'),
-          ),
-          _LibraryTile(
-            icon: Icons.cast,
-            label: 'Cast control',
-            subtitle: 'Manage playback on other devices',
-            onTap: () => showRemoteSessionsSheet(context),
           ),
           // Placeholder for future entries — Movies / Shows / Collections.
           _LibraryTile(
