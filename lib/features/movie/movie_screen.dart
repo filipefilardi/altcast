@@ -13,6 +13,7 @@ import '../../data/jellyfin/models/movie.dart';
 import '../downloads/widgets/download_button.dart';
 import '../remote/remote_sessions_sheet.dart';
 import 'movie_providers.dart';
+import 'widgets/track_preference_row.dart';
 
 class MovieScreen extends ConsumerWidget {
   const MovieScreen({required this.movieId, super.key});
@@ -48,12 +49,20 @@ class MovieScreen extends ConsumerWidget {
   }
 }
 
-class _MovieBody extends ConsumerWidget {
+class _MovieBody extends ConsumerStatefulWidget {
   const _MovieBody({required this.movie});
   final Movie movie;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MovieBody> createState() => _MovieBodyState();
+}
+
+class _MovieBodyState extends ConsumerState<_MovieBody> {
+  TrackPreference _preference = const TrackPreference();
+
+  @override
+  Widget build(BuildContext context) {
+    final movie = widget.movie;
     final repo = ref.watch(jellyfinRepositoryProvider);
     final backdrop = repo.backdropUrl(
       movie.id,
@@ -117,6 +126,11 @@ class _MovieBody extends ConsumerWidget {
                   MovieDownloadButton(movie: movie),
                 ],
               ),
+              TrackPreferenceRow(
+                itemId: movie.id,
+                preference: _preference,
+                onChanged: (next) => setState(() => _preference = next),
+              ),
               if (hasResume)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -157,6 +171,17 @@ class _MovieBody extends ConsumerWidget {
     if (m.year != null) parts.add(m.year.toString());
     if (m.runTime != null) parts.add(formatLongDuration(m.runTime!));
     return parts.isEmpty ? null : parts.join(' • ');
+  }
+
+  void _play(BuildContext context, Movie movie, {required bool fromStart}) {
+    final ticks =
+        fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
+    final query = <String, String>{
+      if (ticks > 0) 'resumeTicks': '$ticks',
+      ..._preference.toQuery(),
+    };
+    final uri = Uri(path: '/play/${movie.id}', queryParameters: query.isEmpty ? null : query);
+    context.push(uri.toString());
   }
 }
 
@@ -305,9 +330,3 @@ class _BackChip extends StatelessWidget {
   }
 }
 
-void _play(BuildContext context, Movie movie, {required bool fromStart}) {
-  final ticks =
-      fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
-  final query = ticks > 0 ? '?resumeTicks=$ticks' : '';
-  context.push('/play/${movie.id}$query');
-}

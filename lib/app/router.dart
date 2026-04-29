@@ -71,6 +71,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           return VideoPlayerScreen(
             itemId: st.pathParameters['id']!,
             resumeTicks: ticks,
+            preferredAudioLang: st.uri.queryParameters['audioLang'],
+            // `subLang=off` is a sentinel meaning "explicitly disable subs".
+            preferredSubLang: st.uri.queryParameters['subLang'],
           );
         },
       ),
