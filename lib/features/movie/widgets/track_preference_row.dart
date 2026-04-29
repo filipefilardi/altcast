@@ -52,8 +52,9 @@ enum SubPreferenceKind { serverDefault, off, byLang }
 /// Tapping opens a bottom sheet picker filled from
 /// [JellyfinRepository.getMediaStreams].
 ///
-/// Quietly renders nothing while streams are loading, and skips the audio
-/// pill entirely when there's only a single audio track (no choice to make).
+/// Quietly renders nothing while streams are loading. The audio pill is shown
+/// whenever there is at least one audio stream so the language is visible
+/// without starting playback.
 class TrackPreferenceRow extends ConsumerWidget {
   const TrackPreferenceRow({
     super.key,
@@ -77,9 +78,7 @@ class TrackPreferenceRow extends ConsumerWidget {
       data: (streams) {
         final hint = originalLanguageHint?.trim();
         final hasOriginalHint = hint != null && hint.isNotEmpty;
-        final showAudio =
-            streams.audio.length > 1 ||
-            (hasOriginalHint && streams.audio.isNotEmpty);
+        final showAudio = streams.audio.isNotEmpty;
         final showSubs = streams.subtitle.isNotEmpty;
         if (!showAudio && !showSubs) return const SizedBox.shrink();
         return Padding(
