@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
@@ -113,18 +114,34 @@ class _Greeting extends StatelessWidget {
     final displayTitle = Theme.of(
       context,
     ).textTheme.displayMedium!.copyWith(color: Colors.white);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
-          child: Text('AltCast', style: displayTitle),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
+                child: Text('AltCast', style: displayTitle),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                username == null ? 'Welcome' : 'Welcome back, $username',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          username == null ? 'Welcome' : 'Welcome back, $username',
-          style: Theme.of(context).textTheme.bodyMedium,
+        IconButton.filledTonal(
+          onPressed: () => context.push('/settings'),
+          icon: const Icon(Icons.settings_outlined, size: 20),
+          style: IconButton.styleFrom(
+            backgroundColor: AppColors.surfaceElevated,
+            foregroundColor: AppColors.textPrimary,
+          ),
+          tooltip: 'Settings',
         ),
       ],
     );
