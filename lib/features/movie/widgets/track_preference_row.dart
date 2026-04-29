@@ -48,8 +48,8 @@ class TrackPreference {
 
 enum SubPreferenceKind { serverDefault, off, byLang }
 
-/// Two compact pills under the Play button: "🔊 Audio: English" /
-/// "💬 Subtitles: Off". Tapping opens a bottom sheet picker filled from
+/// A compact control card under the Play button with Audio/Subtitles selectors.
+/// Tapping opens a bottom sheet picker filled from
 /// [JellyfinRepository.getMediaStreams].
 ///
 /// Quietly renders nothing while streams are loading, and skips the audio
@@ -76,23 +76,46 @@ class TrackPreferenceRow extends ConsumerWidget {
         if (!showAudio && !showSubs) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (showAudio)
-                _Pill(
-                  icon: Icons.volume_up_outlined,
-                  label: _audioLabel(streams),
-                  onTap: () => _pickAudio(context, streams),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AUDIO & SUBTITLES',
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
-              if (showSubs)
-                _Pill(
-                  icon: Icons.subtitles_outlined,
-                  label: _subLabel(),
-                  onTap: () => _pickSub(context, streams),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (showAudio)
+                      Expanded(
+                        child: _TrackTile(
+                          icon: Icons.volume_up_outlined,
+                          title: 'Audio',
+                          value: _audioLabel(streams),
+                          onTap: () => _pickAudio(context, streams),
+                        ),
+                      ),
+                    if (showAudio && showSubs) const SizedBox(width: 8),
+                    if (showSubs)
+                      Expanded(
+                        child: _TrackTile(
+                          icon: Icons.subtitles_outlined,
+                          title: 'Subtitles',
+                          value: _subLabel(),
+                          onTap: () => _pickSub(context, streams),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -107,25 +130,25 @@ class TrackPreferenceRow extends ConsumerWidget {
     final lang = preference.audioLang;
     if (lang == null) {
       final def = streams.defaultAudio();
-      return 'Audio: ${_streamLabel(def, fallback: 'Default')}';
+      return _streamLabel(def, fallback: 'Auto');
     }
     final match = streams.audio.firstWhere(
       (s) => (s.language ?? '').toLowerCase() == lang.toLowerCase(),
       orElse: () => streams.audio.first,
     );
-    return 'Audio: ${_streamLabel(match, fallback: lang)}';
+    return _streamLabel(match, fallback: lang);
   }
 
   String _subLabel() {
     switch (preference.subKind) {
       case SubPreferenceKind.serverDefault:
-        return 'Subtitles: Off';
+        return 'Auto';
       case SubPreferenceKind.off:
-        return 'Subtitles: Off';
+        return 'Off';
       case SubPreferenceKind.byLang:
         final mapped =
             languageDisplay(preference.subLang) ?? preference.subLang ?? 'On';
-        return 'Subtitles: $mapped';
+        return mapped;
     }
   }
 
@@ -133,8 +156,9 @@ class TrackPreferenceRow extends ConsumerWidget {
     if (s == null) return fallback;
     final mapped = languageDisplay(s.language);
     if (mapped != null) {
-      if (s.channels != null && s.channels! > 2)
+      if (s.channels != null && s.channels! > 2) {
         return '$mapped ${s.channels}.0';
+      }
       return mapped;
     }
     final raw = (s.displayTitle ?? s.title ?? '').trim();
@@ -256,40 +280,71 @@ class TrackPreferenceRow extends ConsumerWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label, required this.onTap});
+class _TrackTile extends StatelessWidget {
+  const _TrackTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
 
   final IconData icon;
-  final String label;
+  final String title;
+  final String value;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(999),
+      color: AppColors.surfaceHighlight.withValues(alpha: 0.4),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: AppColors.textSecondary),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 15, color: AppColors.textSecondary),
+              ),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
               const Icon(
-                Icons.expand_more,
-                size: 16,
+                Icons.chevron_right,
+                size: 18,
                 color: AppColors.textTertiary,
               ),
             ],
