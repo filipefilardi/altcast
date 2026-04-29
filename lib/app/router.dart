@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/downloads/downloads_screen.dart';
+import '../features/episode/episode_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/library/library_screen.dart';
+import '../features/library/library_browse_screen.dart';
 import '../features/movie/movie_screen.dart';
 import '../features/player/video_player_screen.dart';
 import '../features/search/search_screen.dart';
+import '../features/season/season_screen.dart';
 import '../features/series/series_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -61,6 +64,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, st) => SeriesScreen(seriesId: st.pathParameters['id']!),
       ),
       GoRoute(
+        path: '/season/:id',
+        builder: (_, st) => SeasonScreen(seasonId: st.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/episode/:id',
+        builder: (_, st) => EpisodeScreen(episodeId: st.pathParameters['id']!),
+      ),
+      GoRoute(
         path: '/play/:id',
         builder: (_, st) {
           final ticks = int.tryParse(
@@ -72,10 +83,27 @@ final routerProvider = Provider<GoRouter>((ref) {
             preferredAudioLang: st.uri.queryParameters['audioLang'],
             // `subLang=off` is a sentinel meaning "explicitly disable subs".
             preferredSubLang: st.uri.queryParameters['subLang'],
+            seriesId: st.uri.queryParameters['seriesId'],
+            seasonNumber: int.tryParse(
+              st.uri.queryParameters['seasonNumber'] ?? '',
+            ),
+            episodeNumber: int.tryParse(
+              st.uri.queryParameters['episodeNumber'] ?? '',
+            ),
           );
         },
       ),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(
+        path: '/library/movies',
+        builder: (_, __) =>
+            const LibraryBrowseScreen(title: 'Movies', itemType: 'Movie'),
+      ),
+      GoRoute(
+        path: '/library/shows',
+        builder: (_, __) =>
+            const LibraryBrowseScreen(title: 'TV Shows', itemType: 'Series'),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(navigationShell: shell),
         branches: [

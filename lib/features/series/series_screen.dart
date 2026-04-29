@@ -47,10 +47,12 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           ref.invalidate(seriesProvider(widget.seriesId));
           ref.invalidate(seasonsProvider(widget.seriesId));
           if (_selectedSeasonId != null) {
-            ref.invalidate(episodesProvider((
-              seriesId: widget.seriesId,
-              seasonId: _selectedSeasonId!,
-            )));
+            ref.invalidate(
+              episodesProvider((
+                seriesId: widget.seriesId,
+                seasonId: _selectedSeasonId!,
+              )),
+            );
           }
           await Future.wait([
             ref.read(seriesProvider(widget.seriesId).future).catchError((_) {
@@ -75,8 +77,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
               ErrorStateView(
                 title: "Couldn't load series",
                 message: e.toString(),
-                onRetry: () =>
-                    ref.invalidate(seriesProvider(widget.seriesId)),
+                onRetry: () => ref.invalidate(seriesProvider(widget.seriesId)),
               ),
             ],
           ),
@@ -111,16 +112,16 @@ class _SeriesBody extends ConsumerWidget {
     );
 
     final seasons = seasonsAsync.value ?? const <Season>[];
-    final activeSeasonId = selectedSeasonId ??
-        (seasons.isNotEmpty ? seasons.first.id : null);
+    final activeSeasonId =
+        selectedSeasonId ?? (seasons.isNotEmpty ? seasons.first.id : null);
 
     // Watch episodes for the active season — drives both the Play CTA and
     // the list rendering, so they can't disagree on which episode is "next".
     final episodesAsync = activeSeasonId == null
         ? const AsyncValue<List<Episode>>.data(<Episode>[])
-        : ref.watch(episodesProvider(
-            (seriesId: series.id, seasonId: activeSeasonId),
-          ));
+        : ref.watch(
+            episodesProvider((seriesId: series.id, seasonId: activeSeasonId)),
+          );
     final episodes = episodesAsync.value ?? const <Episode>[];
     final next = _nextEpisode(episodes);
 
@@ -139,7 +140,9 @@ class _SeriesBody extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PlayButton(
-                onPressed: next == null ? null : () => _playEpisode(context, next),
+                onPressed: next == null
+                    ? null
+                    : () => _playEpisode(context, next),
                 label: _playLabel(next),
                 icon: Icons.play_arrow_rounded,
               ),
@@ -149,13 +152,12 @@ class _SeriesBody extends ConsumerWidget {
                   child: Text(
                     '${next.shortLabel} • ${next.name}',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                        ),
+                      color: AppColors.textTertiary,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              if (series.overview != null &&
-                  series.overview!.isNotEmpty) ...[
+              if (series.overview != null && series.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 Text(
                   series.overview!,
@@ -165,10 +167,7 @@ class _SeriesBody extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 24),
-              Text(
-                'EPISODES',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
+              Text('EPISODES', style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 12),
             ],
           ),
@@ -219,8 +218,8 @@ class _SeriesBody extends ConsumerWidget {
   String _playLabel(Episode? next) {
     if (next == null) return 'Play';
     final ud = next.userData;
-    final hasResume = ud != null &&
-        ud.resumePosition > const Duration(seconds: 5);
+    final hasResume =
+        ud != null && ud.resumePosition > const Duration(seconds: 5);
     return hasResume ? 'Continue' : 'Play';
   }
 }
@@ -339,9 +338,9 @@ class _EpisodeList extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: ErrorStateView(
           title: "Couldn't load episodes",
-          onRetry: () => ref.invalidate(episodesProvider(
-            (seriesId: seriesId, seasonId: seasonId),
-          )),
+          onRetry: () => ref.invalidate(
+            episodesProvider((seriesId: seriesId, seasonId: seasonId)),
+          ),
         ),
       ),
     );
@@ -467,6 +466,15 @@ class _BackChip extends StatelessWidget {
 
 void _playEpisode(BuildContext context, Episode ep) {
   final ticks = ep.userData?.playbackPositionTicks ?? 0;
-  final query = ticks > 0 ? '?resumeTicks=$ticks' : '';
-  context.push('/play/${ep.id}$query');
+  final query = <String, String>{
+    if (ticks > 0) 'resumeTicks': '$ticks',
+    if (ep.seriesId.isNotEmpty) 'seriesId': ep.seriesId,
+    if (ep.parentIndexNumber != null) 'seasonNumber': '${ep.parentIndexNumber}',
+    if (ep.indexNumber != null) 'episodeNumber': '${ep.indexNumber}',
+  };
+  final uri = Uri(
+    path: '/play/${ep.id}',
+    queryParameters: query.isEmpty ? null : query,
+  );
+  context.push(uri.toString());
 }

@@ -12,6 +12,38 @@ import 'models/movie.dart';
 import 'models/series.dart';
 import 'models/stream_source.dart';
 
+enum LibrarySort { recentlyAdded, nameAsc, nameDesc, yearDesc }
+
+class LibraryFilter {
+  const LibraryFilter({
+    this.genre,
+    this.year,
+    this.unwatchedOnly = false,
+    this.sort = LibrarySort.recentlyAdded,
+  });
+
+  final String? genre;
+  final int? year;
+  final bool unwatchedOnly;
+  final LibrarySort sort;
+}
+
+class LibraryPage {
+  const LibraryPage({
+    required this.items,
+    required this.startIndex,
+    required this.limit,
+    required this.totalRecordCount,
+  });
+
+  final List<BrowseItem> items;
+  final int startIndex;
+  final int limit;
+  final int totalRecordCount;
+
+  bool get hasMore => startIndex + items.length < totalRecordCount;
+}
+
 class _NoSession implements Exception {
   @override
   String toString() => 'No active Jellyfin session';
@@ -41,7 +73,8 @@ class JellyfinRepository {
       queryParameters: {
         'MediaTypes': 'Video',
         'Limit': limit,
-        'Fields': 'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage',
+        'Fields':
+            'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage',
         'EnableImages': true,
       },
     );
@@ -73,24 +106,135 @@ class JellyfinRepository {
   /// Empty/blank queries short-circuit to an empty list — callers shouldn't
   /// have to special-case it.
   Future<List<BrowseItem>> search(String query, {int limit = 50}) async {
+    return searchAdvanced(query, limit: limit);
+  }
+
+  Future<List<BrowseItem>> searchAdvanced(
+    String query, {
+    int limit = 50,
+    String? genre,
+    int? year,
+    bool unwatchedOnly = false,
+    String itemTypes = 'Movie,Series',
+  }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
     final s = _session;
+    final queryParameters = <String, dynamic>{
+      'searchTerm': trimmed,
+      'IncludeItemTypes': itemTypes,
+      'Recursive': true,
+      'Limit': limit,
+      'Fields': 'UserData,ProductionYear,ChildCount',
+      'EnableImages': true,
+      if (genre != null && genre.trim().isNotEmpty) 'Genres': genre.trim(),
+      if (year != null) 'Years': '$year',
+      if (unwatchedOnly) 'Filters': 'IsUnplayed',
+    };
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items',
-      queryParameters: {
-        'searchTerm': trimmed,
-        'IncludeItemTypes': 'Movie,Series',
-        'Recursive': true,
-        'Limit': limit,
-        'Fields': 'UserData,ProductionYear,ChildCount',
-        'EnableImages': true,
-      },
+      queryParameters: queryParameters,
     );
     return ((res.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
         .toList();
+  }
+
+  Future<LibraryPage> browseMovies({
+    int startIndex = 0,
+    int limit = 30,
+    LibraryFilter filter = const LibraryFilter(),
+  }) {
+    return _browse(
+      itemTypes: 'Movie',
+      startIndex: startIndex,
+      limit: limit,
+      filter: filter,
+    );
+  }
+
+  Future<LibraryPage> browseShows({
+    int startIndex = 0,
+    int limit = 30,
+    LibraryFilter filter = const LibraryFilter(),
+  }) {
+    return _browse(
+      itemTypes: 'Series',
+      startIndex: startIndex,
+      limit: limit,
+      filter: filter,
+    );
+  }
+
+  Future<List<String>> getGenres({required String itemType}) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Genres',
+      queryParameters: {'UserId': s.userId, 'IncludeItemTypes': itemType},
+    );
+    final items = ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
+    return items
+        .map((e) => (e['Name'] as String?)?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<LibraryPage> _browse({
+    required String itemTypes,
+    required int startIndex,
+    required int limit,
+    required LibraryFilter filter,
+  }) async {
+    final s = _session;
+    final params = <String, dynamic>{
+      'IncludeItemTypes': itemTypes,
+      'Recursive': true,
+      'StartIndex': startIndex,
+      'Limit': limit,
+      'Fields': 'UserData,ProductionYear,ChildCount',
+      'EnableImages': true,
+      ..._sortParams(filter.sort),
+      if (filter.genre != null && filter.genre!.trim().isNotEmpty)
+        'Genres': filter.genre!.trim(),
+      if (filter.year != null) 'Years': '${filter.year}',
+      if (filter.unwatchedOnly) 'Filters': 'IsUnplayed',
+    };
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: params,
+    );
+    final data = res.data ?? const <String, dynamic>{};
+    final items = ((data['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+    return LibraryPage(
+      items: items,
+      startIndex: startIndex,
+      limit: limit,
+      totalRecordCount: data['TotalRecordCount'] as int? ?? items.length,
+    );
+  }
+
+  Map<String, String> _sortParams(LibrarySort sort) {
+    switch (sort) {
+      case LibrarySort.nameAsc:
+        return const {'SortBy': 'SortName', 'SortOrder': 'Ascending'};
+      case LibrarySort.nameDesc:
+        return const {'SortBy': 'SortName', 'SortOrder': 'Descending'};
+      case LibrarySort.yearDesc:
+        return const {
+          'SortBy': 'ProductionYear,SortName',
+          'SortOrder': 'Descending',
+        };
+      case LibrarySort.recentlyAdded:
+        return const {
+          'SortBy': 'DateCreated,SortName',
+          'SortOrder': 'Descending',
+        };
+    }
   }
 
   Future<List<BrowseItem>> recentlyAddedShows({int limit = 16}) async {
@@ -141,17 +285,15 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Shows/$seriesId/Seasons',
-      queryParameters: {
-        'UserId': s.userId,
-        'Fields': 'ChildCount',
-      },
+      queryParameters: {'UserId': s.userId, 'Fields': 'ChildCount'},
     );
     final items = ((res.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(Season.fromJson)
         .toList();
-    items.sort((a, b) =>
-        (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30));
+    items.sort(
+      (a, b) => (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30),
+    );
     return items;
   }
 
@@ -170,9 +312,72 @@ class JellyfinRepository {
         .cast<Map<String, dynamic>>()
         .map(Episode.fromJson)
         .toList();
-    items.sort((a, b) =>
-        (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30));
+    items.sort(
+      (a, b) => (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30),
+    );
     return items;
+  }
+
+  Future<Season> getSeason(String seasonId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$seasonId',
+      queryParameters: const {'Fields': 'ChildCount'},
+    );
+    final data = res.data;
+    if (data == null) {
+      throw StateError('Empty response for season $seasonId');
+    }
+    return Season.fromJson(data);
+  }
+
+  Future<Episode> getEpisode(String episodeId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$episodeId',
+      queryParameters: const {
+        'Fields': 'Overview,UserData,RunTimeTicks,SeriesId,SeasonId',
+      },
+    );
+    final data = res.data;
+    if (data == null) {
+      throw StateError('Empty response for episode $episodeId');
+    }
+    return Episode.fromJson(data);
+  }
+
+  Future<Episode?> getNextEpisode({
+    required String seriesId,
+    required int seasonNumber,
+    required int episodeNumber,
+  }) async {
+    final s = _session;
+    final currentKey = seasonNumber * 1000 + episodeNumber;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Shows/$seriesId/Episodes',
+      queryParameters: {
+        'UserId': s.userId,
+        'Fields': 'Overview,UserData,RunTimeTicks,SeriesId,SeasonId',
+        'Limit': 200,
+      },
+    );
+    final items = ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(Episode.fromJson)
+        .toList();
+    Episode? best;
+    var bestKey = 1 << 30;
+    for (final ep in items) {
+      final sNum = ep.parentIndexNumber;
+      final eNum = ep.indexNumber;
+      if (sNum == null || eNum == null) continue;
+      final key = sNum * 1000 + eNum;
+      if (key > currentKey && key < bestKey) {
+        best = ep;
+        bestKey = key;
+      }
+    }
+    return best;
   }
 
   /// Direct-stream URL for a movie or episode. Returns the original file via
@@ -212,20 +417,14 @@ class JellyfinRepository {
       );
       final data = res.data;
       if (data == null) {
-        return StreamSource(
-          url: streamUrl(itemId),
-          isTranscoding: false,
-        );
+        return StreamSource(url: streamUrl(itemId), isTranscoding: false);
       }
 
       final sources =
           (data['MediaSources'] as List?)?.cast<Map<String, dynamic>>() ??
-              const [];
+          const [];
       if (sources.isEmpty) {
-        return StreamSource(
-          url: streamUrl(itemId),
-          isTranscoding: false,
-        );
+        return StreamSource(url: streamUrl(itemId), isTranscoding: false);
       }
 
       // Use the first source — Jellyfin orders these with the playable one
@@ -234,12 +433,12 @@ class JellyfinRepository {
       final mediaSourceId = src['Id'] as String?;
       final supportsDirectStream =
           (src['SupportsDirectStream'] as bool?) ?? false;
-      final supportsDirectPlay =
-          (src['SupportsDirectPlay'] as bool?) ?? false;
+      final supportsDirectPlay = (src['SupportsDirectPlay'] as bool?) ?? false;
       final transcodingUrl = src['TranscodingUrl'] as String?;
       // PlaySessionId can live at the source or top level depending on server
       // version; check both.
-      final playSessionId = (src['PlaySessionId'] as String?) ??
+      final playSessionId =
+          (src['PlaySessionId'] as String?) ??
           (data['PlaySessionId'] as String?) ??
           const Uuid().v4();
       final externalSubs = _externalSubtitles(src, itemId);
@@ -279,10 +478,7 @@ class JellyfinRepository {
     } catch (_) {
       // Negotiation failed — fall back to the simple static URL. Better to
       // try playback than to block on a server quirk.
-      return StreamSource(
-        url: streamUrl(itemId),
-        isTranscoding: false,
-      );
+      return StreamSource(url: streamUrl(itemId), isTranscoding: false);
     }
   }
 
@@ -305,7 +501,8 @@ class JellyfinRepository {
   ) {
     final s = _session;
     final mediaSourceId = (src['Id'] as String?) ?? itemId;
-    final streams = (src['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
+    final streams = (src['MediaStreams'] as List?)
+        ?.cast<Map<String, dynamic>>();
     if (streams == null) return const [];
 
     final out = <ExternalSubtitle>[];
@@ -314,7 +511,8 @@ class JellyfinRepository {
       final deliveryMethod = st['DeliveryMethod'] as String?;
       final deliveryUrl = st['DeliveryUrl'] as String?;
       final isExternal = st['IsExternal'] == true;
-      final isExtractable = deliveryMethod == 'External' ||
+      final isExtractable =
+          deliveryMethod == 'External' ||
           (deliveryUrl != null && deliveryUrl.isNotEmpty) ||
           isExternal;
       if (!isExtractable) continue;
@@ -332,13 +530,15 @@ class JellyfinRepository {
       );
       if (url == null) continue;
 
-      out.add(ExternalSubtitle(
-        id: url,
-        url: url,
-        title: (st['DisplayTitle'] as String?) ?? (st['Title'] as String?),
-        language: st['Language'] as String?,
-        codec: codec,
-      ));
+      out.add(
+        ExternalSubtitle(
+          id: url,
+          url: url,
+          title: (st['DisplayTitle'] as String?) ?? (st['Title'] as String?),
+          language: st['Language'] as String?,
+          codec: codec,
+        ),
+      );
     }
     return out;
   }
@@ -373,7 +573,8 @@ class JellyfinRepository {
   }) {
     String? raw;
     if (index != null) {
-      raw = '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/'
+      raw =
+          '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/'
           'Stream.vtt';
     } else if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
       raw = deliveryUrl.startsWith('http')
@@ -393,9 +594,7 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$itemId',
-      queryParameters: {
-        'Fields': 'MediaSources,MediaStreams',
-      },
+      queryParameters: {'Fields': 'MediaSources,MediaStreams'},
     );
     final data = res.data;
     if (data == null) {
@@ -405,9 +604,11 @@ class JellyfinRepository {
     // MediaStreams can come either flat at the item level or nested under the
     // first MediaSource — check both for robustness across server versions.
     final flat = (data['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
-    final fromSources = ((data['MediaSources'] as List?)
-                ?.cast<Map<String, dynamic>>()
-                .firstOrNull?['MediaStreams'] as List?)
+    final fromSources =
+        ((data['MediaSources'] as List?)
+                    ?.cast<Map<String, dynamic>>()
+                    .firstOrNull?['MediaStreams']
+                as List?)
             ?.cast<Map<String, dynamic>>() ??
         const [];
     final raw = flat ?? fromSources;
@@ -478,8 +679,9 @@ class JellyfinRepository {
       return '${s.serverUrl}/Items/$itemId/Images/Backdrop'
           '?fillWidth=$width&tag=$backdropTag&api_key=${s.accessToken}';
     }
-    final tagParam =
-        fallbackPrimaryTag != null ? '&tag=$fallbackPrimaryTag' : '';
+    final tagParam = fallbackPrimaryTag != null
+        ? '&tag=$fallbackPrimaryTag'
+        : '';
     return '${s.serverUrl}/Items/$itemId/Images/Primary'
         '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
   }
@@ -503,10 +705,7 @@ const Map<String, dynamic> _libmpvDeviceProfile = {
       'AudioCodec':
           'aac,ac3,eac3,mp3,mp2,opus,flac,vorbis,pcm,truehd,dts,dca,wav,wma',
     },
-    {
-      'Type': 'Audio',
-      'Container': 'aac,mp3,opus,flac,wav,m4a,ogg,wma',
-    },
+    {'Type': 'Audio', 'Container': 'aac,mp3,opus,flac,wav,m4a,ogg,wma'},
   ],
   'TranscodingProfiles': [
     {

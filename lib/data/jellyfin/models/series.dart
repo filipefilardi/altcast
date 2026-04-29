@@ -72,6 +72,8 @@ class Season {
   const Season({
     required this.id,
     required this.name,
+    this.seriesId,
+    this.seriesName,
     this.indexNumber,
     this.imageTag,
     this.episodeCount,
@@ -79,6 +81,8 @@ class Season {
 
   final String id;
   final String name;
+  final String? seriesId;
+  final String? seriesName;
   final int? indexNumber;
   final String? imageTag;
   final int? episodeCount;
@@ -88,6 +92,8 @@ class Season {
     return Season(
       id: json['Id'] as String,
       name: json['Name'] as String? ?? 'Season',
+      seriesId: json['SeriesId'] as String?,
+      seriesName: json['SeriesName'] as String?,
       indexNumber: json['IndexNumber'] as int?,
       imageTag: (tags is Map && tags['Primary'] is String)
           ? tags['Primary'] as String

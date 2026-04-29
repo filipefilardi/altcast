@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
+import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../home/widgets/poster_card.dart';
 import 'search_providers.dart';
@@ -48,11 +49,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
+    final filters = ref.watch(searchFiltersProvider);
     final results = ref.watch(searchResultsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search'),
+        actions: [
+          IconButton(
+            tooltip: 'Filters',
+            onPressed: _showFilters,
+            icon: const Icon(Icons.tune),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
@@ -80,15 +89,145 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ),
-      body: _Body(query: query, results: results),
+      body: _Body(query: query, results: results, filters: filters),
+    );
+  }
+
+  Future<void> _showFilters() async {
+    if (!mounted) return;
+    final current = ref.read(searchFiltersProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        String? genre = current.genre;
+        int? year = current.year;
+        bool unwatched = current.unwatchedOnly;
+        bool movies = current.includeMovies;
+        bool shows = current.includeShows;
+        LibrarySort sort = current.sort;
+        final yearController = TextEditingController(
+          text: year?.toString() ?? '',
+        );
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Search filters',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<LibrarySort>(
+                      value: sort,
+                      decoration: const InputDecoration(labelText: 'Sort'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: LibrarySort.recentlyAdded,
+                          child: Text('Most relevant/recent'),
+                        ),
+                        DropdownMenuItem(
+                          value: LibrarySort.nameAsc,
+                          child: Text('Name A-Z'),
+                        ),
+                        DropdownMenuItem(
+                          value: LibrarySort.nameDesc,
+                          child: Text('Name Z-A'),
+                        ),
+                        DropdownMenuItem(
+                          value: LibrarySort.yearDesc,
+                          child: Text('Year (newest first)'),
+                        ),
+                      ],
+                      onChanged: (v) => setModalState(() => sort = v ?? sort),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      initialValue: genre ?? '',
+                      decoration: const InputDecoration(labelText: 'Genre'),
+                      onChanged: (v) =>
+                          genre = v.trim().isEmpty ? null : v.trim(),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: yearController,
+                      decoration: const InputDecoration(labelText: 'Year'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => year = int.tryParse(v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Unwatched only'),
+                      value: unwatched,
+                      onChanged: (v) => setModalState(() => unwatched = v),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Movies'),
+                      value: movies,
+                      onChanged: (v) => setModalState(() => movies = v ?? true),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('TV Shows'),
+                      value: shows,
+                      onChanged: (v) => setModalState(() => shows = v ?? true),
+                    ),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            ref.read(searchFiltersProvider.notifier).clear();
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Clear'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () {
+                            ref
+                                .read(searchFiltersProvider.notifier)
+                                .set(
+                                  SearchFilterState(
+                                    genre: genre,
+                                    year: year,
+                                    unwatchedOnly: unwatched,
+                                    includeMovies: movies,
+                                    includeShows: shows,
+                                    sort: sort,
+                                  ),
+                                );
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.query, required this.results});
+  const _Body({
+    required this.query,
+    required this.results,
+    required this.filters,
+  });
   final String query;
   final AsyncValue<List<BrowseItem>> results;
+  final SearchFilterState filters;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +243,20 @@ class _Body extends StatelessWidget {
     }
     return results.when(
       data: (items) {
-        if (items.isEmpty) {
+        final sorted = [...items]
+          ..sort((a, b) {
+            switch (filters.sort) {
+              case LibrarySort.nameAsc:
+                return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+              case LibrarySort.nameDesc:
+                return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+              case LibrarySort.yearDesc:
+                return (b.year ?? 0).compareTo(a.year ?? 0);
+              case LibrarySort.recentlyAdded:
+                return 0;
+            }
+          });
+        if (sorted.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
@@ -114,15 +266,17 @@ class _Body extends StatelessWidget {
             ),
           );
         }
-        final movies = items
+        final movies = sorted
             .where((i) => i.kind == MediaKind.movie)
             .toList(growable: false);
-        final shows = items
+        final shows = sorted
             .where((i) => i.kind == MediaKind.series)
             .toList(growable: false);
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
+            _SearchFilterSummary(filters: filters),
+            const SizedBox(height: 12),
             if (movies.isNotEmpty) ...[
               _SectionHeader(label: 'Movies', count: movies.length),
               const SizedBox(height: 12),
@@ -144,11 +298,54 @@ class _Body extends StatelessWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ErrorStateView(
-          title: 'Search failed',
-          message: e.toString(),
-        ),
+        child: ErrorStateView(title: 'Search failed', message: e.toString()),
       ),
+    );
+  }
+}
+
+class _SearchFilterSummary extends StatelessWidget {
+  const _SearchFilterSummary({required this.filters});
+  final SearchFilterState filters;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <String>[
+      if (filters.genre != null) filters.genre!,
+      if (filters.year != null) '${filters.year}',
+      if (filters.unwatchedOnly) 'Unwatched',
+      if (!filters.includeMovies) 'No Movies',
+      if (!filters.includeShows) 'No Shows',
+      switch (filters.sort) {
+        LibrarySort.nameAsc => 'A-Z',
+        LibrarySort.nameDesc => 'Z-A',
+        LibrarySort.yearDesc => 'Year',
+        LibrarySort.recentlyAdded => 'Recent',
+      },
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: chips
+          .map(
+            (c) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Text(
+                c,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }
@@ -170,9 +367,9 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           count.toString(),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.textTertiary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: AppColors.textTertiary),
         ),
       ],
     );
@@ -228,10 +425,8 @@ class _SearchSkeleton extends StatelessWidget {
               childAspectRatio: 0.55,
             ),
             itemCount: 6,
-            itemBuilder: (_, __) => Skeleton.box(
-              width: double.infinity,
-              height: double.infinity,
-            ),
+            itemBuilder: (_, __) =>
+                Skeleton.box(width: double.infinity, height: double.infinity),
           ),
         ],
       ),
@@ -246,8 +441,8 @@ void _openDetail(BuildContext context, BrowseItem item) {
     case MediaKind.series:
       context.push('/series/${item.id}');
     case MediaKind.season:
+      context.push('/season/${item.id}');
     case MediaKind.episode:
-      final id = item.seriesId ?? item.id;
-      context.push('/series/$id');
+      context.push('/episode/${item.id}');
   }
 }
