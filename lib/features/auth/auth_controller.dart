@@ -76,6 +76,10 @@ class AuthController extends Notifier<AuthState> {
     if (e.response?.statusCode == 401) {
       return 'Invalid username or password.';
     }
+    if (e.type == DioExceptionType.badCertificate) {
+      return 'HTTPS certificate could not be verified (common with self-signed certs). '
+          'Try http:// if your server allows plain HTTP, or use a trusted certificate.';
+    }
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.connectionError) {
       return 'Could not reach server. Check the URL and your network.';

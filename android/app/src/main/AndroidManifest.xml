@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for Jellyfin API calls in release (debug/profile manifests are not merged into release). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="altcast"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
