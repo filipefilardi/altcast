@@ -124,7 +124,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<LibrarySort>(
-                      value: sort,
+                      initialValue: sort,
                       decoration: const InputDecoration(labelText: 'Sort'),
                       items: const [
                         DropdownMenuItem(
@@ -425,7 +425,7 @@ class _SearchSkeleton extends StatelessWidget {
               childAspectRatio: 0.55,
             ),
             itemCount: 6,
-            itemBuilder: (_, __) =>
+            itemBuilder: (_, _) =>
                 Skeleton.box(width: double.infinity, height: double.infinity),
           ),
         ],

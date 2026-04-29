@@ -99,7 +99,7 @@ class TrackPreferenceRow extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       // Streams fetch is cosmetic — if it fails, the in-player picker still
       // works. Don't show an error state on the detail screen.
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -123,9 +123,8 @@ class TrackPreferenceRow extends ConsumerWidget {
       case SubPreferenceKind.off:
         return 'Subtitles: Off';
       case SubPreferenceKind.byLang:
-        final mapped = languageDisplay(preference.subLang) ??
-            preference.subLang ??
-            'On';
+        final mapped =
+            languageDisplay(preference.subLang) ?? preference.subLang ?? 'On';
         return 'Subtitles: $mapped';
     }
   }
@@ -134,7 +133,8 @@ class TrackPreferenceRow extends ConsumerWidget {
     if (s == null) return fallback;
     final mapped = languageDisplay(s.language);
     if (mapped != null) {
-      if (s.channels != null && s.channels! > 2) return '$mapped ${s.channels}.0';
+      if (s.channels != null && s.channels! > 2)
+        return '$mapped ${s.channels}.0';
       return mapped;
     }
     final raw = (s.displayTitle ?? s.title ?? '').trim();
@@ -157,26 +157,31 @@ class TrackPreferenceRow extends ConsumerWidget {
             label: 'Server default',
             selected: preference.audioLang == null,
             onTap: () {
-              onChanged(TrackPreference(
-                audioLang: null,
-                subKind: preference.subKind,
-                subLang: preference.subLang,
-              ));
+              onChanged(
+                TrackPreference(
+                  audioLang: null,
+                  subKind: preference.subKind,
+                  subLang: preference.subLang,
+                ),
+              );
               Navigator.of(sheetCtx).pop();
             },
           ),
           for (final s in streams.audio)
             _PickerRow(
               label: _audioRowLabel(s),
-              selected: preference.audioLang != null &&
+              selected:
+                  preference.audioLang != null &&
                   preference.audioLang!.toLowerCase() ==
                       (s.language ?? '').toLowerCase(),
               onTap: () {
-                onChanged(TrackPreference(
-                  audioLang: s.language,
-                  subKind: preference.subKind,
-                  subLang: preference.subLang,
-                ));
+                onChanged(
+                  TrackPreference(
+                    audioLang: s.language,
+                    subKind: preference.subKind,
+                    subLang: preference.subLang,
+                  ),
+                );
                 Navigator.of(sheetCtx).pop();
               },
             ),
@@ -185,10 +190,7 @@ class TrackPreferenceRow extends ConsumerWidget {
     );
   }
 
-  Future<void> _pickSub(
-    BuildContext context,
-    ItemMediaStreams streams,
-  ) async {
+  Future<void> _pickSub(BuildContext context, ItemMediaStreams streams) async {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -200,26 +202,31 @@ class TrackPreferenceRow extends ConsumerWidget {
             label: 'Off',
             selected: preference.subKind != SubPreferenceKind.byLang,
             onTap: () {
-              onChanged(TrackPreference(
-                audioLang: preference.audioLang,
-                subKind: SubPreferenceKind.off,
-              ));
+              onChanged(
+                TrackPreference(
+                  audioLang: preference.audioLang,
+                  subKind: SubPreferenceKind.off,
+                ),
+              );
               Navigator.of(sheetCtx).pop();
             },
           ),
           for (final s in streams.subtitle)
             _PickerRow(
               label: _subRowLabel(s),
-              selected: preference.subKind == SubPreferenceKind.byLang &&
+              selected:
+                  preference.subKind == SubPreferenceKind.byLang &&
                   preference.subLang != null &&
                   preference.subLang!.toLowerCase() ==
                       (s.language ?? '').toLowerCase(),
               onTap: () {
-                onChanged(TrackPreference(
-                  audioLang: preference.audioLang,
-                  subKind: SubPreferenceKind.byLang,
-                  subLang: s.language,
-                ));
+                onChanged(
+                  TrackPreference(
+                    audioLang: preference.audioLang,
+                    subKind: SubPreferenceKind.byLang,
+                    subLang: s.language,
+                  ),
+                );
                 Navigator.of(sheetCtx).pop();
               },
             ),
@@ -250,11 +257,7 @@ class TrackPreferenceRow extends ConsumerWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _Pill({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -369,7 +372,7 @@ class _PickerRow extends StatelessWidget {
   }
 }
 
-final _streamsProvider =
-    FutureProvider.autoDispose.family<ItemMediaStreams, String>((ref, id) {
-  return ref.watch(jellyfinRepositoryProvider).getMediaStreams(id);
-});
+final _streamsProvider = FutureProvider.autoDispose
+    .family<ItemMediaStreams, String>((ref, id) {
+      return ref.watch(jellyfinRepositoryProvider).getMediaStreams(id);
+    });

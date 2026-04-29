@@ -210,7 +210,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<LibrarySort>(
-                      value: localSort,
+                      initialValue: localSort,
                       decoration: const InputDecoration(labelText: 'Sort'),
                       items: const [
                         DropdownMenuItem(
@@ -235,7 +235,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String?>(
-                      value: localGenre,
+                      initialValue: localGenre,
                       decoration: const InputDecoration(labelText: 'Genre'),
                       items: [
                         const DropdownMenuItem<String?>(
@@ -337,7 +337,7 @@ class _FilterSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <String>[
       _sortLabel(sort),
-      if (genre != null) genre!,
+      ?genre,
       if (year != null) '$year',
       if (unwatchedOnly) 'Unwatched',
     ];
