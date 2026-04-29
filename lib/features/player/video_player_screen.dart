@@ -16,6 +16,7 @@ import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/stream_source.dart';
+import '../../data/jellyfin/models/episode.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
@@ -34,6 +35,9 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     this.resumeTicks,
     this.preferredAudioLang,
     this.preferredSubLang,
+    this.seriesId,
+    this.seasonNumber,
+    this.episodeNumber,
   });
 
   final String itemId;
@@ -51,6 +55,9 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   /// explicitly disable. Matches both embedded and external subs by
   /// language. `null` → no override.
   final String? preferredSubLang;
+  final String? seriesId;
+  final int? seasonNumber;
+  final int? episodeNumber;
 
   @override
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -73,6 +80,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<bool>? _completedSub;
+  StreamSubscription<Duration>? _durationSub;
+  Episode? _nextEpisode;
+  bool _showNextUp = false;
+  int _autoplayCountdown = 8;
+  Timer? _autoplayTimer;
+  Duration _mediaDuration = Duration.zero;
 
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
   /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
@@ -164,10 +177,27 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       }
 
       if (mounted) _applyTrackPreferences();
+      await _resolveNextEpisode();
     } catch (e) {
       if (!mounted) return;
       setState(() => _openError = e);
     }
+  }
+
+  Future<void> _resolveNextEpisode() async {
+    final seriesId = widget.seriesId;
+    final season = widget.seasonNumber;
+    final episode = widget.episodeNumber;
+    if (seriesId == null || season == null || episode == null) return;
+    _nextEpisode = await ref
+        .read(jellyfinRepositoryProvider)
+        .getNextEpisode(
+          seriesId: seriesId,
+          seasonNumber: season,
+          episodeNumber: episode,
+        );
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _setSubVisibility(bool visible) {
@@ -283,19 +313,81 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // Jellyfin marks it played.
     _completedSub = _player.stream.completed.listen((completed) {
       if (completed) {
+        _cancelAutoplay();
         scrobbler.stop(
           positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
         );
+        if (_nextEpisode != null) {
+          _startAutoplay();
+        }
       }
     });
+    _durationSub = _player.stream.duration.listen((d) => _mediaDuration = d);
+    _positionSub?.cancel();
+    _positionSub = _player.stream.position.listen((p) {
+      _lastPosition = p;
+      _maybeShowNextUp();
+    });
+  }
+
+  void _maybeShowNextUp() {
+    if (_nextEpisode == null || _mediaDuration <= Duration.zero) return;
+    final remaining = _mediaDuration - _lastPosition;
+    if (remaining <= const Duration(seconds: 30) && !_showNextUp) {
+      setState(() => _showNextUp = true);
+    }
+  }
+
+  void _startAutoplay() {
+    if (!mounted || _nextEpisode == null) return;
+    setState(() {
+      _showNextUp = true;
+      _autoplayCountdown = 8;
+    });
+    _autoplayTimer?.cancel();
+    _autoplayTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_autoplayCountdown <= 1) {
+        t.cancel();
+        _playNextEpisode();
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _autoplayCountdown -= 1);
+    });
+  }
+
+  void _cancelAutoplay() {
+    _autoplayTimer?.cancel();
+    _autoplayTimer = null;
+    if (mounted && _showNextUp) {
+      setState(() => _showNextUp = false);
+    }
+  }
+
+  void _playNextEpisode() {
+    final next = _nextEpisode;
+    if (next == null || !mounted) return;
+    final query = <String, String>{
+      if (next.seriesId.isNotEmpty) 'seriesId': next.seriesId,
+      if (next.parentIndexNumber != null)
+        'seasonNumber': '${next.parentIndexNumber}',
+      if (next.indexNumber != null) 'episodeNumber': '${next.indexNumber}',
+    };
+    final uri = Uri(
+      path: '/play/${next.id}',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    context.go(uri.toString());
   }
 
   @override
   void dispose() {
     _progressTimer?.cancel();
+    _autoplayTimer?.cancel();
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
+    _durationSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
     _scrobbler?.stop(positionTicks: _lastPosition.inMilliseconds * _ticksPerMs);
     // Release the server-side transcoder if we were transcoding. Fire-and-
@@ -380,6 +472,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   onPressed: () => _showTracksSheet(context),
                 ),
               ),
+            if (_showNextUp && _nextEpisode != null)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: _NextUpCard(
+                  episode: _nextEpisode!,
+                  countdown: _autoplayCountdown,
+                  onCancel: _cancelAutoplay,
+                  onPlayNow: _playNextEpisode,
+                ),
+              ),
           ],
         ),
       ),
@@ -414,6 +517,62 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _setSubVisibility(true);
           }
         },
+      ),
+    );
+  }
+}
+
+class _NextUpCard extends StatelessWidget {
+  const _NextUpCard({
+    required this.episode,
+    required this.countdown,
+    required this.onCancel,
+    required this.onPlayNow,
+  });
+
+  final Episode episode;
+  final int countdown;
+  final VoidCallback onCancel;
+  final VoidCallback onPlayNow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Next Up', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 6),
+          Text(
+            episode.shortLabel.isEmpty
+                ? episode.name
+                : '${episode.shortLabel} • ${episode.name}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              TextButton(onPressed: onCancel, child: const Text('Cancel')),
+              const Spacer(),
+              FilledButton(
+                onPressed: onPlayNow,
+                child: Text('Play now ($countdown)'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

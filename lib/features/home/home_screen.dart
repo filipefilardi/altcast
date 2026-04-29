@@ -123,7 +123,8 @@ class _Greeting extends StatelessWidget {
             children: [
               ShaderMask(
                 blendMode: BlendMode.srcIn,
-                shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
+                shaderCallback: (bounds) =>
+                    AppGradients.accent.createShader(bounds),
                 child: Text('AltCast', style: displayTitle),
               ),
               const SizedBox(height: 8),
@@ -270,9 +271,9 @@ void _openDetail(BuildContext context, BrowseItem item) {
       context.push('/movie/${item.id}');
     case MediaKind.series:
       context.push('/series/${item.id}');
-    case MediaKind.episode:
     case MediaKind.season:
-      final id = item.seriesId ?? item.id;
-      context.push('/series/$id');
+      context.push('/season/${item.id}');
+    case MediaKind.episode:
+      context.push('/episode/${item.id}');
   }
 }

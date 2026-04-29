@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
+import '../../data/local/playback_preferences.dart';
 import '../../features/auth/auth_controller.dart';
 
 final _serverInfoProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((
@@ -66,6 +67,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          const _PlaybackGroup(),
+          const SizedBox(height: 24),
+          const _ConnectionGroup(),
           const SizedBox(height: 28),
           const _SignOutTile(),
           const SizedBox(height: 28),
@@ -85,6 +90,88 @@ class SettingsScreen extends ConsumerWidget {
       if (pending > 0) '$pending downloading',
     ];
     return parts.join(' • ');
+  }
+}
+
+class _PlaybackGroup extends ConsumerWidget {
+  const _PlaybackGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(playbackPreferencesProvider);
+    return _SettingsGroup(
+      label: 'Playback',
+      children: [
+        ListTile(
+          leading: const Icon(Icons.high_quality_outlined),
+          title: const Text('Streaming quality'),
+          subtitle: Text(
+            prefs.streamingQuality.label,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showStreamingQualitySheet(context),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.wifi_outlined),
+          title: const Text('Wi-Fi only streaming'),
+          subtitle: const Text(
+            'Block playback when only mobile data is available.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.wifiOnlyStreaming,
+          onChanged: (v) => ref
+              .read(playbackPreferencesProvider.notifier)
+              .setWifiOnlyStreaming(v),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConnectionGroup extends ConsumerWidget {
+  const _ConnectionGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _SettingsGroup(
+      label: 'Connection',
+      children: [
+        ListTile(
+          leading: const Icon(Icons.network_check_outlined),
+          title: const Text('Test server connection'),
+          subtitle: const Text(
+            'Checks that your Jellyfin server is reachable.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.play_arrow_rounded,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () async {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Testing connection...')),
+            );
+            final info = await ref.read(_serverInfoProvider.future);
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  info == null
+                      ? 'Server unreachable'
+                      : 'Connected to ${info['ServerName'] ?? 'Jellyfin'}',
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 
@@ -335,6 +422,52 @@ class _VersionFooter extends ConsumerWidget {
   }
 }
 
+Future<void> _showStreamingQualitySheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final current = ref.watch(playbackPreferencesProvider).streamingQuality;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Streaming quality',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                for (final q in StreamingQuality.values)
+                  RadioListTile<StreamingQuality>(
+                    value: q,
+                    groupValue: current,
+                    title: Text(q.label),
+                    subtitle: Text(
+                      q.subtitle,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) async {
+                      if (v == null) return;
+                      await ref
+                          .read(playbackPreferencesProvider.notifier)
+                          .setStreamingQuality(v);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup({required this.label, required this.children});
 
@@ -371,4 +504,3 @@ class _SettingsGroup extends StatelessWidget {
     );
   }
 }
-

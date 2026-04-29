@@ -43,13 +43,13 @@ class LibraryScreen extends ConsumerWidget {
             icon: Icons.movie_outlined,
             label: 'Movies',
             subtitle: 'Browse all movies',
-            onTap: null, // Coming in a follow-up.
+            onTap: () => context.push('/library/movies'),
           ),
           _LibraryTile(
             icon: Icons.tv_outlined,
             label: 'TV Shows',
             subtitle: 'Browse all shows',
-            onTap: null,
+            onTap: () => context.push('/library/shows'),
           ),
         ],
       ),
