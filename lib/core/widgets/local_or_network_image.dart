@@ -41,7 +41,7 @@ class LocalOrNetworkImage extends StatelessWidget {
         return Image.file(
           File(path),
           fit: fit,
-          errorBuilder: (ctx, _, __) => _fallback(ctx),
+          errorBuilder: (ctx, _, _) => _fallback(ctx),
         );
       } catch (_) {
         return _fallback(context);
@@ -54,7 +54,7 @@ class LocalOrNetworkImage extends StatelessWidget {
       placeholder: placeholderBuilder == null
           ? null
           : (ctx, _) => placeholderBuilder!(ctx),
-      errorWidget: (ctx, _, __) => _fallback(ctx),
+      errorWidget: (ctx, _, _) => _fallback(ctx),
     );
   }
 }

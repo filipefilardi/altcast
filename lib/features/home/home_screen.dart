@@ -212,8 +212,8 @@ class _SkeletonRow extends StatelessWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: 4,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => Skeleton.box(width: 132, height: height - 8),
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (_, _) => Skeleton.box(width: 132, height: height - 8),
         ),
       ),
     );
@@ -231,7 +231,7 @@ class _ResumeRow extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => ResumeCard(
           item: items[i],
           onTap: () => _openDetail(context, items[i]),
@@ -252,7 +252,7 @@ class _PosterRow extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => PosterCard(
           item: items[i],
           onTap: () => _openDetail(context, items[i]),

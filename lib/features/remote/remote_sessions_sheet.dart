@@ -84,7 +84,7 @@ class _RemoteSessionsSheet extends ConsumerWidget {
                     shrinkWrap: true,
                     padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
                     itemCount: sessions.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (_, i) => _SessionRow(
                       session: sessions[i],
                       itemId: itemId,
@@ -135,10 +135,7 @@ class _SessionRow extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  _iconForClient(session.client),
-                  color: AppColors.primary,
-                ),
+                Icon(_iconForClient(session.client), color: AppColors.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -201,18 +198,14 @@ class _SessionRow extends ConsumerWidget {
           duration: const Duration(seconds: 3),
           action: SnackBarAction(
             label: 'Stop',
-            onPressed: () => repo.sendCommand(
-              sessionId: session.id,
-              command: 'Stop',
-            ),
+            onPressed: () =>
+                repo.sendCommand(sessionId: session.id, command: 'Stop'),
           ),
         ),
       );
     } catch (e) {
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(content: Text('Cast failed: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Cast failed: $e')));
     }
   }
 
@@ -302,13 +295,13 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.stop_rounded,
-                    color: AppColors.textSecondary),
-                tooltip: 'Stop',
-                onPressed: () => repo.sendCommand(
-                  sessionId: session.id,
-                  command: 'Stop',
+                icon: const Icon(
+                  Icons.stop_rounded,
+                  color: AppColors.textSecondary,
                 ),
+                tooltip: 'Stop',
+                onPressed: () =>
+                    repo.sendCommand(sessionId: session.id, command: 'Stop'),
               ),
             ],
           ),
@@ -319,10 +312,8 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 2,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape:
-                    const RoundSliderOverlayShape(overlayRadius: 12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               ),
               child: Slider(
                 value: value.clamp(0, 1),
@@ -347,18 +338,18 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    formatDuration(Duration(
-                      microseconds: ((value * totalTicks).round()) ~/ 10,
-                    )),
+                    formatDuration(
+                      Duration(
+                        microseconds: ((value * totalTicks).round()) ~/ 10,
+                      ),
+                    ),
                     style: const TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 11,
                     ),
                   ),
                   Text(
-                    formatDuration(
-                      Duration(microseconds: totalTicks ~/ 10),
-                    ),
+                    formatDuration(Duration(microseconds: totalTicks ~/ 10)),
                     style: const TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 11,
