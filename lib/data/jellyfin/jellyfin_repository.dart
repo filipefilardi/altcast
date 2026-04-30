@@ -276,9 +276,11 @@ class JellyfinRepository {
   }) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
-      '/Collections/$collectionId/Items',
+      '/Users/${s.userId}/Items',
       queryParameters: {
-        'UserId': s.userId,
+        'ParentId': collectionId,
+        'IncludeItemTypes': 'Movie,Series,Season,Episode,BoxSet',
+        'Recursive': false,
         'Limit': limit,
         'Fields': 'UserData,ProductionYear,ChildCount',
         'EnableImages': true,
