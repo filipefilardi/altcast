@@ -53,13 +53,3 @@ GoRouter with an auth redirect guard (`authControllerProvider`). The bottom nav 
 
 - Movies & shows: 2:3 portrait Primary image — use `JellyfinRepository.posterUrl(...)` and the `PosterCard` widget.
 - Episodes & resume cards: 16:9 — use `backdropUrl(...)` and the `ResumeCard` widget. Backdrops fall back to the Primary image when no Backdrop tag is present (episodes typically only have a Primary still).
-
-## Roadmap (out of scope today)
-
-- Detail screens: `/movie/:id`, `/series/:id`, `/season/:id`, `/episode/:id`.
-- Video player feature (introduce `media_kit`).
-- Scrobbler — `/Sessions/Playing*` endpoints with `PositionTicks`.
-- Downloads (mirror AltSound's `DownloadManager` + manifest).
-- Remote / cast sessions.
-- Optional Radarr/Sonarr discovery (nullable repository pattern).
-- Search & Library implementations.
