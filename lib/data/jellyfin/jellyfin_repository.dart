@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:uuid/uuid.dart';
@@ -6,6 +7,7 @@ import 'auth_repository.dart';
 import 'jellyfin_api.dart';
 import 'models/browse_item.dart';
 import 'models/episode.dart';
+import 'models/intro_skipper_timestamps.dart';
 import 'models/jellyfin_session.dart';
 import 'models/media_stream.dart';
 import 'models/movie.dart';
@@ -464,6 +466,43 @@ class JellyfinRepository {
       }
     }
     return best;
+  }
+
+  /// Fetches Intro Skipper segment times for an episode or movie, if the
+  /// server has a compatible plugin installed and analysis exists.
+  ///
+  /// Tries the current fork's `GET /Episode/{id}/Timestamps` first, then the
+  /// legacy `GET /Episode/{id}/IntroTimestamps/v1` (intro only). Any failure
+  /// or `404` yields `null` so playback never depends on this call.
+  Future<IntroSkipperTimestamps?> getIntroSkipperTimestamps(String itemId) async {
+    if (_api.session == null) return null;
+    IntroSkipperTimestamps? merged;
+    try {
+      final modern = await _api.dio.get<Map<String, dynamic>>(
+        '/Episode/$itemId/Timestamps',
+        options: Options(validateStatus: (s) => s == 200 || s == 404),
+      );
+      if (modern.statusCode == 200 && modern.data != null) {
+        merged = IntroSkipperTimestamps.fromPluginTimestampsJson(modern.data!);
+      }
+    } catch (_) {}
+
+    try {
+      final legacy = await _api.dio.get<Map<String, dynamic>>(
+        '/Episode/$itemId/IntroTimestamps/v1',
+        options: Options(validateStatus: (s) => s == 200 || s == 404),
+      );
+      if (legacy.statusCode == 200 && legacy.data != null) {
+        final fromLegacy = IntroSkipperTimestamps.fromLegacyIntroV1Json(
+          legacy.data!,
+        );
+        merged = merged == null
+            ? fromLegacy
+            : merged.mergePreferNonNull(fromLegacy);
+      }
+    } catch (_) {}
+
+    return merged?.hasAny == true ? merged : null;
   }
 
   /// Direct-stream URL for a movie or episode. Returns the original file via

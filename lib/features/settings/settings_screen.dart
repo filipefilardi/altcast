@@ -186,6 +186,32 @@ class _PlaybackGroup extends ConsumerWidget {
               .read(playbackPreferencesProvider.notifier)
               .setWifiOnlyStreaming(v),
         ),
+        SwitchListTile(
+          secondary: const Icon(Icons.skip_next_outlined),
+          title: const Text('Auto-skip intros & credits'),
+          subtitle: const Text(
+            'Uses Jellyfin Intro Skipper when your server has it installed.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.autoSkipIntroCredits,
+          onChanged: (v) => ref
+              .read(playbackPreferencesProvider.notifier)
+              .setAutoSkipIntroCredits(v),
+          activeThumbColor: AppColors.primary,
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.play_circle_outline),
+          title: const Text('Autoplay next episode'),
+          subtitle: const Text(
+            'After an episode ends, continue to the next one automatically.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.autoplayNextTvEpisode,
+          onChanged: (v) => ref
+              .read(playbackPreferencesProvider.notifier)
+              .setAutoplayNextTvEpisode(v),
+          activeThumbColor: AppColors.primary,
+        ),
         ListTile(
           leading: const Icon(Icons.volume_up_outlined),
           title: const Text('Default audio'),

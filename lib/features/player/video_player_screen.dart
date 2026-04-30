@@ -16,8 +16,10 @@ import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
+import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
+import '../../data/local/playback_preferences.dart';
 import 'player_material_theme.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
@@ -88,6 +90,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _autoplayCountdown = 8;
   Timer? _autoplayTimer;
   Duration _mediaDuration = Duration.zero;
+
+  IntroSkipperTimestamps? _introSkipper;
+  bool _canAutoSkipIntro = true;
+  bool _canAutoSkipCredits = true;
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
@@ -193,6 +199,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
       if (mounted) _applyTrackPreferences();
       await _resolveNextEpisode();
+      unawaited(_loadIntroSkipper());
       if (mounted) _tryEnterFullscreenAfterOpen();
     } catch (e) {
       if (!mounted) return;
@@ -209,6 +216,52 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         await _videoKey.currentState?.enterFullscreen();
       });
     });
+  }
+
+  Future<void> _loadIntroSkipper() async {
+    try {
+      final timestamps = await ref
+          .read(jellyfinRepositoryProvider)
+          .getIntroSkipperTimestamps(widget.itemId);
+      if (!mounted) return;
+      setState(() {
+        _introSkipper = timestamps;
+        _canAutoSkipIntro = true;
+        _canAutoSkipCredits = true;
+      });
+      if (timestamps != null && mounted) {
+        _applyIntroSkipperForPosition(_lastPosition);
+      }
+    } catch (_) {}
+  }
+
+  /// Seeks past intro/credits when Intro Skipper data exists and the user
+  /// has not rewound before that segment again.
+  void _applyIntroSkipperForPosition(Duration position) {
+    if (!ref.read(playbackPreferencesProvider).autoSkipIntroCredits) return;
+    final data = _introSkipper;
+    if (data == null || !_player.state.playing) return;
+
+    final intro = data.introduction;
+    if (intro != null) {
+      if (position < intro.start) {
+        _canAutoSkipIntro = true;
+      } else if (_canAutoSkipIntro && intro.contains(position)) {
+        _canAutoSkipIntro = false;
+        unawaited(_player.seek(intro.end));
+        return;
+      }
+    }
+
+    final credits = data.credits;
+    if (credits != null) {
+      if (position < credits.start) {
+        _canAutoSkipCredits = true;
+      } else if (_canAutoSkipCredits && credits.contains(position)) {
+        _canAutoSkipCredits = false;
+        unawaited(_player.seek(credits.end));
+      }
+    }
   }
 
   Future<void> _resolveNextEpisode() async {
@@ -326,6 +379,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         eventName: playing ? 'Unpause' : 'Pause',
       );
       if (playing) {
+        if (mounted) _applyIntroSkipperForPosition(_lastPosition);
         _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
           scrobbler.progress(
             positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
@@ -345,7 +399,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
         );
         if (_nextEpisode != null) {
-          _startAutoplay();
+          final autoplay = ref
+              .read(playbackPreferencesProvider)
+              .autoplayNextTvEpisode;
+          if (autoplay) {
+            _startAutoplay();
+          } else if (mounted) {
+            setState(() {
+              _showNextUp = true;
+              _autoplayCountdown = 0;
+            });
+          }
         }
       }
     });
@@ -354,6 +418,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub = _player.stream.position.listen((p) {
       _lastPosition = p;
       _maybeShowNextUp();
+      if (mounted) _applyIntroSkipperForPosition(p);
     });
   }
 
@@ -490,7 +555,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               bottom: pad.bottom + 16,
               child: _NextUpCard(
                 episode: _nextEpisode!,
-                countdown: _autoplayCountdown,
+                countdownForAutoplay: _autoplayTimer != null
+                    ? _autoplayCountdown
+                    : null,
                 onCancel: _cancelAutoplay,
                 onPlayNow: _playNextEpisode,
               ),
@@ -546,18 +613,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 class _NextUpCard extends StatelessWidget {
   const _NextUpCard({
     required this.episode,
-    required this.countdown,
+    required this.countdownForAutoplay,
     required this.onCancel,
     required this.onPlayNow,
   });
 
   final Episode episode;
-  final int countdown;
+
+  /// When non-null and positive, the primary button shows a live countdown
+  /// and autoplay is running. When null, only manual "Play next" is offered.
+  final int? countdownForAutoplay;
   final VoidCallback onCancel;
   final VoidCallback onPlayNow;
 
   @override
   Widget build(BuildContext context) {
+    final c = countdownForAutoplay;
+    final playCta = (c != null && c > 0) ? 'Play now ($c)' : 'Play next';
     return Container(
       width: 280,
       padding: const EdgeInsets.all(12),
@@ -589,7 +661,7 @@ class _NextUpCard extends StatelessWidget {
               const Spacer(),
               FilledButton(
                 onPressed: onPlayNow,
-                child: Text('Play now ($countdown)'),
+                child: Text(playCta),
               ),
             ],
           ),
