@@ -27,6 +27,7 @@ import 'widgets/tracks_sheet.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
+const _resumeSeekTolerance = Duration(seconds: 2);
 
 /// Gives time to see skip chips before we jump automatically (when enabled).
 const _introSkipperAutoSkipDelay = Duration(seconds: 3);
@@ -245,12 +246,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               : null,
         ),
       );
-      final ticks = widget.resumeTicks ?? 0;
-      if (ticks > 0) {
-        final at = Duration(microseconds: ticks ~/ 10);
-        await _player.seek(at);
-        _lastPosition = at;
-      }
+      await _seekToResumePosition(widget.resumeTicks);
       _attachScrobbler();
 
       // Wait until media_kit has populated the tracks lists. This is more
@@ -272,6 +268,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (!mounted) return;
       setState(() => _openError = e);
     }
+  }
+
+  Future<void> _seekToResumePosition(int? resumeTicks) async {
+    final ticks = resumeTicks ?? 0;
+    if (ticks <= 0) return;
+    final target = Duration(microseconds: ticks ~/ 10);
+
+    // Some sources (especially transcodes/HLS) may ignore an immediate seek
+    // right after open. Retry briefly until playback position settles.
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (!mounted) return;
+      await _player.seek(target);
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      final current = _player.state.position;
+      if ((current - target).abs() <= _resumeSeekTolerance) {
+        _lastPosition = current;
+        return;
+      }
+    }
+    _lastPosition = target;
   }
 
   void _tryEnterFullscreenAfterOpen() {
