@@ -100,6 +100,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      // Required so the sheet can grow tall enough to host the keyboard
+      // when a filter text field gains focus.
+      isScrollControlled: true,
       builder: (context) {
         String? genre = current.genre;
         int? year = current.year;
@@ -113,17 +116,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Search filters',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Search filters',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<LibrarySort>(
                       initialValue: sort,
@@ -218,6 +223,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ],
                     ),
                   ],
+                  ),
                 ),
               ),
             );
