@@ -706,7 +706,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _selectedExternalSubNotifier.dispose();
     _overlaySnapshots.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    // Restore app default orientation after leaving the landscape-only player.
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -820,6 +823,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (vs != null && vs.isFullscreen()) {
       await vs.exitFullscreen();
     }
+    if (!mounted) return;
+    // Avoid popping in the same pointer event that triggered the close action.
+    // media_kit's Material seek bar may still emit onPointerUp after controls
+    // teardown, which can touch a defunct BuildContext.
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     if (context.canPop()) context.pop();
   }
