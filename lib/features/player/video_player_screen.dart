@@ -172,9 +172,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           : const VideoControllerConfiguration(),
     );
 
-    // Subtitle overlay on — Jellyfin sidecar URLs carry api_key; main stream
-    // auth is passed via [Media.httpHeaders] in [_open] (mpv expects structured
-    // headers there — a raw `http-header-fields` string can break HTTP).
+    // Use libmpv's native subtitle rasterizer for maximum format compatibility
+    // (ASS/SSA styling, positioning, bitmap subtitles, etc.).
     try {
       final impl = _player.platform as dynamic;
       impl?.setProperty('sub-visibility', 'yes');
@@ -789,7 +788,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 controls: _buildVideoControls,
                 fit: BoxFit.contain,
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
-                  visible: true,
+                  visible: false,
                   textAlign: TextAlign.center,
                   padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
                   style: TextStyle(
