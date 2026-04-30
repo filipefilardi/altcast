@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/dio_error_message.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/models/jellyfin_session.dart';
@@ -61,7 +62,7 @@ class AuthController extends Notifier<AuthState> {
     } on JellyfinAuthException catch (e) {
       state = AuthUnauthenticated(error: e.message);
     } on DioException catch (e) {
-      state = AuthUnauthenticated(error: _dioMessage(e));
+      state = AuthUnauthenticated(error: userFacingDioMessage(e));
     } catch (e) {
       state = AuthUnauthenticated(error: 'Unexpected error: $e');
     }
@@ -70,20 +71,5 @@ class AuthController extends Notifier<AuthState> {
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = const AuthUnauthenticated();
-  }
-
-  String _dioMessage(DioException e) {
-    if (e.response?.statusCode == 401) {
-      return 'Invalid username or password.';
-    }
-    if (e.type == DioExceptionType.badCertificate) {
-      return 'HTTPS certificate could not be verified (common with self-signed certs). '
-          'Try http:// if your server allows plain HTTP, or use a trusted certificate.';
-    }
-    if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.connectionError) {
-      return 'Could not reach server. Check the URL and your network.';
-    }
-    return e.message ?? 'Network error.';
   }
 }
