@@ -213,6 +213,21 @@ class _PlaybackGroup extends ConsumerWidget {
               .setAutoplayNextTvEpisode(v),
           activeThumbColor: AppColors.primary,
         ),
+        if (Platform.isAndroid)
+          SwitchListTile(
+            secondary: const Icon(Icons.memory_outlined),
+            title: const Text('Software video decoding'),
+            subtitle: const Text(
+              'Turn on if some titles show glitchy picture on this device '
+              '(uses more CPU and battery).',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.androidSoftwareVideoDecode,
+            onChanged: (v) => ref
+                .read(playbackPreferencesProvider.notifier)
+                .setAndroidSoftwareVideoDecode(v),
+            activeThumbColor: AppColors.primary,
+          ),
         ListTile(
           leading: const Icon(Icons.volume_up_outlined),
           title: const Text('Default audio'),

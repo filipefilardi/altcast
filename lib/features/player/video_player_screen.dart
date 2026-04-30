@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/dio_error_message.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
@@ -124,7 +125,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   void initState() {
     super.initState();
     _player = Player();
-    _controller = VideoController(_player);
+    final useAndroidSoftwareDecode =
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        ref.read(playbackPreferencesProvider).androidSoftwareVideoDecode;
+    _controller = VideoController(
+      _player,
+      configuration: useAndroidSoftwareDecode
+          ? const VideoControllerConfiguration(
+              enableHardwareAcceleration: false,
+            )
+          : const VideoControllerConfiguration(),
+    );
 
     // Subtitle overlay on — Jellyfin sidecar URLs carry api_key; main stream
     // auth is passed via [Media.httpHeaders] in [_open] (mpv expects structured
@@ -1288,7 +1300,7 @@ class _PlaybackError extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              error.toString(),
+              userFacingNetworkMessage(error),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textSecondary,

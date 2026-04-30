@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/dio_error_message.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
@@ -127,7 +128,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
           const SizedBox(height: 120),
           ErrorStateView(
             title: "Couldn't load library",
-            message: _error.toString(),
+            message: userFacingNetworkMessage(_error!),
             onRetry: _reload,
           ),
         ],

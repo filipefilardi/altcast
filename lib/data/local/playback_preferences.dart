@@ -22,6 +22,7 @@ class PlaybackPreferences {
     this.wifiOnlyStreaming = false,
     this.autoSkipIntroCredits = true,
     this.autoplayNextTvEpisode = true,
+    this.androidSoftwareVideoDecode = true,
     this.defaultAudioMode = DefaultAudioMode.auto,
     this.defaultAudioLanguage,
     this.defaultSubtitleMode = DefaultSubtitleMode.auto,
@@ -38,6 +39,10 @@ class PlaybackPreferences {
   /// When true, shows the next-episode card with a countdown after an
   /// episode ends. When false, the card still appears but only manual play.
   final bool autoplayNextTvEpisode;
+
+  /// When true on Android, libmpv uses software decode (`hwdec=no`) instead of
+  /// MediaCodec. Helps with glitchy HEVC/HDR on some devices; higher CPU use.
+  final bool androidSoftwareVideoDecode;
 
   final DefaultAudioMode defaultAudioMode;
 
@@ -66,6 +71,7 @@ class PlaybackPreferences {
     bool? wifiOnlyStreaming,
     bool? autoSkipIntroCredits,
     bool? autoplayNextTvEpisode,
+    bool? androidSoftwareVideoDecode,
     DefaultAudioMode? defaultAudioMode,
     String? defaultAudioLanguage,
     bool clearDefaultAudioLanguage = false,
@@ -78,6 +84,8 @@ class PlaybackPreferences {
       wifiOnlyStreaming: wifiOnlyStreaming ?? this.wifiOnlyStreaming,
       autoSkipIntroCredits: autoSkipIntroCredits ?? this.autoSkipIntroCredits,
       autoplayNextTvEpisode: autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
+      androidSoftwareVideoDecode:
+          androidSoftwareVideoDecode ?? this.androidSoftwareVideoDecode,
       defaultAudioMode: defaultAudioMode ?? this.defaultAudioMode,
       defaultAudioLanguage: clearDefaultAudioLanguage
           ? null
@@ -94,6 +102,7 @@ class PlaybackPreferences {
     'wifiOnlyStreaming': wifiOnlyStreaming,
     'autoSkipIntroCredits': autoSkipIntroCredits,
     'autoplayNextTvEpisode': autoplayNextTvEpisode,
+    'androidSoftwareVideoDecode': androidSoftwareVideoDecode,
     'defaultAudioMode': defaultAudioMode.name,
     'defaultAudioLanguage': defaultAudioLanguage,
     'defaultSubtitleMode': defaultSubtitleMode.name,
@@ -134,6 +143,8 @@ class PlaybackPreferences {
       wifiOnlyStreaming: json['wifiOnlyStreaming'] as bool? ?? false,
       autoSkipIntroCredits: json['autoSkipIntroCredits'] as bool? ?? true,
       autoplayNextTvEpisode: json['autoplayNextTvEpisode'] as bool? ?? true,
+      androidSoftwareVideoDecode:
+          json['androidSoftwareVideoDecode'] as bool? ?? true,
       defaultAudioMode: audioMode,
       defaultAudioLanguage: langForFixed,
       defaultSubtitleMode: subtitleMode,
@@ -184,6 +195,11 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
 
   Future<void> setAutoplayNextTvEpisode(bool enabled) async {
     state = state.copyWith(autoplayNextTvEpisode: enabled);
+    await _persist();
+  }
+
+  Future<void> setAndroidSoftwareVideoDecode(bool enabled) async {
+    state = state.copyWith(androidSoftwareVideoDecode: enabled);
     await _persist();
   }
 
