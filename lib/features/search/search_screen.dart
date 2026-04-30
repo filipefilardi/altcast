@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/filter_chips_row.dart';
 import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
@@ -307,7 +308,7 @@ class _Body extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
-            _SearchFilterSummary(filters: filters),
+            FilterChipsRow(labels: _searchFilterLabels(filters)),
             const SizedBox(height: 12),
             if (movies.isNotEmpty) ...[
               _SectionHeader(label: 'Movies', count: movies.length),
@@ -342,13 +343,7 @@ class _Body extends StatelessWidget {
   }
 }
 
-class _SearchFilterSummary extends StatelessWidget {
-  const _SearchFilterSummary({required this.filters});
-  final SearchFilterState filters;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = <String>[
+List<String> _searchFilterLabels(SearchFilterState filters) => [
       if (filters.genre != null) filters.genre!,
       if (filters.year != null) '${filters.year}',
       if (filters.unwatchedOnly) 'Unwatched',
@@ -362,32 +357,6 @@ class _SearchFilterSummary extends StatelessWidget {
         LibrarySort.recentlyAdded => 'Recent',
       },
     ];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips
-          .map(
-            (c) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Text(
-                c,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label, required this.count});
@@ -505,26 +474,49 @@ class _PersonTile extends ConsumerWidget {
       color: AppColors.surfaceElevated,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
+      child: InkWell(
         onTap: () => openItemDetail(context, item),
-        leading: ClipOval(
-          child: SizedBox(
-            width: 42,
-            height: 42,
-            child: ColoredBox(
-              color: AppColors.surfaceHighlight,
-              child: LocalOrNetworkImage(
-                source: image,
-                errorBuilder: (_) => const Icon(
-                  Icons.person_outline,
-                  color: AppColors.textSecondary,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              ClipOval(
+                child: SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: ColoredBox(
+                    color: AppColors.surfaceHighlight,
+                    child: LocalOrNetworkImage(
+                      source: image,
+                      errorBuilder: (_) => const Icon(
+                        Icons.person_outline,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
+            ],
           ),
         ),
-        title: Text(item.name),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
       ),
     );
   }
