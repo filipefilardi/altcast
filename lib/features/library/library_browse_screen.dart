@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/utils/dio_error_message.dart';
 import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/filter_chips_row.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../home/widgets/poster_card.dart';
@@ -122,8 +122,26 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(onRefresh: _reload, child: _buildBody(context)),
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: _buildBody(context),
+        ),
+      ),
     );
+  }
+
+  /// Trigger the next page when the user scrolls within ~600 px of the
+  /// bottom — replaces the old "Load more" button with infinite scrolling.
+  /// `_loadMore` itself guards against overlapping calls via `_inflight`.
+  bool _onScroll(ScrollNotification notification) {
+    if (!_hasMore || _inflight) return false;
+    final metrics = notification.metrics;
+    if (metrics.pixels >= metrics.maxScrollExtent - 600) {
+      _loadMore();
+    }
+    return false;
   }
 
   Widget _buildBody(BuildContext context) {
@@ -161,12 +179,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
-        _FilterSummary(
-          genre: _genre,
-          year: _year,
-          unwatchedOnly: _unwatchedOnly,
-          sort: _sort,
-        ),
+        FilterChipsRow(labels: _filterLabels()),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
@@ -187,11 +200,16 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
             );
           },
         ),
-        const SizedBox(height: 20),
         if (_hasMore)
-          OutlinedButton(
-            onPressed: _loading ? null : _loadMore,
-            child: Text(_loading ? 'Loading...' : 'Load more'),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           ),
       ],
     );
@@ -324,65 +342,23 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
     );
   }
 
+  List<String> _filterLabels() => [
+        _sortLabel(_sort),
+        ?_genre,
+        if (_year != null) '$_year',
+        if (_unwatchedOnly) 'Unwatched',
+      ];
 }
 
-class _FilterSummary extends StatelessWidget {
-  const _FilterSummary({
-    required this.genre,
-    required this.year,
-    required this.unwatchedOnly,
-    required this.sort,
-  });
-
-  final String? genre;
-  final int? year;
-  final bool unwatchedOnly;
-  final LibrarySort sort;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = <String>[
-      _sortLabel(sort),
-      ?genre,
-      if (year != null) '$year',
-      if (unwatchedOnly) 'Unwatched',
-    ];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips
-          .map(
-            (label) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  String _sortLabel(LibrarySort sort) {
-    switch (sort) {
-      case LibrarySort.recentlyAdded:
-        return 'Recent';
-      case LibrarySort.nameAsc:
-        return 'A-Z';
-      case LibrarySort.nameDesc:
-        return 'Z-A';
-      case LibrarySort.yearDesc:
-        return 'Year';
-    }
+String _sortLabel(LibrarySort sort) {
+  switch (sort) {
+    case LibrarySort.recentlyAdded:
+      return 'Recent';
+    case LibrarySort.nameAsc:
+      return 'A-Z';
+    case LibrarySort.nameDesc:
+      return 'Z-A';
+    case LibrarySort.yearDesc:
+      return 'Year';
   }
 }

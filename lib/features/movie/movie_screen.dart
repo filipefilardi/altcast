@@ -129,36 +129,47 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              // Wrap so the secondary actions drop to a second line on
+              // narrow phones (long "Resume" labels + 4 trailing icons can
+              // otherwise overflow a single Row).
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 4,
                 children: [
                   PlayButton(
                     onPressed: () => _play(context, movie, fromStart: false),
                     label: hasResume ? 'Resume' : 'Play',
                   ),
-                  const Spacer(),
-                  UserDataActions(
-                    initialFavorite: movie.userData?.isFavorite ?? false,
-                    initialPlayed: movie.userData?.played ?? false,
-                    onSetFavorite: (v) async {
-                      await repo.setFavorite(movie.id, favorite: v);
-                      ref.invalidate(movieProvider(movie.id));
-                    },
-                    onSetPlayed: (v) async {
-                      await repo.setPlayed(movie.id, played: v);
-                      ref.invalidate(movieProvider(movie.id));
-                    },
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UserDataActions(
+                        initialFavorite: movie.userData?.isFavorite ?? false,
+                        initialPlayed: movie.userData?.played ?? false,
+                        onSetFavorite: (v) async {
+                          await repo.setFavorite(movie.id, favorite: v);
+                          ref.invalidate(movieProvider(movie.id));
+                        },
+                        onSetPlayed: (v) async {
+                          await repo.setPlayed(movie.id, played: v);
+                          ref.invalidate(movieProvider(movie.id));
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.cast),
+                        tooltip: 'Play on…',
+                        onPressed: () => showRemoteSessionsSheet(
+                          context,
+                          itemId: movie.id,
+                          startPositionTicks:
+                              movie.userData?.playbackPositionTicks ?? 0,
+                        ),
+                      ),
+                      MovieDownloadButton(movie: movie),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.cast),
-                    tooltip: 'Play on…',
-                    onPressed: () => showRemoteSessionsSheet(
-                      context,
-                      itemId: movie.id,
-                      startPositionTicks:
-                          movie.userData?.playbackPositionTicks ?? 0,
-                    ),
-                  ),
-                  MovieDownloadButton(movie: movie),
                 ],
               ),
               if (hasResume)

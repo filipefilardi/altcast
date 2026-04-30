@@ -91,39 +91,47 @@ class _EpisodeBody extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 4,
                 children: [
                   PlayButton(
                     onPressed: () => _play(context, fromStart: false),
                     label: hasResume ? 'Resume' : 'Play',
                   ),
-                  const Spacer(),
-                  UserDataActions(
-                    initialFavorite: episode.userData?.isFavorite ?? false,
-                    initialPlayed: episode.userData?.played ?? false,
-                    onSetFavorite: (v) async {
-                      await repo.setFavorite(episode.id, favorite: v);
-                      ref.invalidate(episodeProvider(episode.id));
-                    },
-                    onSetPlayed: (v) async {
-                      await repo.setPlayed(episode.id, played: v);
-                      ref.invalidate(episodeProvider(episode.id));
-                    },
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UserDataActions(
+                        initialFavorite: episode.userData?.isFavorite ?? false,
+                        initialPlayed: episode.userData?.played ?? false,
+                        onSetFavorite: (v) async {
+                          await repo.setFavorite(episode.id, favorite: v);
+                          ref.invalidate(episodeProvider(episode.id));
+                        },
+                        onSetPlayed: (v) async {
+                          await repo.setPlayed(episode.id, played: v);
+                          ref.invalidate(episodeProvider(episode.id));
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.cast),
+                        tooltip: 'Play on…',
+                        onPressed: () => showRemoteSessionsSheet(
+                          context,
+                          itemId: episode.id,
+                          startPositionTicks: ticks,
+                        ),
+                      ),
+                      if (seriesName != null && seriesName.isNotEmpty)
+                        EpisodeDownloadButton(
+                          episode: episode,
+                          seriesName: seriesName,
+                        ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.cast),
-                    tooltip: 'Play on…',
-                    onPressed: () => showRemoteSessionsSheet(
-                      context,
-                      itemId: episode.id,
-                      startPositionTicks: ticks,
-                    ),
-                  ),
-                  if (seriesName != null && seriesName.isNotEmpty)
-                    EpisodeDownloadButton(
-                      episode: episode,
-                      seriesName: seriesName,
-                    ),
                 ],
               ),
               if (hasResume)
