@@ -100,7 +100,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
       if (!mounted) return;
       setState(() {
         _items.addAll(page.items);
-        _nextIndex += page.items.length;
+        _nextIndex += page.fetchedItemCount ?? page.items.length;
         _hasMore = page.hasMore;
         _loading = false;
       });

@@ -37,14 +37,17 @@ class LibraryPage {
     required this.startIndex,
     required this.limit,
     required this.totalRecordCount,
+    this.fetchedItemCount,
   });
 
   final List<BrowseItem> items;
   final int startIndex;
   final int limit;
   final int totalRecordCount;
+  final int? fetchedItemCount;
 
-  bool get hasMore => startIndex + items.length < totalRecordCount;
+  bool get hasMore =>
+      startIndex + (fetchedItemCount ?? items.length) < totalRecordCount;
 }
 
 class _NoSession implements Exception {
@@ -226,11 +229,16 @@ class JellyfinRepository {
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
         .toList();
+    final resolvedItems = itemTypes == 'Series'
+        ? await _resolveSeriesSeasonCounts(items)
+        : items;
     return LibraryPage(
-      items: items,
+      items: resolvedItems,
       startIndex: startIndex,
       limit: limit,
-      totalRecordCount: data['TotalRecordCount'] as int? ?? items.length,
+      totalRecordCount:
+          data['TotalRecordCount'] as int? ?? resolvedItems.length,
+      fetchedItemCount: items.length,
     );
   }
 
@@ -264,10 +272,78 @@ class JellyfinRepository {
         'EnableImages': true,
       },
     );
-    return (res.data ?? const [])
+    final items = (res.data ?? const [])
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
         .toList();
+    return _resolveSeriesSeasonCounts(items);
+  }
+
+  Future<List<BrowseItem>> _resolveSeriesSeasonCounts(
+    List<BrowseItem> items,
+  ) async {
+    final resolved = await Future.wait(
+      items.map((item) async {
+        if (item.kind != MediaKind.series) return item;
+        final stats = await _getSeriesAvailableStats(item);
+        if (stats == null) return item;
+        if (stats.episodeCount <= 0) return null;
+        return item.copyWithChildCount(stats.seasonCount);
+      }),
+    );
+    return resolved.whereType<BrowseItem>().toList(growable: false);
+  }
+
+  Future<({int seasonCount, int episodeCount})?> _getSeriesAvailableStats(
+    BrowseItem item,
+  ) async {
+    try {
+      final seasons = await getSeasons(item.id);
+      if (seasons.isEmpty) return (seasonCount: 0, episodeCount: 0);
+
+      var seasonCount = 0;
+      var episodeCount = 0;
+      final unknownSeasons = <Season>[];
+
+      for (final season in seasons) {
+        final count = season.episodeCount;
+        if (count == null) {
+          unknownSeasons.add(season);
+          continue;
+        }
+        if (count > 0) {
+          seasonCount++;
+          episodeCount += count;
+        }
+      }
+
+      if (unknownSeasons.isNotEmpty) {
+        final resolvedCounts = await Future.wait(
+          unknownSeasons.map((season) async {
+            try {
+              return (await getEpisodes(item.id, season.id)).length;
+            } on DioException {
+              return null;
+            }
+          }),
+        );
+        for (final count in resolvedCounts) {
+          if (count == null || count <= 0) continue;
+          seasonCount++;
+          episodeCount += count;
+        }
+      }
+
+      return (seasonCount: seasonCount, episodeCount: episodeCount);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return (seasonCount: 0, episodeCount: 0);
+      }
+      final existing = item.childCount;
+      return existing == null || existing <= 0
+          ? null
+          : (seasonCount: existing, episodeCount: 1);
+    }
   }
 
   Future<List<BrowseItem>> getCollectionItems(
@@ -288,10 +364,11 @@ class JellyfinRepository {
         'SortOrder': 'Ascending',
       },
     );
-    return ((res.data?['Items'] as List?) ?? const [])
+    final items = ((res.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
         .toList(growable: false);
+    return _resolveSeriesSeasonCounts(items);
   }
 
   /// Full movie metadata for the detail screen.

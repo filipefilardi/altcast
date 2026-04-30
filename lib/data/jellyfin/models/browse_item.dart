@@ -66,49 +66,56 @@ class BrowseItem {
 
   final UserData? userData;
 
+  BrowseItem copyWithChildCount(int? count) {
+    return BrowseItem(
+      id: id,
+      name: name,
+      kind: kind,
+      subtitle: _subtitleFor(
+        kind: kind,
+        year: year,
+        childCount: count,
+        seasonNumber: seasonNumber,
+        episodeNumber: episodeNumber,
+      ),
+      imageTag: imageTag,
+      backdropTag: backdropTag,
+      runTime: runTime,
+      childCount: count,
+      year: year,
+      seriesId: seriesId,
+      seriesName: seriesName,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      userData: userData,
+    );
+  }
+
   factory BrowseItem.fromJson(Map<String, dynamic> json) {
     final type = json['Type'] as String?;
     final kind = _kindFromJellyfinType(type) ?? MediaKind.movie;
     final year = json['ProductionYear'] as int?;
     final season = json['ParentIndexNumber'] as int?;
     final episode = json['IndexNumber'] as int?;
-
-    String? subtitle;
-    switch (kind) {
-      case MediaKind.movie:
-        subtitle = year?.toString();
-      case MediaKind.series:
-        final count = json['ChildCount'] as int?;
-        subtitle = [
-          if (year != null) year.toString(),
-          if (count != null) '$count season${count == 1 ? '' : 's'}',
-        ].join(' • ');
-        if (subtitle.isEmpty) subtitle = null;
-      case MediaKind.season:
-        subtitle = season != null ? 'Season $season' : null;
-      case MediaKind.episode:
-        if (season != null && episode != null) {
-          final padded = episode.toString().padLeft(2, '0');
-          subtitle = 'S$season · E$padded';
-        }
-      case MediaKind.person:
-        subtitle = null;
-      case MediaKind.collection:
-        final count = json['ChildCount'] as int?;
-        subtitle = count == null ? null : '$count item${count == 1 ? '' : 's'}';
-    }
+    final childCount = _intFromJson(json['ChildCount']);
 
     return BrowseItem(
       id: json['Id'] as String,
       name: json['Name'] as String? ?? 'Untitled',
       kind: kind,
-      subtitle: subtitle,
+      subtitle: _subtitleFor(
+        kind: kind,
+        year: year,
+        childCount: childCount,
+        seasonNumber: season,
+        episodeNumber: episode,
+      ),
       imageTag: _primaryImageTag(json),
       backdropTag: _backdropImageTag(json),
       runTime: json['RunTimeTicks'] != null
           ? _durationFromTicks(json['RunTimeTicks'] as int?)
           : null,
-      childCount: json['ChildCount'] as int?,
+      childCount: childCount,
       year: year,
       seriesId: json['SeriesId'] as String?,
       seriesName: json['SeriesName'] as String?,
@@ -119,6 +126,46 @@ class BrowseItem {
           : null,
     );
   }
+}
+
+String? _subtitleFor({
+  required MediaKind kind,
+  required int? year,
+  required int? childCount,
+  required int? seasonNumber,
+  required int? episodeNumber,
+}) {
+  switch (kind) {
+    case MediaKind.movie:
+      return year?.toString();
+    case MediaKind.series:
+      final parts = [
+        if (year != null) year.toString(),
+        if (childCount != null && childCount > 0)
+          '$childCount season${childCount == 1 ? '' : 's'}',
+      ];
+      return parts.isEmpty ? null : parts.join(' • ');
+    case MediaKind.season:
+      return seasonNumber != null ? 'Season $seasonNumber' : null;
+    case MediaKind.episode:
+      if (seasonNumber != null && episodeNumber != null) {
+        final padded = episodeNumber.toString().padLeft(2, '0');
+        return 'S$seasonNumber · E$padded';
+      }
+      return null;
+    case MediaKind.person:
+      return null;
+    case MediaKind.collection:
+      return childCount == null
+          ? null
+          : '$childCount item${childCount == 1 ? '' : 's'}';
+  }
+}
+
+int? _intFromJson(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return null;
 }
 
 /// Per-user playback state attached to any video item.
