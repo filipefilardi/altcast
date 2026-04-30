@@ -10,8 +10,8 @@ import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../auth/auth_controller.dart';
 import 'home_providers.dart';
+import 'widgets/continue_watching_hero.dart';
 import 'widgets/poster_card.dart';
-import 'widgets/resume_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -94,14 +94,10 @@ class HomeScreen extends ConsumerWidget {
                 ),
               )
             else ...[
-              _Section<List<BrowseItem>>(
-                title: 'Continue Watching',
-                state: resumeAsync,
+              ContinueWatchingShelf(
+                itemsAsync: resumeAsync,
                 onRetry: () => ref.invalidate(continueWatchingProvider),
-                builder: (items) => _ResumeRow(items: items),
-                hideWhenEmpty: true,
-                skeletonHeight: 168,
-                skeletonCardWidth: 240,
+                onOpen: (item) => _openDetail(context, item),
               ),
               _Section<List<BrowseItem>>(
                 title: 'Recently added movies',
@@ -279,28 +275,6 @@ class _SkeletonRow extends StatelessWidget {
           separatorBuilder: (_, _) => const SizedBox(width: 12),
           itemBuilder: (_, _) =>
               Skeleton.box(width: cardWidth, height: height - 8),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResumeRow extends StatelessWidget {
-  const _ResumeRow({required this.items});
-  final List<BrowseItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 168,
-      child: ListView.separated(
-        primary: false,
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => ResumeCard(
-          item: items[i],
-          onTap: () => _openDetail(context, items[i]),
         ),
       ),
     );
