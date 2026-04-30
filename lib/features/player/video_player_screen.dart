@@ -25,6 +25,12 @@ import 'player_material_theme.dart';
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
 
+/// Gives time to see skip chips before we jump automatically (when enabled).
+const _introSkipperAutoSkipDelay = Duration(seconds: 3);
+
+/// Clears MaterialVideoControls (seek bar + bottom bar) so chips stay visible.
+const _introSkipperChipLiftFromSafeBottom = 104.0;
+
 /// Full-screen video player. Routes here are entered via
 /// `/play/:id?resumeTicks=N` — the optional `resumeTicks` (Jellyfin tick
 /// count, 100 ns) is applied with [Player.seek] right after open.
@@ -92,8 +98,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Duration _mediaDuration = Duration.zero;
 
   IntroSkipperTimestamps? _introSkipper;
-  bool _canAutoSkipIntro = true;
-  bool _canAutoSkipCredits = true;
+  bool _showSkipIntroChip = false;
+  bool _showSkipCreditsChip = false;
+  Timer? _introSkipperAutoTimer;
+  Timer? _creditsSkipperAutoTimer;
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
@@ -226,41 +234,126 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (!mounted) return;
       setState(() {
         _introSkipper = timestamps;
-        _canAutoSkipIntro = true;
-        _canAutoSkipCredits = true;
+        _showSkipIntroChip = false;
+        _showSkipCreditsChip = false;
       });
       if (timestamps != null && mounted) {
-        _applyIntroSkipperForPosition(_lastPosition);
+        _syncIntroSkipperOverlay(_lastPosition);
       }
     } catch (_) {}
   }
 
-  /// Seeks past intro/credits when Intro Skipper data exists and the user
-  /// has not rewound before that segment again.
-  void _applyIntroSkipperForPosition(Duration position) {
-    if (!ref.read(playbackPreferencesProvider).autoSkipIntroCredits) return;
-    final data = _introSkipper;
-    if (data == null || !_player.state.playing) return;
+  void _cancelIntroSkipperTimers() {
+    _introSkipperAutoTimer?.cancel();
+    _introSkipperAutoTimer = null;
+    _creditsSkipperAutoTimer?.cancel();
+    _creditsSkipperAutoTimer = null;
+  }
 
+  /// Hides Intro Skipper UI and cancels delayed auto-skip timers.
+  void _clearIntroSkipperOverlay() {
+    _cancelIntroSkipperTimers();
+    if (!mounted) return;
+    if (_showSkipIntroChip || _showSkipCreditsChip) {
+      setState(() {
+        _showSkipIntroChip = false;
+        _showSkipCreditsChip = false;
+      });
+    }
+  }
+
+  Future<void> _manualSkipIntro() async {
+    final intro = _introSkipper?.introduction;
+    if (intro == null) return;
+    _introSkipperAutoTimer?.cancel();
+    _introSkipperAutoTimer = null;
+    await _player.seek(intro.end);
+    if (mounted) {
+      setState(() => _showSkipIntroChip = false);
+    }
+  }
+
+  Future<void> _manualSkipCredits() async {
+    final credits = _introSkipper?.credits;
+    if (credits == null) return;
+    _creditsSkipperAutoTimer?.cancel();
+    _creditsSkipperAutoTimer = null;
+    await _player.seek(credits.end);
+    if (mounted) {
+      setState(() => _showSkipCreditsChip = false);
+    }
+  }
+
+  /// Shows skip chips while playback sits inside a segment and schedules a
+  /// delayed auto-jump so taps remain optional.
+  void _syncIntroSkipperOverlay(Duration position) {
+    if (!ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
+      _clearIntroSkipperOverlay();
+      return;
+    }
+    final data = _introSkipper;
+    if (data == null) {
+      _clearIntroSkipperOverlay();
+      return;
+    }
+
+    final playing = _player.state.playing;
     final intro = data.introduction;
-    if (intro != null) {
-      if (position < intro.start) {
-        _canAutoSkipIntro = true;
-      } else if (_canAutoSkipIntro && intro.contains(position)) {
-        _canAutoSkipIntro = false;
-        unawaited(_player.seek(intro.end));
-        return;
+    final inIntro = intro != null && intro.contains(position);
+    final credits = data.credits;
+    final inCredits = credits != null && credits.contains(position);
+
+    final nextIntroChip = intro != null && inIntro;
+    final nextCreditsChip = credits != null && inCredits;
+    if (nextIntroChip != _showSkipIntroChip ||
+        nextCreditsChip != _showSkipCreditsChip) {
+      if (mounted) {
+        setState(() {
+          _showSkipIntroChip = nextIntroChip;
+          _showSkipCreditsChip = nextCreditsChip;
+        });
       }
     }
 
-    final credits = data.credits;
-    if (credits != null) {
-      if (position < credits.start) {
-        _canAutoSkipCredits = true;
-      } else if (_canAutoSkipCredits && credits.contains(position)) {
-        _canAutoSkipCredits = false;
-        unawaited(_player.seek(credits.end));
-      }
+    // Delayed auto-skip while actively playing inside each segment.
+    if (intro != null && playing && inIntro) {
+      _introSkipperAutoTimer ??=
+          Timer(_introSkipperAutoSkipDelay, () async {
+        _introSkipperAutoTimer = null;
+        if (!mounted) return;
+        final pos = _lastPosition;
+        final i = _introSkipper?.introduction;
+        if (i != null &&
+            i.contains(pos) &&
+            _player.state.playing &&
+            ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
+          await _player.seek(i.end);
+          if (mounted) setState(() => _showSkipIntroChip = false);
+        }
+      });
+    } else {
+      _introSkipperAutoTimer?.cancel();
+      _introSkipperAutoTimer = null;
+    }
+
+    if (credits != null && playing && inCredits) {
+      _creditsSkipperAutoTimer ??=
+          Timer(_introSkipperAutoSkipDelay, () async {
+        _creditsSkipperAutoTimer = null;
+        if (!mounted) return;
+        final pos = _lastPosition;
+        final c = _introSkipper?.credits;
+        if (c != null &&
+            c.contains(pos) &&
+            _player.state.playing &&
+            ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
+          await _player.seek(c.end);
+          if (mounted) setState(() => _showSkipCreditsChip = false);
+        }
+      });
+    } else {
+      _creditsSkipperAutoTimer?.cancel();
+      _creditsSkipperAutoTimer = null;
     }
   }
 
@@ -379,7 +472,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         eventName: playing ? 'Unpause' : 'Pause',
       );
       if (playing) {
-        if (mounted) _applyIntroSkipperForPosition(_lastPosition);
         _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
           scrobbler.progress(
             positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
@@ -388,6 +480,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           );
         });
       }
+      if (mounted) _syncIntroSkipperOverlay(_lastPosition);
     });
 
     // When the file finishes, fire a final stop with full position so
@@ -418,7 +511,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub = _player.stream.position.listen((p) {
       _lastPosition = p;
       _maybeShowNextUp();
-      if (mounted) _applyIntroSkipperForPosition(p);
+      if (mounted) _syncIntroSkipperOverlay(p);
     });
   }
 
@@ -476,6 +569,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   void dispose() {
     _progressTimer?.cancel();
     _autoplayTimer?.cancel();
+    _cancelIntroSkipperTimers();
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
@@ -503,6 +597,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
+    final nextUpLift =
+        (_showNextUp && _nextEpisode != null) ? 132.0 : 0.0;
+    final skipperStackBottom =
+        pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
       onClosePlayer: _closePlayer,
@@ -549,6 +647,32 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
           const _EdgeScrim(top: true, height: 110),
           const _EdgeScrim(top: false, height: 86),
+          if (_showSkipCreditsChip)
+            Positioned(
+              left: pad.left + 16,
+              right: pad.right + 16,
+              bottom: skipperStackBottom,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: _IntroSkipChipButton(
+                  label: 'Skip credits',
+                  onPressed: () => unawaited(_manualSkipCredits()),
+                ),
+              ),
+            ),
+          if (_showSkipIntroChip)
+            Positioned(
+              left: pad.left + 16,
+              right: pad.right + 16,
+              bottom: skipperStackBottom + (_showSkipCreditsChip ? 52 : 0),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: _IntroSkipChipButton(
+                  label: 'Skip intro',
+                  onPressed: () => unawaited(_manualSkipIntro()),
+                ),
+              ),
+            ),
           if (_showNextUp && _nextEpisode != null)
             Positioned(
               right: pad.right + 16,
@@ -605,6 +729,42 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _setSubVisibility(true);
           }
         },
+      ),
+    );
+  }
+}
+
+/// Netflix-style pill shown when Intro Skipper marks an intro/credits range.
+class _IntroSkipChipButton extends StatelessWidget {
+  const _IntroSkipChipButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.surfaceElevated.withValues(alpha: 0.92),
+          foregroundColor: AppColors.primary,
+          elevation: 6,
+          shadowColor: Colors.black54,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: AppColors.divider),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+        ),
       ),
     );
   }

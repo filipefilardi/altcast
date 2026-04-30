@@ -190,7 +190,8 @@ class _PlaybackGroup extends ConsumerWidget {
           secondary: const Icon(Icons.skip_next_outlined),
           title: const Text('Auto-skip intros & credits'),
           subtitle: const Text(
-            'Uses Jellyfin Intro Skipper when your server has it installed.',
+            'Skip buttons during playback when Intro Skipper has timings; '
+            'optional jump after a short delay.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           value: prefs.autoSkipIntroCredits,
