@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
+import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
@@ -97,7 +98,7 @@ class HomeScreen extends ConsumerWidget {
               ContinueWatchingShelf(
                 itemsAsync: resumeAsync,
                 onRetry: () => ref.invalidate(continueWatchingProvider),
-                onOpen: (item) => _openDetail(context, item),
+                onOpen: (item) => openItemDetail(context, item),
               ),
               _Section<List<BrowseItem>>(
                 title: 'Recently added movies',
@@ -296,27 +297,9 @@ class _PosterRow extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => PosterCard(
           item: items[i],
-          onTap: () => _openDetail(context, items[i]),
+          onTap: () => openItemDetail(context, items[i]),
         ),
       ),
     );
-  }
-}
-
-/// Routes a Home tap to the right detail screen based on item kind.
-/// Episodes & seasons land on their parent series — there's no per-episode
-/// screen yet (planned for the player phase).
-void _openDetail(BuildContext context, BrowseItem item) {
-  switch (item.kind) {
-    case MediaKind.movie:
-      context.push('/movie/${item.id}');
-    case MediaKind.series:
-      context.push('/series/${item.id}');
-    case MediaKind.season:
-      context.push('/season/${item.id}');
-    case MediaKind.episode:
-      context.push('/episode/${item.id}');
-    case MediaKind.person:
-      context.push('/person/${item.id}');
   }
 }
