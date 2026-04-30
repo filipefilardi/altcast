@@ -22,6 +22,7 @@ class PlaybackPreferences {
     this.wifiOnlyStreaming = false,
     this.autoSkipIntroCredits = true,
     this.autoplayNextTvEpisode = true,
+    this.autoplayCountdownSeconds = 8,
     this.androidSoftwareVideoDecode = true,
     this.defaultAudioMode = DefaultAudioMode.auto,
     this.defaultAudioLanguage,
@@ -41,6 +42,12 @@ class PlaybackPreferences {
   /// When true, shows the next-episode card with a countdown after an
   /// episode ends. When false, the card still appears but only manual play.
   final bool autoplayNextTvEpisode;
+
+  /// Length of the countdown shown on the Next Up card before the player
+  /// jumps to the next episode automatically. Only honored when
+  /// [autoplayNextTvEpisode] is on. Allowed presets live in
+  /// [autoplayCountdownPresets]; values outside it round to the nearest one.
+  final int autoplayCountdownSeconds;
 
   /// When true on Android, libmpv uses software decode (`hwdec=no`) instead of
   /// MediaCodec. Helps with glitchy HEVC/HDR on some devices; higher CPU use.
@@ -73,6 +80,7 @@ class PlaybackPreferences {
     bool? wifiOnlyStreaming,
     bool? autoSkipIntroCredits,
     bool? autoplayNextTvEpisode,
+    int? autoplayCountdownSeconds,
     bool? androidSoftwareVideoDecode,
     DefaultAudioMode? defaultAudioMode,
     String? defaultAudioLanguage,
@@ -86,6 +94,8 @@ class PlaybackPreferences {
       wifiOnlyStreaming: wifiOnlyStreaming ?? this.wifiOnlyStreaming,
       autoSkipIntroCredits: autoSkipIntroCredits ?? this.autoSkipIntroCredits,
       autoplayNextTvEpisode: autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
+      autoplayCountdownSeconds:
+          autoplayCountdownSeconds ?? this.autoplayCountdownSeconds,
       androidSoftwareVideoDecode:
           androidSoftwareVideoDecode ?? this.androidSoftwareVideoDecode,
       defaultAudioMode: defaultAudioMode ?? this.defaultAudioMode,
@@ -104,6 +114,7 @@ class PlaybackPreferences {
     'wifiOnlyStreaming': wifiOnlyStreaming,
     'autoSkipIntroCredits': autoSkipIntroCredits,
     'autoplayNextTvEpisode': autoplayNextTvEpisode,
+    'autoplayCountdownSeconds': autoplayCountdownSeconds,
     'androidSoftwareVideoDecode': androidSoftwareVideoDecode,
     'defaultAudioMode': defaultAudioMode.name,
     'defaultAudioLanguage': defaultAudioLanguage,
@@ -145,6 +156,9 @@ class PlaybackPreferences {
       wifiOnlyStreaming: json['wifiOnlyStreaming'] as bool? ?? false,
       autoSkipIntroCredits: json['autoSkipIntroCredits'] as bool? ?? true,
       autoplayNextTvEpisode: json['autoplayNextTvEpisode'] as bool? ?? true,
+      autoplayCountdownSeconds: _normalizeAutoplayCountdown(
+        json['autoplayCountdownSeconds'] as int?,
+      ),
       androidSoftwareVideoDecode:
           json['androidSoftwareVideoDecode'] as bool? ?? true,
       defaultAudioMode: audioMode,
@@ -153,6 +167,27 @@ class PlaybackPreferences {
       defaultSubtitleLanguage: json['defaultSubtitleLanguage'] as String?,
     );
   }
+}
+
+/// Allowed values for [PlaybackPreferences.autoplayCountdownSeconds]. Kept
+/// short so the picker stays compact and the chosen number maps to a clean
+/// progress arc on the Next Up card.
+const autoplayCountdownPresets = <int>[5, 8, 10, 15, 30];
+
+int _normalizeAutoplayCountdown(int? value) {
+  if (value == null) return 8;
+  // Snap to the nearest preset so persisted values from older builds (or a
+  // future picker tweak) always land on a supported choice.
+  var best = autoplayCountdownPresets.first;
+  var bestDelta = (value - best).abs();
+  for (final preset in autoplayCountdownPresets.skip(1)) {
+    final d = (value - preset).abs();
+    if (d < bestDelta) {
+      best = preset;
+      bestDelta = d;
+    }
+  }
+  return best;
 }
 
 enum DefaultAudioMode { auto, originalLanguage, fixedLanguage }
@@ -197,6 +232,13 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
 
   Future<void> setAutoplayNextTvEpisode(bool enabled) async {
     state = state.copyWith(autoplayNextTvEpisode: enabled);
+    await _persist();
+  }
+
+  Future<void> setAutoplayCountdownSeconds(int seconds) async {
+    state = state.copyWith(
+      autoplayCountdownSeconds: _normalizeAutoplayCountdown(seconds),
+    );
     await _persist();
   }
 

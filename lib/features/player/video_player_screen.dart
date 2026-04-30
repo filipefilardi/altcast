@@ -41,14 +41,21 @@ class _PlayerOverlaysSnapshot {
     this.showSkipCredits = false,
     this.showNextUp = false,
     this.nextEpisode,
+    this.nextEpisodePosterUrl,
     this.autoplayCountdown,
+    this.autoplayDuration = 8,
   });
 
   final bool showSkipIntro;
   final bool showSkipCredits;
   final bool showNextUp;
   final Episode? nextEpisode;
+  final String? nextEpisodePosterUrl;
   final int? autoplayCountdown;
+
+  /// Total countdown length when autoplay is running — used to draw the
+  /// circular progress arc on the Next Up card.
+  final int autoplayDuration;
 }
 
 /// Full-screen video player. Routes here are entered via
@@ -112,8 +119,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   StreamSubscription<bool>? _completedSub;
   StreamSubscription<Duration>? _durationSub;
   Episode? _nextEpisode;
+  String? _nextEpisodePosterUrl;
   bool _showNextUp = false;
   int _autoplayCountdown = 8;
+  int _autoplayDuration = 8;
   Timer? _autoplayTimer;
   Duration _mediaDuration = Duration.zero;
 
@@ -192,7 +201,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       showSkipCredits: _showSkipCreditsChip,
       showNextUp: _showNextUp,
       nextEpisode: _nextEpisode,
+      nextEpisodePosterUrl: _nextEpisodePosterUrl,
       autoplayCountdown: _autoplayTimer != null ? _autoplayCountdown : null,
+      autoplayDuration: _autoplayDuration,
     );
   }
 
@@ -441,12 +452,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       }
     }
 
-    _nextEpisode = await ref.read(jellyfinRepositoryProvider).getNextEpisode(
+    final next = await ref.read(jellyfinRepositoryProvider).getNextEpisode(
           seriesId: seriesId,
           seasonNumber: season,
           episodeNumber: episodeNum,
         );
     if (!mounted) return;
+    _nextEpisode = next;
+    if (next != null) {
+      _nextEpisodePosterUrl = ref
+          .read(jellyfinRepositoryProvider)
+          .backdropUrl(next.id, null, fallbackPrimaryTag: next.imageTag);
+    } else {
+      _nextEpisodePosterUrl = null;
+    }
     _publishOverlays();
   }
 
@@ -602,8 +621,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   void _startAutoplay() {
     if (!mounted || _nextEpisode == null) return;
+    final seconds = ref.read(playbackPreferencesProvider).autoplayCountdownSeconds;
+    _autoplayDuration = seconds;
+    _autoplayCountdown = seconds;
     _showNextUp = true;
-    _autoplayCountdown = 8;
     _publishOverlays();
     _autoplayTimer?.cancel();
     _autoplayTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -678,9 +699,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       valueListenable: _overlaySnapshots,
       builder: (context, snap, _) {
         final pad = MediaQuery.paddingOf(context);
+        // Lift the skip chips above the Next Up card when both are on
+        // screen so they don't visually collide near the bottom-right.
+        // Card is ~300 px tall (16:9 thumb + body); 224 lift puts the chip
+        // comfortably above its top edge.
         final nextUpLift =
-            (snap.showNextUp && snap.nextEpisode != null) ? 132.0 : 0.0;
-        final skipperStackBottom =
+            (snap.showNextUp && snap.nextEpisode != null) ? 224.0 : 0.0;
+        final skipperBottom =
             pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
 
         return Stack(
@@ -688,31 +713,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           clipBehavior: Clip.none,
           children: [
             MaterialVideoControls(videoState),
-            if (snap.showSkipCredits)
+            if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
-                left: pad.left + 16,
                 right: pad.right + 16,
-                bottom: skipperStackBottom,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _IntroSkipChipButton(
-                    label: 'Skip credits',
-                    onPressed: () => unawaited(_manualSkipCredits()),
-                  ),
-                ),
-              ),
-            if (snap.showSkipIntro)
-              Positioned(
-                left: pad.left + 16,
-                right: pad.right + 16,
-                bottom: skipperStackBottom +
-                    (snap.showSkipCredits ? 52 : 0),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _IntroSkipChipButton(
-                    label: 'Skip intro',
-                    onPressed: () => unawaited(_manualSkipIntro()),
-                  ),
+                bottom: skipperBottom,
+                child: _SkipChipStack(
+                  showIntro: snap.showSkipIntro,
+                  showCredits: snap.showSkipCredits,
+                  onSkipIntro: () => unawaited(_manualSkipIntro()),
+                  onSkipCredits: () => unawaited(_manualSkipCredits()),
                 ),
               ),
             if (snap.showNextUp && snap.nextEpisode != null)
@@ -721,7 +730,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 bottom: pad.bottom + 16,
                 child: _NextUpCard(
                   episode: snap.nextEpisode!,
+                  posterUrl: snap.nextEpisodePosterUrl,
                   countdownForAutoplay: snap.autoplayCountdown,
+                  countdownDuration: snap.autoplayDuration,
                   onCancel: _cancelAutoplay,
                   onPlayNow: _playNextEpisode,
                 ),
@@ -828,12 +839,358 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 }
 
-/// Netflix-style pill shown when Intro Skipper marks an intro/credits range.
-class _IntroSkipChipButton extends StatelessWidget {
-  const _IntroSkipChipButton({
+/// Stack of skip-intro / skip-credits pills. Vertically stacks chips when
+/// both segments overlap (rare, but handled). Right-anchored to avoid the
+/// player's bottom seek bar and to align with the Next Up card.
+class _SkipChipStack extends StatelessWidget {
+  const _SkipChipStack({
+    required this.showIntro,
+    required this.showCredits,
+    required this.onSkipIntro,
+    required this.onSkipCredits,
+  });
+
+  final bool showIntro;
+  final bool showCredits;
+  final VoidCallback onSkipIntro;
+  final VoidCallback onSkipCredits;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (showIntro)
+          _SkipChip(
+            label: 'Skip intro',
+            icon: Icons.fast_forward_rounded,
+            onPressed: onSkipIntro,
+          ),
+        if (showIntro && showCredits) const SizedBox(height: 10),
+        if (showCredits)
+          _SkipChip(
+            label: 'Skip credits',
+            icon: Icons.skip_next_rounded,
+            onPressed: onSkipCredits,
+          ),
+      ],
+    );
+  }
+}
+
+/// Glass-style pill that matches AltCast's brand: dark navy fill, subtle
+/// cyan stroke + glow, accent-coloured leading icon. Sized for a single
+/// crisp tap target, never stretches edge-to-edge.
+class _SkipChip extends StatelessWidget {
+  const _SkipChip({
     required this.label,
+    required this.icon,
     required this.onPressed,
   });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: AppColors.background.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.55),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.18),
+              blurRadius: 18,
+              spreadRadius: -2,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onPressed,
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  label.toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom-right card that previews the next episode and offers a play CTA
+/// matching the brand's accent-gradient pill. Shows a live countdown ring
+/// while autoplay is running, otherwise a static play arrow.
+class _NextUpCard extends StatelessWidget {
+  const _NextUpCard({
+    required this.episode,
+    required this.posterUrl,
+    required this.countdownForAutoplay,
+    required this.countdownDuration,
+    required this.onCancel,
+    required this.onPlayNow,
+  });
+
+  final Episode episode;
+  final String? posterUrl;
+
+  /// Live remaining seconds — non-null means autoplay is running. Null means
+  /// the card is offering only a manual "Play next" action.
+  final int? countdownForAutoplay;
+
+  /// Total countdown length, used to fill the progress arc.
+  final int countdownDuration;
+
+  final VoidCallback onCancel;
+  final VoidCallback onPlayNow;
+
+  bool get _autoplayRunning =>
+      countdownForAutoplay != null && countdownForAutoplay! > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 320,
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.28),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _NextUpThumb(
+              posterUrl: posterUrl,
+              countdownRemaining: countdownForAutoplay,
+              countdownTotal: countdownDuration,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (b) =>
+                        AppGradients.accent.createShader(b),
+                    child: Text(
+                      'NEXT UP',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: Colors.white,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (episode.shortLabel.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        episode.shortLabel,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    episode.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _NextUpPlayPill(
+                          label: _autoplayRunning ? 'Play now' : 'Play next',
+                          onPressed: onPlayNow,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _NextUpCancelButton(
+                        label: _autoplayRunning ? 'Cancel' : 'Dismiss',
+                        onPressed: onCancel,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NextUpThumb extends StatelessWidget {
+  const _NextUpThumb({
+    required this.posterUrl,
+    required this.countdownRemaining,
+    required this.countdownTotal,
+  });
+
+  final String? posterUrl;
+  final int? countdownRemaining;
+  final int countdownTotal;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(
+            color: AppColors.surfaceElevated,
+            child: posterUrl == null
+                ? const Center(
+                    child: Icon(
+                      Icons.movie_outlined,
+                      color: AppColors.textTertiary,
+                      size: 28,
+                    ),
+                  )
+                : Image.network(
+                    posterUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Icon(
+                        Icons.movie_outlined,
+                        color: AppColors.textTertiary,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  AppColors.surface.withValues(alpha: 0.85),
+                ],
+                stops: const [0.55, 1],
+              ),
+            ),
+          ),
+          if (countdownRemaining != null && countdownTotal > 0)
+            Positioned(
+              right: 10,
+              top: 10,
+              child: _CountdownRing(
+                remaining: countdownRemaining!,
+                total: countdownTotal,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountdownRing extends StatelessWidget {
+  const _CountdownRing({required this.remaining, required this.total});
+
+  final int remaining;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    // Sweep from full → empty as the countdown ticks down.
+    final value = (remaining / total).clamp(0.0, 1.0);
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.background.withValues(alpha: 0.72),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.25),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              value: value,
+              strokeWidth: 2.5,
+              backgroundColor: Colors.transparent,
+              valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+            ),
+          ),
+          Text(
+            '$remaining',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextUpPlayPill extends StatelessWidget {
+  const _NextUpPlayPill({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -842,84 +1199,76 @@ class _IntroSkipChipButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.surfaceElevated.withValues(alpha: 0.92),
-          foregroundColor: AppColors.primary,
-          elevation: 6,
-          shadowColor: Colors.black54,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: AppColors.divider),
-          ),
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: AppGradients.accent,
+          borderRadius: BorderRadius.circular(999),
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.play_arrow_rounded,
+                  color: AppColors.onAccent,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label.toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.onAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _NextUpCard extends StatelessWidget {
-  const _NextUpCard({
-    required this.episode,
-    required this.countdownForAutoplay,
-    required this.onCancel,
-    required this.onPlayNow,
-  });
+class _NextUpCancelButton extends StatelessWidget {
+  const _NextUpCancelButton({required this.label, required this.onPressed});
 
-  final Episode episode;
-
-  /// When non-null and positive, the primary button shows a live countdown
-  /// and autoplay is running. When null, only manual "Play next" is offered.
-  final int? countdownForAutoplay;
-  final VoidCallback onCancel;
-  final VoidCallback onPlayNow;
+  final String label;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final c = countdownForAutoplay;
-    final playCta = (c != null && c > 0) ? 'Play now ($c)' : 'Play next';
-    return Container(
-      width: 280,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Next Up', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
-          Text(
-            episode.shortLabel.isEmpty
-                ? episode.name
-                : '${episode.shortLabel} • ${episode.name}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onPressed,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Text(
+            label.toUpperCase(),
             style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              TextButton(onPressed: onCancel, child: const Text('Cancel')),
-              const Spacer(),
-              FilledButton(
-                onPressed: onPlayNow,
-                child: Text(playCta),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
