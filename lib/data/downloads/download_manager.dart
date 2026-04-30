@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../jellyfin/jellyfin_repository.dart';
 import '../jellyfin/models/episode.dart';
 import '../jellyfin/models/movie.dart';
+import '../local/download_preferences.dart';
 import 'downloaded_item.dart';
 
 /// Snapshot of the offline library + in-flight downloads.
@@ -229,6 +230,9 @@ class DownloadManager extends Notifier<DownloadsState> {
         ..remove(entry.itemId);
       state = state.copyWith(items: newItems, progress: newProgress);
       await _persist();
+
+      // Trigger auto-download if enabled and this was an episode
+      _maybeAutoDownloadNext(entry);
     } catch (e) {
       // Cancellations and errors both land here — clean up either way.
       try {
@@ -243,6 +247,36 @@ class DownloadManager extends Notifier<DownloadsState> {
     }
   }
 
+  Future<void> _maybeAutoDownloadNext(_QueueEntry entry) async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!prefs.autoDownloadNextEpisode) return;
+    if (entry.kind != DownloadedItemKind.episode) return;
+
+    final seriesId = entry.seriesId;
+    final seasonNum = entry.seasonNumber;
+    final episodeNum = entry.episodeNumber;
+    if (seriesId == null || seasonNum == null || episodeNum == null) return;
+
+    try {
+      final repo = ref.read(jellyfinRepositoryProvider);
+      final next = await repo.getNextEpisode(
+        seriesId: seriesId,
+        seasonNumber: seasonNum,
+        episodeNumber: episodeNum,
+      );
+
+      if (next != null) {
+        await enqueueEpisode(
+          next,
+          seriesName: entry.seriesName ?? 'Series',
+          seriesPosterTag: entry.imageTag,
+        );
+      }
+    } catch (_) {
+      // Silently fail auto-download — don't interrupt the user's flow.
+    }
+  }
+
   Future<void> _persist() async {
     final dir = await _downloadsDir();
     final manifest = File('${dir.path}/manifest.json');
@@ -251,8 +285,24 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<Directory> _downloadsDir() async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory('${docs.path}/downloads');
+    final prefs = ref.read(downloadPreferencesProvider);
+    
+    Directory? baseDir;
+    if (Platform.isAndroid && prefs.downloadLocation == DownloadLocation.external) {
+      final externals = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+      // Pick the first one that isn't the primary internal storage if possible,
+      // though getExternalStorageDirectories usually returns internal first.
+      // This is a simplified heuristic.
+      if (externals != null && externals.length > 1) {
+        baseDir = externals.last;
+      } else {
+        baseDir = externals?.firstOrNull;
+      }
+    }
+
+    baseDir ??= await getApplicationDocumentsDirectory();
+    
+    final dir = Directory('${baseDir.path}/downloads');
     if (!dir.existsSync()) await dir.create(recursive: true);
     return dir;
   }
