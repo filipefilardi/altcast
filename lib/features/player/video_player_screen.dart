@@ -177,6 +177,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     try {
       final impl = _player.platform as dynamic;
       impl?.setProperty('sub-visibility', 'yes');
+      // mpv: 100 = bottom edge, lower values move subtitles up.
+      impl?.setProperty('sub-pos', '92');
     } catch (_) {}
 
     // Lock to landscape while the player is on screen. Best-effort:
