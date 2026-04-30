@@ -32,8 +32,10 @@ class PlaybackPreferences {
   final StreamingQuality streamingQuality;
   final bool wifiOnlyStreaming;
 
-  /// When true, seeks past intro/credits when the Jellyfin Intro Skipper
-  /// plugin reports segments for the item. No-op if the plugin is missing.
+  /// When true, seeks past intro/credits automatically after a short delay
+  /// while playback stays inside a segment. Skip buttons still appear when
+  /// this is off, as long as the server reports timings. No-op if the plugin
+  /// is missing.
   final bool autoSkipIntroCredits;
 
   /// When true, shows the next-episode card with a countdown after an

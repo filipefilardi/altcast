@@ -190,8 +190,8 @@ class _PlaybackGroup extends ConsumerWidget {
           secondary: const Icon(Icons.skip_next_outlined),
           title: const Text('Auto-skip intros & credits'),
           subtitle: const Text(
-            'Skip buttons during playback when Intro Skipper has timings; '
-            'optional jump after a short delay.',
+            'When on, jumps past detected segments after a few seconds. '
+            'Skip buttons still show when Intro Skipper has timings even if this is off.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           value: prefs.autoSkipIntroCredits,

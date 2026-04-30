@@ -23,7 +23,10 @@ class IntroSkipperTimestamps {
         json['Introduction'] ?? json['introduction'],
       ),
       credits: IntroSkipperRange.parseSegmentJson(
-        json['Credits'] ?? json['credits'],
+        json['Credits'] ??
+            json['credits'] ??
+            json['Outro'] ??
+            json['outro'],
       ),
     );
   }
@@ -76,6 +79,11 @@ class IntroSkipperRange {
 }
 
 Duration? _readNonNegativeSeconds(dynamic v) {
+  if (v is String) {
+    final parsed = double.tryParse(v.trim());
+    if (parsed == null) return null;
+    v = parsed;
+  }
   if (v is! num) return null;
   if (v.toDouble() < 0) return null;
   return Duration(microseconds: (v.toDouble() * 1000000).round());
