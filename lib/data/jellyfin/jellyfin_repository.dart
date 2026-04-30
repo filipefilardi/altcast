@@ -284,7 +284,7 @@ class JellyfinRepository {
         'Limit': limit,
         'Fields': 'UserData,ProductionYear,ChildCount',
         'EnableImages': true,
-        'SortBy': 'SortName',
+        'SortBy': 'ProductionYear,SortName',
         'SortOrder': 'Ascending',
       },
     );
