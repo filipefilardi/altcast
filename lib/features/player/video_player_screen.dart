@@ -216,11 +216,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   Future<void> _open() async {
     try {
+      // Capture providers upfront — calling `ref.read` after an await on a
+      // disposed widget throws.
+      final downloads = ref.read(downloadManagerProvider);
+      final repo = ref.read(jellyfinRepositoryProvider);
+      final api = ref.read(jellyfinApiProvider);
       // Prefer the local file if this item was downloaded — saves a server
       // round-trip and lets playback work fully offline.
-      final localPath = ref
-          .read(downloadManagerProvider)
-          .localPath(widget.itemId);
+      final localPath = downloads.localPath(widget.itemId);
       final StreamSource source;
       if (localPath != null) {
         source = StreamSource(
@@ -228,12 +231,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           isTranscoding: false,
         );
       } else {
-        source = await ref
-            .read(jellyfinRepositoryProvider)
-            .getStreamSource(widget.itemId);
+        source = await repo.getStreamSource(widget.itemId);
       }
+      if (!mounted) return;
       _sourceNotifier.value = source;
-      final api = ref.read(jellyfinApiProvider);
       final auth = api.dio.options.headers['Authorization'];
       await _player.open(
         Media(
@@ -424,6 +425,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _resolveNextEpisode() async {
+    // Capture the repo upfront — `ref.read` after dispose throws.
+    final repo = ref.read(jellyfinRepositoryProvider);
     var seriesId = widget.seriesId;
     var season = widget.seasonNumber;
     var episodeNum = widget.episodeNumber;
@@ -434,12 +437,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         episodeNum == null;
     if (routingIncomplete) {
       try {
-        final ep =
-            await ref.read(jellyfinRepositoryProvider).getEpisode(widget.itemId);
+        final ep = await repo.getEpisode(widget.itemId);
+        if (!mounted) return;
         if (ep.seriesId.isEmpty ||
             ep.parentIndexNumber == null ||
             ep.indexNumber == null) {
-          if (!mounted) return;
           _publishOverlays();
           return;
         }
@@ -453,20 +455,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       }
     }
 
-    final next = await ref.read(jellyfinRepositoryProvider).getNextEpisode(
-          seriesId: seriesId,
-          seasonNumber: season,
-          episodeNumber: episodeNum,
-        );
+    final next = await repo.getNextEpisode(
+      seriesId: seriesId,
+      seasonNumber: season,
+      episodeNumber: episodeNum,
+    );
     if (!mounted) return;
     _nextEpisode = next;
-    if (next != null) {
-      _nextEpisodePosterUrl = ref
-          .read(jellyfinRepositoryProvider)
-          .backdropUrl(next.id, null, fallbackPrimaryTag: next.imageTag);
-    } else {
-      _nextEpisodePosterUrl = null;
-    }
+    _nextEpisodePosterUrl = next == null
+        ? null
+        : repo.backdropUrl(next.id, null, fallbackPrimaryTag: next.imageTag);
     _publishOverlays();
   }
 

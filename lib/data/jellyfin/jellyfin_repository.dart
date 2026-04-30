@@ -434,38 +434,52 @@ class JellyfinRepository {
     return Episode.fromJson(data);
   }
 
+  /// Picks the episode that follows S[seasonNumber]E[episodeNumber] for
+  /// autoplay/Next-Up. Searches the current season first, then falls back to
+  /// the start of the next season — bounded queries so long-running shows
+  /// (anime, soaps with hundreds of episodes) don't get clipped by a list cap.
   Future<Episode?> getNextEpisode({
     required String seriesId,
     required int seasonNumber,
     required int episodeNumber,
   }) async {
+    final inSameSeason = await _firstEpisodeAfter(
+      seriesId: seriesId,
+      seasonNumber: seasonNumber,
+      afterEpisodeNumber: episodeNumber,
+    );
+    if (inSameSeason != null) return inSameSeason;
+    return _firstEpisodeAfter(
+      seriesId: seriesId,
+      seasonNumber: seasonNumber + 1,
+      afterEpisodeNumber: 0,
+    );
+  }
+
+  Future<Episode?> _firstEpisodeAfter({
+    required String seriesId,
+    required int seasonNumber,
+    required int afterEpisodeNumber,
+  }) async {
     final s = _session;
-    final currentKey = seasonNumber * 1000 + episodeNumber;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Shows/$seriesId/Episodes',
       queryParameters: {
         'UserId': s.userId,
+        'Season': seasonNumber,
         'Fields': 'Overview,UserData,RunTimeTicks,SeriesId,SeasonId',
-        'Limit': 200,
       },
     );
     final items = ((res.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(Episode.fromJson)
+        .where((e) => e.indexNumber != null)
         .toList();
-    Episode? best;
-    var bestKey = 1 << 30;
+    items.sort((a, b) => a.indexNumber!.compareTo(b.indexNumber!));
     for (final ep in items) {
-      final sNum = ep.parentIndexNumber;
-      final eNum = ep.indexNumber;
-      if (sNum == null || eNum == null) continue;
-      final key = sNum * 1000 + eNum;
-      if (key > currentKey && key < bestKey) {
-        best = ep;
-        bestKey = key;
-      }
+      if (ep.indexNumber! > afterEpisodeNumber) return ep;
     }
-    return best;
+    return null;
   }
 
   /// Fetches Intro Skipper segment times for an episode or movie, if the

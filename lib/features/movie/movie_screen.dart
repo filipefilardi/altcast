@@ -78,28 +78,21 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
   @override
   void initState() {
     super.initState();
-    _preference = _preferenceFromDefaults(widget.movie);
+    _preference = TrackPreference.fromPlaybackPrefs(
+      ref.read(playbackPreferencesProvider),
+      itemOriginalLanguage: widget.movie.originalLanguage,
+    );
   }
 
   @override
   void didUpdateWidget(covariant _MovieBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.movie.id != widget.movie.id) {
-      _preference = _preferenceFromDefaults(widget.movie);
+      _preference = TrackPreference.fromPlaybackPrefs(
+        ref.read(playbackPreferencesProvider),
+        itemOriginalLanguage: widget.movie.originalLanguage,
+      );
     }
-  }
-
-  TrackPreference _preferenceFromDefaults(Movie movie) {
-    final pb = ref.read(playbackPreferencesProvider);
-    return TrackPreference(
-      audioLang: pb.resolvedAudioLanguage(movie.originalLanguage),
-      subKind: switch (pb.defaultSubtitleMode) {
-        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
-        DefaultSubtitleMode.off => SubPreferenceKind.off,
-        DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
-      },
-      subLang: pb.defaultSubtitleLanguage,
-    );
   }
 
   @override

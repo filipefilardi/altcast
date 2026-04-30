@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -212,7 +213,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
           builder: (context, setModalState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,7 +222,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                       'Filters',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     DropdownButtonFormField<LibrarySort>(
                       initialValue: localSort,
                       decoration: const InputDecoration(labelText: 'Sort'),
@@ -269,6 +270,10 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                       initialValue: localYear?.toString() ?? '',
                       decoration: const InputDecoration(labelText: 'Year'),
                       keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       onChanged: (v) => localYear = int.tryParse(v),
                     ),
                     SwitchListTile(
