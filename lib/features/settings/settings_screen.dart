@@ -213,6 +213,20 @@ class _PlaybackGroup extends ConsumerWidget {
               .setAutoplayNextTvEpisode(v),
           activeThumbColor: AppColors.primary,
         ),
+        if (prefs.autoplayNextTvEpisode)
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Autoplay countdown'),
+            subtitle: Text(
+              '${prefs.autoplayCountdownSeconds} seconds',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+            ),
+            onTap: () => _showAutoplayCountdownSheet(context),
+          ),
         if (Platform.isAndroid)
           SwitchListTile(
             secondary: const Icon(Icons.memory_outlined),
@@ -552,6 +566,56 @@ class _VersionFooter extends ConsumerWidget {
       ),
     );
   }
+}
+
+Future<void> _showAutoplayCountdownSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final current =
+            ref.watch(playbackPreferencesProvider).autoplayCountdownSeconds;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Autoplay countdown',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 4, bottom: 8),
+                  child: Text(
+                    'How long the Next Up card waits before jumping to the next episode.',
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ),
+                for (final seconds in autoplayCountdownPresets)
+                  RadioListTile<int>(
+                    value: seconds,
+                    groupValue: current,
+                    title: Text('$seconds seconds'),
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) async {
+                      if (v == null) return;
+                      await ref
+                          .read(playbackPreferencesProvider.notifier)
+                          .setAutoplayCountdownSeconds(v);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 Future<void> _showStreamingQualitySheet(BuildContext context) {
