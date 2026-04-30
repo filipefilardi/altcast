@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_gradients.dart';
 import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../auth/auth_controller.dart';
+import '../remote/remote_sessions_sheet.dart';
 import 'home_providers.dart';
 import 'widgets/continue_watching_hero.dart';
 import 'widgets/poster_card.dart';
@@ -72,10 +72,9 @@ class HomeScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
-            _Greeting(
-              username: username,
-              greetingPhrase: _timeBasedGreeting(),
-            ),
+            _HomeHeader(username: username),
+            const SizedBox(height: 18),
+            const _LibraryNav(),
             const SizedBox(height: 24),
             if (everythingFailed)
               ErrorStateView(
@@ -127,60 +126,147 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Local-time greeting for the home header (5–12 morning, 12–17 afternoon, else evening).
-String _timeBasedGreeting() {
-  final h = DateTime.now().hour;
-  if (h >= 5 && h < 12) return 'Good morning';
-  if (h >= 12 && h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-class _Greeting extends StatelessWidget {
-  const _Greeting({this.username, required this.greetingPhrase});
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({this.username});
 
   final String? username;
-  final String greetingPhrase;
 
   @override
   Widget build(BuildContext context) {
-    final displayTitle = Theme.of(context).textTheme.displayMedium!.copyWith(
-      // ShaderMask + BlendMode.srcIn: fill must be a solid light color so the
-      // accent gradient reads correctly (matches previous white treatment).
-      color: AppColors.textPrimary,
-    );
+    final title = username == null || username!.isEmpty ? 'Home' : username!;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback: (bounds) =>
-                    AppGradients.accent.createShader(bounds),
-                child: Text('AltCast', style: displayTitle),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                username == null || username!.isEmpty
-                    ? greetingPhrase
-                    : '$greetingPhrase, $username',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
         ),
-        IconButton.filledTonal(
-          onPressed: () => context.push('/settings'),
-          icon: const Icon(Icons.settings_outlined, size: 20),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.surfaceElevated,
-            foregroundColor: AppColors.textPrimary,
-          ),
-          tooltip: 'Settings',
+        const SizedBox(width: 12),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _NavIconButton(
+              icon: Icons.search_rounded,
+              tooltip: 'Search',
+              onPressed: () => context.push('/search'),
+            ),
+            _NavIconButton(
+              icon: Icons.cast_rounded,
+              tooltip: 'Cast',
+              onPressed: () => showRemoteSessionsSheet(context),
+            ),
+            _NavIconButton(
+              icon: Icons.download_rounded,
+              tooltip: 'Downloads',
+              onPressed: () => context.push('/downloads'),
+            ),
+            _NavIconButton(
+              icon: Icons.settings_outlined,
+              tooltip: 'Settings',
+              onPressed: () => context.push('/settings'),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _NavIconButton extends StatelessWidget {
+  const _NavIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 21),
+      color: AppColors.textPrimary,
+      tooltip: tooltip,
+      style: IconButton.styleFrom(
+        backgroundColor: AppColors.surfaceElevated,
+        minimumSize: const Size(40, 40),
+        fixedSize: const Size(40, 40),
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+class _LibraryNav extends StatelessWidget {
+  const _LibraryNav();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _LibraryNavItem(
+            label: 'Movies',
+            onTap: () => context.push('/library/movies'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _LibraryNavItem(
+            label: 'Series',
+            onTap: () => context.push('/library/shows'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _LibraryNavItem(
+            label: 'Collections',
+            onTap: () => context.push('/library/collections'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LibraryNavItem extends StatelessWidget {
+  const _LibraryNavItem({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: SizedBox(
+          height: 42,
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -239,10 +325,7 @@ class _Section<T> extends StatelessWidget {
           ),
         ),
         if (state.isLoading)
-          _SkeletonRow(
-            height: skeletonHeight,
-            cardWidth: skeletonCardWidth,
-          )
+          _SkeletonRow(height: skeletonHeight, cardWidth: skeletonCardWidth)
         else if (state.hasError)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),

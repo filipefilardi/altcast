@@ -21,7 +21,7 @@ class LibraryBrowseScreen extends ConsumerStatefulWidget {
   });
 
   final String title;
-  final String itemType; // Movie or Series
+  final String itemType; // Movie, Series, or BoxSet
   final String? initialGenre;
 
   @override
@@ -79,17 +79,24 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
         unwatchedOnly: _unwatchedOnly,
         sort: _sort,
       );
-      final page = widget.itemType == 'Movie'
-          ? await repo.browseMovies(
-              startIndex: _nextIndex,
-              limit: _pageSize,
-              filter: filter,
-            )
-          : await repo.browseShows(
-              startIndex: _nextIndex,
-              limit: _pageSize,
-              filter: filter,
-            );
+      final page = switch (widget.itemType) {
+        'Movie' => await repo.browseMovies(
+          startIndex: _nextIndex,
+          limit: _pageSize,
+          filter: filter,
+        ),
+        'Series' => await repo.browseShows(
+          startIndex: _nextIndex,
+          limit: _pageSize,
+          filter: filter,
+        ),
+        'BoxSet' => await repo.browseCollections(
+          startIndex: _nextIndex,
+          limit: _pageSize,
+          filter: filter,
+        ),
+        _ => throw ArgumentError('Unsupported library type ${widget.itemType}'),
+      };
       if (!mounted) return;
       setState(() {
         _items.addAll(page.items);
@@ -114,13 +121,15 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
       appBar: AppBar(
         title: Text(widget.title),
         leading: BackButton(onPressed: () => context.pop()),
-        actions: [
-          IconButton(
-            tooltip: 'Filters',
-            onPressed: _showFilters,
-            icon: const Icon(Icons.tune),
-          ),
-        ],
+        actions: _filtersEnabled
+            ? [
+                IconButton(
+                  tooltip: 'Filters',
+                  onPressed: _showFilters,
+                  icon: const Icon(Icons.tune),
+                ),
+              ]
+            : null,
       ),
       body: RefreshIndicator(
         onRefresh: _reload,
@@ -162,14 +171,16 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
     }
     if (_items.isEmpty) {
       return ListView(
-        children: const [
-          SizedBox(height: 80),
+        children: [
+          const SizedBox(height: 80),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
               icon: Icons.video_library_outlined,
               title: 'No items found',
-              message: 'Try changing filters.',
+              message: _filtersEnabled
+                  ? 'Try changing filters.'
+                  : 'No collections found.',
             ),
           ),
         ],
@@ -179,8 +190,10 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
-        FilterChipsRow(labels: _filterLabels()),
-        const SizedBox(height: 12),
+        if (_filtersEnabled) ...[
+          FilterChipsRow(labels: _filterLabels()),
+          const SizedBox(height: 12),
+        ],
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -216,6 +229,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
   }
 
   Future<void> _showFilters() async {
+    if (!_filtersEnabled) return;
     final repo = ref.read(jellyfinRepositoryProvider);
     final genres = await repo.getGenres(itemType: widget.itemType);
     if (!mounted) return;
@@ -289,9 +303,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                       decoration: const InputDecoration(labelText: 'Year'),
                       keyboardType: TextInputType.number,
                       maxLength: 4,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: (v) => localYear = int.tryParse(v),
                     ),
                     SwitchListTile(
@@ -343,11 +355,13 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
   }
 
   List<String> _filterLabels() => [
-        _sortLabel(_sort),
-        ?_genre,
-        if (_year != null) '$_year',
-        if (_unwatchedOnly) 'Unwatched',
-      ];
+    _sortLabel(_sort),
+    ?_genre,
+    if (_year != null) '$_year',
+    if (_unwatchedOnly) 'Unwatched',
+  ];
+
+  bool get _filtersEnabled => widget.itemType != 'BoxSet';
 }
 
 String _sortLabel(LibrarySort sort) {

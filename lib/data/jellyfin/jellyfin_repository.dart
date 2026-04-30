@@ -170,6 +170,19 @@ class JellyfinRepository {
     );
   }
 
+  Future<LibraryPage> browseCollections({
+    int startIndex = 0,
+    int limit = 30,
+    LibraryFilter filter = const LibraryFilter(),
+  }) {
+    return _browse(
+      itemTypes: 'BoxSet',
+      startIndex: startIndex,
+      limit: limit,
+      filter: filter,
+    );
+  }
+
   Future<List<String>> getGenres({required String itemType}) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
@@ -257,14 +270,34 @@ class JellyfinRepository {
         .toList();
   }
 
+  Future<List<BrowseItem>> getCollectionItems(
+    String collectionId, {
+    int limit = 100,
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Collections/$collectionId/Items',
+      queryParameters: {
+        'UserId': s.userId,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+  }
+
   /// Full movie metadata for the detail screen.
   Future<Movie> getMovie(String id) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
-      queryParameters: const {
-        'Fields': 'People,OriginalLanguage,Tags',
-      },
+      queryParameters: const {'Fields': 'People,OriginalLanguage,Tags'},
     );
     final data = res.data;
     if (data == null) {
@@ -278,9 +311,7 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$id',
-      queryParameters: const {
-        'Fields': 'People,OriginalLanguage,Tags',
-      },
+      queryParameters: const {'Fields': 'People,OriginalLanguage,Tags'},
     );
     final data = res.data;
     if (data == null) {
@@ -351,7 +382,10 @@ class JellyfinRepository {
     }
   }
 
-  Future<List<BrowseItem>> getSimilarItems(String itemId, {int limit = 16}) async {
+  Future<List<BrowseItem>> getSimilarItems(
+    String itemId, {
+    int limit = 16,
+  }) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Items/$itemId/Similar',
@@ -488,7 +522,9 @@ class JellyfinRepository {
   /// Tries fork `GET …/Episode/{id}/Timestamps` (several URL prefixes), legacy
   /// `IntroTimestamps`, then merges. Any failure or empty segments yields only
   /// whatever other calls succeeded — playback never depends on this call.
-  Future<IntroSkipperTimestamps?> getIntroSkipperTimestamps(String itemId) async {
+  Future<IntroSkipperTimestamps?> getIntroSkipperTimestamps(
+    String itemId,
+  ) async {
     if (_api.session == null) return null;
     IntroSkipperTimestamps? merged;
 
@@ -499,11 +535,10 @@ class JellyfinRepository {
           options: Options(validateStatus: (s) => s == 200 || s == 404),
         );
         if (res.statusCode == 200 && res.data != null) {
-          final parsed =
-              IntroSkipperTimestamps.fromPluginTimestampsJson(res.data!);
-          merged = merged == null
-              ? parsed
-              : merged!.mergePreferNonNull(parsed);
+          final parsed = IntroSkipperTimestamps.fromPluginTimestampsJson(
+            res.data!,
+          );
+          merged = merged == null ? parsed : merged!.mergePreferNonNull(parsed);
         }
       } catch (_) {}
     }
@@ -859,7 +894,9 @@ class JellyfinRepository {
   }) {
     if (personId == null || personId.isEmpty) return null;
     final s = _session;
-    final tagParam = (imageTag != null && imageTag.isNotEmpty) ? '&tag=$imageTag' : '';
+    final tagParam = (imageTag != null && imageTag.isNotEmpty)
+        ? '&tag=$imageTag'
+        : '';
     return '${s.serverUrl}/Items/$personId/Images/Primary'
         '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
   }

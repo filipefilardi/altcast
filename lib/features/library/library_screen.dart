@@ -44,6 +44,12 @@ class LibraryScreen extends ConsumerWidget {
             subtitle: 'Browse all shows',
             onTap: () => context.push('/library/shows'),
           ),
+          _LibraryTile(
+            icon: Icons.collections_bookmark_outlined,
+            label: 'Collections',
+            subtitle: 'Browse movie collections',
+            onTap: () => context.push('/library/collections'),
+          ),
         ],
       ),
     );

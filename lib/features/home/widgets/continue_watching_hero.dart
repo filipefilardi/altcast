@@ -34,13 +34,6 @@ class ContinueWatchingShelf extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            'CONTINUE WATCHING',
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-        ),
         if (itemsAsync.isLoading)
           const _ContinueWatchingHeroSkeleton()
         else if (itemsAsync.hasError)
@@ -52,10 +45,7 @@ class ContinueWatchingShelf extends StatelessWidget {
             ),
           )
         else if (itemsAsync.hasValue)
-          ContinueWatchingHero(
-            items: itemsAsync.requireValue,
-            onOpen: onOpen,
-          ),
+          ContinueWatchingHero(items: itemsAsync.requireValue, onOpen: onOpen),
         const SizedBox(height: 24),
       ],
     );
@@ -101,24 +91,24 @@ class _ContinueWatchingHeroState extends ConsumerState<ContinueWatchingHero> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final h = c.maxWidth * 9 / 16;
-                return SizedBox(
-                  height: h,
+        LayoutBuilder(
+          builder: (context, c) {
+            final h = (c.maxWidth * 1.08).clamp(340.0, 520.0);
+            return SizedBox(
+              height: h,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: items.length,
@@ -128,10 +118,10 @@ class _ContinueWatchingHeroState extends ConsumerState<ContinueWatchingHero> {
                       onOpenDetail: () => widget.onOpen(items[i]),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         ),
         if (items.length > 1) ...[
           const SizedBox(height: 12),
@@ -177,6 +167,7 @@ class _HeroSlide extends ConsumerWidget {
     );
     final progress = item.userData?.progress ?? 0;
     final title = _heroTitle(item);
+    final metadata = _heroMetadata(item, progress);
     final remaining = _heroRemaining(item);
 
     return Material(
@@ -281,8 +272,21 @@ class _HeroSlide extends ConsumerWidget {
                                   height: 1.25,
                                 ),
                               ),
-                              if (remaining.isNotEmpty) ...[
+                              if (metadata.isNotEmpty) ...[
                                 const SizedBox(height: 4),
+                                Text(
+                                  metadata,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                              if (remaining.isNotEmpty) ...[
+                                const SizedBox(height: 3),
                                 Text(
                                   remaining,
                                   maxLines: 1,
@@ -345,11 +349,7 @@ class _ResumePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.play_arrow_rounded,
-              color: AppColors.onAccent,
-              size: 22,
-            ),
+            Icon(Icons.play_arrow_rounded, color: AppColors.onAccent, size: 22),
             SizedBox(width: 4),
             Text(
               'RESUME',
@@ -377,26 +377,14 @@ class _ContinueWatchingHeroSkeleton extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  return Skeleton.box(
-                    width: c.maxWidth,
-                    height: c.maxHeight,
-                    radius: 0,
-                  );
-                },
-              ),
+            borderRadius: BorderRadius.circular(24),
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final h = (c.maxWidth * 1.08).clamp(340.0, 520.0);
+                return Skeleton.box(width: c.maxWidth, height: h, radius: 0);
+              },
             ),
           ),
-          const SizedBox(height: 14),
-          Skeleton.line(height: 16),
-          const SizedBox(height: 8),
-          Skeleton.line(height: 12, width: 180),
-          const SizedBox(height: 12),
-          Skeleton.line(height: 4),
         ],
       ),
     );
@@ -434,6 +422,7 @@ void _openContinueWatchingResume(
     case MediaKind.series:
     case MediaKind.season:
     case MediaKind.person:
+    case MediaKind.collection:
       onOpenDetail();
   }
 }
@@ -443,6 +432,27 @@ String _heroTitle(BrowseItem item) {
     return '${item.seriesName} — ${item.name}';
   }
   return item.name;
+}
+
+String _heroMetadata(BrowseItem item, double progress) {
+  final parts = <String>[];
+  if (item.kind == MediaKind.episode &&
+      item.seasonNumber != null &&
+      item.episodeNumber != null) {
+    parts.add(
+      'S${item.seasonNumber} E${item.episodeNumber.toString().padLeft(2, '0')}',
+    );
+  } else if (item.year != null) {
+    parts.add('${item.year}');
+  } else if (item.subtitle != null && item.subtitle!.isNotEmpty) {
+    parts.add(item.subtitle!);
+  }
+
+  final percent = (progress * 100).round();
+  if (percent > 0) {
+    parts.add('$percent% watched');
+  }
+  return parts.join(' • ');
 }
 
 String _heroRemaining(BrowseItem item) {

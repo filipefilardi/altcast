@@ -18,5 +18,12 @@ void openItemDetail(BuildContext context, BrowseItem item) {
       context.push('/episode/${item.id}');
     case MediaKind.person:
       context.push('/person/${item.id}');
+    case MediaKind.collection:
+      context.push(
+        Uri(
+          path: '/collection/${item.id}',
+          queryParameters: {'title': item.name},
+        ).toString(),
+      );
   }
 }
