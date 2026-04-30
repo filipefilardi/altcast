@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  /// Navy stack aligned with adaptive icon background `#18265D` + foreground.
-  static const background = Color(0xFF0A0F24);
-  static const surface = Color(0xFF121A35);
-  static const surfaceElevated = Color(0xFF1A2448);
-  static const surfaceHighlight = Color(0xFF283364);
+  /// Near-black blue stack for the app chrome and media surfaces.
+  static const background = Color(0xFF03071D);
+  static const surface = Color(0xFF071023);
+  static const surfaceElevated = Color(0xFF0D1830);
+  static const surfaceHighlight = Color(0xFF172542);
 
   /// Cyan accent matching the Play Store / launcher mark.
   static const primary = Color(0xFF00AEFF);
@@ -21,7 +21,7 @@ class AppColors {
   static const textSecondary = Color(0xFF94A3C4);
   static const textTertiary = Color(0xFF5C6B8A);
 
-  static const divider = Color(0xFF243058);
+  static const divider = Color(0xFF18243E);
   static const error = Color(0xFFE5635A);
   static const success = Color(0xFF66CC8A);
 
