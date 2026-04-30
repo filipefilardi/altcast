@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
@@ -37,16 +38,12 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     final seriesAsync = ref.watch(seriesProvider(widget.seriesId));
     final seasonsAsync = ref.watch(seasonsProvider(widget.seriesId));
 
-    // Auto-select the first season once they arrive.
-    if (_selectedSeasonId == null && seasonsAsync.hasValue) {
-      final seasons = seasonsAsync.requireValue;
-      if (seasons.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          setState(() => _selectedSeasonId = seasons.first.id);
-        });
-      }
-    }
+    // Active season: user choice if set, otherwise the first season as soon
+    // as the list arrives. Derived (not stored) so we don't end up scheduling
+    // a post-frame setState on every build.
+    final seasons = seasonsAsync.value ?? const [];
+    final activeSeasonId =
+        _selectedSeasonId ?? (seasons.isNotEmpty ? seasons.first.id : null);
 
     return Scaffold(
       body: RefreshIndicator(
@@ -54,11 +51,11 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           ref.invalidate(seriesProvider(widget.seriesId));
           ref.invalidate(seasonsProvider(widget.seriesId));
           ref.invalidate(similarSeriesProvider(widget.seriesId));
-          if (_selectedSeasonId != null) {
+          if (activeSeasonId != null) {
             ref.invalidate(
               episodesProvider((
                 seriesId: widget.seriesId,
-                seasonId: _selectedSeasonId!,
+                seasonId: activeSeasonId,
               )),
             );
           }
@@ -78,7 +75,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           data: (series) => _SeriesBody(
             series: series,
             seasonsAsync: seasonsAsync,
-            selectedSeasonId: _selectedSeasonId,
+            selectedSeasonId: activeSeasonId,
             onSelectSeason: (id) => setState(() => _selectedSeasonId = id),
           ),
           loading: () => const _SeriesSkeleton(),
@@ -94,7 +91,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           ),
         ),
       ),
-      floatingActionButton: const _BackChip(),
+      floatingActionButton: const BackChip(),
       floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
     );
   }
@@ -563,26 +560,6 @@ class _SeriesSkeleton extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BackChip extends StatelessWidget {
-  const _BackChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.55),
-            shape: BoxShape.circle,
-          ),
-          child: BackButton(color: AppColors.textPrimary),
-        ),
-      ),
     );
   }
 }

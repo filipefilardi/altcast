@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/dio_error_message.dart';
+import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
@@ -34,6 +35,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
   int _nextIndex = 0;
   bool _hasMore = true;
   bool _loading = true;
+  bool _inflight = false;
   Object? _error;
 
   String? _genre;
@@ -62,7 +64,8 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (!_hasMore || _loading && _items.isNotEmpty) return;
+    if (_inflight || !_hasMore) return;
+    _inflight = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -86,6 +89,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
               limit: _pageSize,
               filter: filter,
             );
+      if (!mounted) return;
       setState(() {
         _items.addAll(page.items);
         _nextIndex += page.items.length;
@@ -93,10 +97,13 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e;
         _loading = false;
       });
+    } finally {
+      _inflight = false;
     }
   }
 
@@ -175,7 +182,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
             return PosterCard(
               item: item,
               width: double.infinity,
-              onTap: () => _openDetail(context, item),
+              onTap: () => openItemDetail(context, item),
             );
           },
         ),
@@ -312,20 +319,6 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
     );
   }
 
-  void _openDetail(BuildContext context, BrowseItem item) {
-    switch (item.kind) {
-      case MediaKind.movie:
-        context.push('/movie/${item.id}');
-      case MediaKind.series:
-        context.push('/series/${item.id}');
-      case MediaKind.season:
-        context.push('/season/${item.id}');
-      case MediaKind.episode:
-        context.push('/episode/${item.id}');
-      case MediaKind.person:
-        context.push('/person/${item.id}');
-    }
-  }
 }
 
 class _FilterSummary extends StatelessWidget {

@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
+import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/meta_pill_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/user_data_actions.dart';
@@ -42,7 +44,7 @@ class EpisodeScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: const _BackChip(),
+      floatingActionButton: const BackChip(),
       floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
     );
   }
@@ -74,10 +76,14 @@ class _EpisodeBody extends ConsumerWidget {
           backdropUrl: backdrop,
           title: episode.name,
           subtitle: _heroSubtitle(episode),
-          metaRow: _MetaRow(
-            runtime: episode.runTime,
-            premiereDate: episode.premiereDate,
-            communityRating: episode.communityRating,
+          metaRow: MetaPillRow(
+            labels: [
+              if (episode.runTime != null) formatLongDuration(episode.runTime!),
+              if (episode.premiereDate != null)
+                _formatAirDate(episode.premiereDate!),
+              if (episode.communityRating != null)
+                '★ ${episode.communityRating!.toStringAsFixed(1)}',
+            ],
           ),
         ),
         Padding(
@@ -210,49 +216,6 @@ class _EpisodeBody extends ConsumerWidget {
   }
 }
 
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({
-    required this.runtime,
-    required this.premiereDate,
-    required this.communityRating,
-  });
-
-  final Duration? runtime;
-  final DateTime? premiereDate;
-  final double? communityRating;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = <Widget>[];
-    if (runtime != null) chips.add(_pill(formatLongDuration(runtime!)));
-    if (premiereDate != null) chips.add(_pill(_formatAirDate(premiereDate!)));
-    if (communityRating != null) {
-      chips.add(_pill('★ ${communityRating!.toStringAsFixed(1)}'));
-    }
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 8, children: chips);
-  }
-
-  Widget _pill(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighlight.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.6,
-        ),
-      ),
-    );
-  }
-}
-
 class _OpenSeriesTile extends StatelessWidget {
   const _OpenSeriesTile({required this.seriesId, this.seriesName});
 
@@ -348,22 +311,3 @@ class _EpisodeSkeleton extends StatelessWidget {
   }
 }
 
-class _BackChip extends StatelessWidget {
-  const _BackChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.55),
-            shape: BoxShape.circle,
-          ),
-          child: BackButton(color: AppColors.textPrimary),
-        ),
-      ),
-    );
-  }
-}

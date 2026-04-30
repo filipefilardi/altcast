@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/navigation.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/local_or_network_image.dart';
@@ -31,13 +31,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // Pre-populate the field with the last query so coming back to the tab
     // restores state. The provider is non-autoDispose so this round-trips.
     _controller.text = ref.read(searchQueryProvider);
+    // Drive the suffix-clear icon visibility from the controller itself,
+    // so it appears/disappears as the user types — without this listener
+    // the icon's `_controller.text.isEmpty` check is read once during build
+    // and only updates when something else triggers a rebuild.
+    _controller.addListener(_onControllerChanged);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onChanged(String value) {
@@ -82,7 +92,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         onPressed: () {
                           _controller.clear();
                           ref.read(searchQueryProvider.notifier).setQuery('');
-                          setState(() {});
                         },
                       ),
               ),
@@ -422,7 +431,7 @@ class _PosterGrid extends StatelessWidget {
         return PosterCard(
           item: item,
           width: double.infinity,
-          onTap: () => _openDetail(context, item),
+          onTap: () => openItemDetail(context, item),
         );
       },
     );
@@ -492,7 +501,7 @@ class _PersonTile extends ConsumerWidget {
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        onTap: () => _openDetail(context, item),
+        onTap: () => openItemDetail(context, item),
         leading: ClipOval(
           child: SizedBox(
             width: 42,
@@ -516,17 +525,3 @@ class _PersonTile extends ConsumerWidget {
   }
 }
 
-void _openDetail(BuildContext context, BrowseItem item) {
-  switch (item.kind) {
-    case MediaKind.movie:
-      context.push('/movie/${item.id}');
-    case MediaKind.series:
-      context.push('/series/${item.id}');
-    case MediaKind.season:
-      context.push('/season/${item.id}');
-    case MediaKind.episode:
-      context.push('/episode/${item.id}');
-    case MediaKind.person:
-      context.push('/person/${item.id}');
-  }
-}

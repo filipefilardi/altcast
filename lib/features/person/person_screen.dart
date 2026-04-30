@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/navigation.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/skeleton.dart';
@@ -179,7 +180,7 @@ class _WorksGrid extends StatelessWidget {
       itemBuilder: (_, i) => PosterCard(
         item: items[i],
         width: double.infinity,
-        onTap: () => _openDetail(context, items[i]),
+        onTap: () => openItemDetail(context, items[i]),
       ),
     );
   }
@@ -232,20 +233,5 @@ class _WorksSkeleton extends StatelessWidget {
         itemBuilder: (_, _) => Skeleton.box(width: double.infinity, height: 180),
       ),
     );
-  }
-}
-
-void _openDetail(BuildContext context, BrowseItem item) {
-  switch (item.kind) {
-    case MediaKind.movie:
-      context.push('/movie/${item.id}');
-    case MediaKind.series:
-      context.push('/series/${item.id}');
-    case MediaKind.season:
-      context.push('/season/${item.id}');
-    case MediaKind.episode:
-      context.push('/episode/${item.id}');
-    case MediaKind.person:
-      context.push('/person/${item.id}');
   }
 }

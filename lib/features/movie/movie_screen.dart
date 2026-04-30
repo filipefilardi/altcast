@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
+import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/genre_chips.dart';
+import '../../core/widgets/meta_pill_row.dart';
 import '../../core/widgets/more_like_this_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
@@ -56,7 +58,7 @@ class MovieScreen extends ConsumerWidget {
         ),
       ),
       // Floating back button so the hero artwork stays edge-to-edge at the top.
-      floatingActionButton: const _BackChip(),
+      floatingActionButton: const BackChip(),
       floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
     );
   }
@@ -121,11 +123,12 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
           backdropUrl: backdrop,
           title: movie.name,
           subtitle: _subtitle(movie),
-          metaRow: _MetaRow(
-            year: movie.year,
-            runtime: movie.runTime,
-            officialRating: movie.officialRating,
-            communityRating: movie.communityRating,
+          metaRow: MetaPillRow(
+            labels: [
+              movie.officialRating,
+              if (movie.communityRating != null)
+                '★ ${movie.communityRating!.toStringAsFixed(1)}',
+            ],
           ),
         ),
         Padding(
@@ -267,55 +270,6 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
   }
 }
 
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({
-    required this.year,
-    required this.runtime,
-    required this.officialRating,
-    required this.communityRating,
-  });
-  final int? year;
-  final Duration? runtime;
-  final String? officialRating;
-  final double? communityRating;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = <Widget>[];
-    if (officialRating != null && officialRating!.isNotEmpty) {
-      chips.add(_pill(officialRating!));
-    }
-    if (communityRating != null) {
-      chips.add(_pill('★ ${communityRating!.toStringAsFixed(1)}'));
-    }
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips,
-    );
-  }
-
-  Widget _pill(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHighlight.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.6,
-        ),
-      ),
-    );
-  }
-}
-
 class _MovieSkeleton extends StatelessWidget {
   const _MovieSkeleton();
 
@@ -356,26 +310,6 @@ class _MovieSkeleton extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BackChip extends StatelessWidget {
-  const _BackChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.55),
-            shape: BoxShape.circle,
-          ),
-          child: BackButton(color: AppColors.textPrimary),
-        ),
-      ),
     );
   }
 }

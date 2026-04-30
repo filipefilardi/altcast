@@ -10,9 +10,10 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/dio_error_message.dart';
 import '../../core/theme/app_gradients.dart';
+import '../../core/utils/dio_error_message.dart';
 import '../../core/utils/language.dart';
+import '../../core/widgets/local_or_network_image.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_api.dart';
@@ -1092,25 +1093,16 @@ class _NextUpThumb extends StatelessWidget {
         children: [
           ColoredBox(
             color: AppColors.surfaceElevated,
-            child: posterUrl == null
-                ? const Center(
-                    child: Icon(
-                      Icons.movie_outlined,
-                      color: AppColors.textTertiary,
-                      size: 28,
-                    ),
-                  )
-                : Image.network(
-                    posterUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Icon(
-                        Icons.movie_outlined,
-                        color: AppColors.textTertiary,
-                        size: 28,
-                      ),
-                    ),
-                  ),
+            child: LocalOrNetworkImage(
+              source: posterUrl,
+              errorBuilder: (_) => const Center(
+                child: Icon(
+                  Icons.movie_outlined,
+                  color: AppColors.textTertiary,
+                  size: 28,
+                ),
+              ),
+            ),
           ),
           DecoratedBox(
             decoration: BoxDecoration(
