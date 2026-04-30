@@ -1,4 +1,4 @@
-enum MediaKind { movie, series, season, episode, person }
+enum MediaKind { movie, series, season, episode, person, collection }
 
 MediaKind? _kindFromJellyfinType(String? type) {
   switch (type) {
@@ -12,6 +12,8 @@ MediaKind? _kindFromJellyfinType(String? type) {
       return MediaKind.episode;
     case 'Person':
       return MediaKind.person;
+    case 'BoxSet':
+      return MediaKind.collection;
     default:
       return null;
   }
@@ -22,7 +24,7 @@ Duration _durationFromTicks(int? ticks) {
   return Duration(microseconds: ticks ~/ 10);
 }
 
-/// Generic poster/list item — any of the four video kinds.
+/// Generic poster/list item for media, people, and collections.
 class BrowseItem {
   const BrowseItem({
     required this.id,
@@ -91,6 +93,9 @@ class BrowseItem {
         }
       case MediaKind.person:
         subtitle = null;
+      case MediaKind.collection:
+        final count = json['ChildCount'] as int?;
+        subtitle = count == null ? null : '$count item${count == 1 ? '' : 's'}';
     }
 
     return BrowseItem(

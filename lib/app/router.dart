@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_controller.dart';
+import '../features/collection/collection_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/downloads/downloads_screen.dart';
 import '../features/episode/episode_screen.dart';
@@ -69,6 +70,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, st) => PersonScreen(personId: st.pathParameters['id']!),
       ),
       GoRoute(
+        path: '/collection/:id',
+        builder: (_, st) => CollectionScreen(
+          collectionId: st.pathParameters['id']!,
+          title: st.uri.queryParameters['title'],
+        ),
+      ),
+      GoRoute(
         path: '/season/:id',
         builder: (_, st) => SeasonScreen(seasonId: st.pathParameters['id']!),
       ),
@@ -115,11 +123,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, st) {
           final genre = st.uri.queryParameters['genre'];
           return LibraryBrowseScreen(
-            title: genre == null || genre.isEmpty ? 'TV Shows' : '$genre TV Shows',
+            title: genre == null || genre.isEmpty
+                ? 'TV Shows'
+                : '$genre TV Shows',
             itemType: 'Series',
             initialGenre: genre,
           );
         },
+      ),
+      GoRoute(
+        path: '/library/collections',
+        builder: (_, _) =>
+            const LibraryBrowseScreen(title: 'Collections', itemType: 'BoxSet'),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => AppShell(navigationShell: shell),
