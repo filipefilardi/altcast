@@ -332,10 +332,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// Shows skip chips while playback sits inside a segment and schedules a
   /// delayed auto-jump so taps remain optional.
   void _syncIntroSkipperOverlay(Duration position) {
-    if (!ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
-      _clearIntroSkipperOverlay();
-      return;
+    final autoSkip = ref.read(playbackPreferencesProvider).autoSkipIntroCredits;
+    if (!autoSkip) {
+      _introSkipperAutoTimer?.cancel();
+      _introSkipperAutoTimer = null;
+      _creditsSkipperAutoTimer?.cancel();
+      _creditsSkipperAutoTimer = null;
     }
+
     final data = _introSkipper;
     if (data == null) {
       _clearIntroSkipperOverlay();
@@ -360,7 +364,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
 
     // Delayed auto-skip while actively playing inside each segment.
-    if (intro != null && playing && inIntro) {
+    if (autoSkip && intro != null && playing && inIntro) {
       _introSkipperAutoTimer ??=
           Timer(_introSkipperAutoSkipDelay, () async {
         _introSkipperAutoTimer = null;
@@ -383,7 +387,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _introSkipperAutoTimer = null;
     }
 
-    if (credits != null && playing && inCredits) {
+    if (autoSkip && credits != null && playing && inCredits) {
       _creditsSkipperAutoTimer ??=
           Timer(_introSkipperAutoSkipDelay, () async {
         _creditsSkipperAutoTimer = null;

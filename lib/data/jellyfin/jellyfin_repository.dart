@@ -471,36 +471,51 @@ class JellyfinRepository {
   /// Fetches Intro Skipper segment times for an episode or movie, if the
   /// server has a compatible plugin installed and analysis exists.
   ///
-  /// Tries the current fork's `GET /Episode/{id}/Timestamps` first, then the
-  /// legacy `GET /Episode/{id}/IntroTimestamps/v1` (intro only). Any failure
-  /// or `404` yields `null` so playback never depends on this call.
+  /// Tries fork `GET …/Episode/{id}/Timestamps` (several URL prefixes), legacy
+  /// `IntroTimestamps`, then merges. Any failure or empty segments yields only
+  /// whatever other calls succeeded — playback never depends on this call.
   Future<IntroSkipperTimestamps?> getIntroSkipperTimestamps(String itemId) async {
     if (_api.session == null) return null;
     IntroSkipperTimestamps? merged;
-    try {
-      final modern = await _api.dio.get<Map<String, dynamic>>(
-        '/Episode/$itemId/Timestamps',
-        options: Options(validateStatus: (s) => s == 200 || s == 404),
-      );
-      if (modern.statusCode == 200 && modern.data != null) {
-        merged = IntroSkipperTimestamps.fromPluginTimestampsJson(modern.data!);
-      }
-    } catch (_) {}
 
-    try {
-      final legacy = await _api.dio.get<Map<String, dynamic>>(
-        '/Episode/$itemId/IntroTimestamps/v1',
-        options: Options(validateStatus: (s) => s == 200 || s == 404),
-      );
-      if (legacy.statusCode == 200 && legacy.data != null) {
-        final fromLegacy = IntroSkipperTimestamps.fromLegacyIntroV1Json(
-          legacy.data!,
+    Future<void> mergeModern(String path) async {
+      try {
+        final res = await _api.dio.get<Map<String, dynamic>>(
+          path,
+          options: Options(validateStatus: (s) => s == 200 || s == 404),
         );
-        merged = merged == null
-            ? fromLegacy
-            : merged.mergePreferNonNull(fromLegacy);
-      }
-    } catch (_) {}
+        if (res.statusCode == 200 && res.data != null) {
+          final parsed =
+              IntroSkipperTimestamps.fromPluginTimestampsJson(res.data!);
+          merged = merged == null
+              ? parsed
+              : merged!.mergePreferNonNull(parsed);
+        }
+      } catch (_) {}
+    }
+
+    Future<void> mergeLegacy(String path) async {
+      try {
+        final res = await _api.dio.get<Map<String, dynamic>>(
+          path,
+          options: Options(validateStatus: (s) => s == 200 || s == 404),
+        );
+        if (res.statusCode == 200 && res.data != null) {
+          final fromLegacy = IntroSkipperTimestamps.fromLegacyIntroV1Json(
+            res.data!,
+          );
+          merged = merged == null
+              ? fromLegacy
+              : merged!.mergePreferNonNull(fromLegacy);
+        }
+      } catch (_) {}
+    }
+
+    await mergeModern('/Episode/$itemId/Timestamps');
+    await mergeModern('/IntroSkipper/Episode/$itemId/Timestamps');
+
+    await mergeLegacy('/Episode/$itemId/IntroTimestamps/v1');
+    await mergeLegacy('/Episode/$itemId/IntroTimestamps');
 
     return merged?.hasAny == true ? merged : null;
   }
