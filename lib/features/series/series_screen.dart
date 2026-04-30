@@ -120,15 +120,9 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
   @override
   void initState() {
     super.initState();
-    final pb = ref.read(playbackPreferencesProvider);
-    _preference = TrackPreference(
-      audioLang: pb.resolvedAudioLanguage(widget.series.originalLanguage),
-      subKind: switch (pb.defaultSubtitleMode) {
-        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
-        DefaultSubtitleMode.off => SubPreferenceKind.off,
-        DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
-      },
-      subLang: pb.defaultSubtitleLanguage,
+    _preference = TrackPreference.fromPlaybackPrefs(
+      ref.read(playbackPreferencesProvider),
+      itemOriginalLanguage: widget.series.originalLanguage,
     );
   }
 
@@ -136,15 +130,9 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
   void didUpdateWidget(covariant _SeriesBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.series.id != widget.series.id) {
-      final pb = ref.read(playbackPreferencesProvider);
-      _preference = TrackPreference(
-        audioLang: pb.resolvedAudioLanguage(widget.series.originalLanguage),
-        subKind: switch (pb.defaultSubtitleMode) {
-          DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
-          DefaultSubtitleMode.off => SubPreferenceKind.off,
-          DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
-        },
-        subLang: pb.defaultSubtitleLanguage,
+      _preference = TrackPreference.fromPlaybackPrefs(
+        ref.read(playbackPreferencesProvider),
+        itemOriginalLanguage: widget.series.originalLanguage,
       );
     }
   }

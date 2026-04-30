@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/language.dart';
 import '../../../data/jellyfin/jellyfin_repository.dart';
 import '../../../data/jellyfin/models/media_stream.dart';
+import '../../../data/local/playback_preferences.dart';
 
 /// Per-play user preferences captured by [TrackPreferenceRow] and forwarded
 /// to the player as query params on `/play/:id`.
@@ -20,6 +21,24 @@ class TrackPreference {
     this.subKind = SubPreferenceKind.serverDefault,
     this.subLang,
   });
+
+  /// Seeds a per-item preference from the user's global playback defaults,
+  /// resolving the audio language against the item's original language so
+  /// "Original" maps to the right ISO code.
+  factory TrackPreference.fromPlaybackPrefs(
+    PlaybackPreferences prefs, {
+    String? itemOriginalLanguage,
+  }) {
+    return TrackPreference(
+      audioLang: prefs.resolvedAudioLanguage(itemOriginalLanguage),
+      subKind: switch (prefs.defaultSubtitleMode) {
+        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+        DefaultSubtitleMode.off => SubPreferenceKind.off,
+        DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
+      },
+      subLang: prefs.defaultSubtitleLanguage,
+    );
+  }
 
   final String? audioLang;
   final SubPreferenceKind subKind;
@@ -305,22 +324,18 @@ class TrackPreferenceRow extends ConsumerWidget {
     );
   }
 
-  String _audioRowLabel(MediaStream s) {
-    final mapped = languageDisplay(s.language) ?? s.language ?? 'Track';
-    final extra = <String>[
-      if (s.channels != null) '${s.channels}.0',
-      if (s.codec != null) s.codec!,
-    ];
-    if (extra.isEmpty) return mapped;
-    return '$mapped · ${extra.join(' · ')}';
-  }
+  String _audioRowLabel(MediaStream s) => _streamRowLabel(s, [
+        if (s.channels != null) '${s.channels}.0',
+        if (s.codec != null) s.codec!,
+      ]);
 
-  String _subRowLabel(MediaStream s) {
+  String _subRowLabel(MediaStream s) => _streamRowLabel(s, [
+        if (s.codec != null) s.codec!,
+        if (s.isExternal) 'external',
+      ]);
+
+  String _streamRowLabel(MediaStream s, List<String> extra) {
     final mapped = languageDisplay(s.language) ?? s.language ?? 'Track';
-    final extra = <String>[
-      if (s.codec != null) s.codec!,
-      if (s.isExternal) 'external',
-    ];
     if (extra.isEmpty) return mapped;
     return '$mapped · ${extra.join(' · ')}';
   }

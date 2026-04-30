@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -128,7 +129,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
             return SafeArea(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 24 + bottomInset),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -138,7 +139,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         'Search filters',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     DropdownButtonFormField<LibrarySort>(
                       initialValue: sort,
                       decoration: const InputDecoration(labelText: 'Sort'),
@@ -174,6 +175,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       controller: yearController,
                       decoration: const InputDecoration(labelText: 'Year'),
                       keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       onChanged: (v) => year = int.tryParse(v),
                     ),
                     SwitchListTile(
