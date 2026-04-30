@@ -32,6 +32,25 @@ const _introSkipperAutoSkipDelay = Duration(seconds: 3);
 /// Clears MaterialVideoControls (seek bar + bottom bar) so chips stay visible.
 const _introSkipperChipLiftFromSafeBottom = 104.0;
 
+/// Snapshot pushed to [ValueNotifier] so skip / next-up UI rebuilds inside
+/// [MaterialVideoControls] — required because media_kit fullscreen is a
+/// separate route that only contains [Video], not the screen-level [Stack].
+class _PlayerOverlaysSnapshot {
+  const _PlayerOverlaysSnapshot({
+    this.showSkipIntro = false,
+    this.showSkipCredits = false,
+    this.showNextUp = false,
+    this.nextEpisode,
+    this.autoplayCountdown,
+  });
+
+  final bool showSkipIntro;
+  final bool showSkipCredits;
+  final bool showNextUp;
+  final Episode? nextEpisode;
+  final int? autoplayCountdown;
+}
+
 /// Full-screen video player. Routes here are entered via
 /// `/play/:id?resumeTicks=N` — the optional `resumeTicks` (Jellyfin tick
 /// count, 100 ns) is applied with [Player.seek] right after open.
@@ -104,6 +123,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Timer? _introSkipperAutoTimer;
   Timer? _creditsSkipperAutoTimer;
 
+  final ValueNotifier<_PlayerOverlaysSnapshot> _overlaySnapshots =
+      ValueNotifier(const _PlayerOverlaysSnapshot());
+
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
 
@@ -161,6 +183,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     unawaited(_prepareScreenBrightnessForGestures());
 
     _open();
+  }
+
+  void _publishOverlays() {
+    if (!mounted) return;
+    _overlaySnapshots.value = _PlayerOverlaysSnapshot(
+      showSkipIntro: _showSkipIntroChip,
+      showSkipCredits: _showSkipCreditsChip,
+      showNextUp: _showNextUp,
+      nextEpisode: _nextEpisode,
+      autoplayCountdown: _autoplayTimer != null ? _autoplayCountdown : null,
+    );
   }
 
   Future<void> _prepareScreenBrightnessForGestures() async {
@@ -244,11 +277,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           .read(jellyfinRepositoryProvider)
           .getIntroSkipperTimestamps(widget.itemId);
       if (!mounted) return;
-      setState(() {
-        _introSkipper = timestamps;
-        _showSkipIntroChip = false;
-        _showSkipCreditsChip = false;
-      });
+      _introSkipper = timestamps;
+      _showSkipIntroChip = false;
+      _showSkipCreditsChip = false;
+      _publishOverlays();
       if (timestamps != null && mounted) {
         _syncIntroSkipperOverlay(_lastPosition);
       }
@@ -267,10 +299,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _cancelIntroSkipperTimers();
     if (!mounted) return;
     if (_showSkipIntroChip || _showSkipCreditsChip) {
-      setState(() {
-        _showSkipIntroChip = false;
-        _showSkipCreditsChip = false;
-      });
+      _showSkipIntroChip = false;
+      _showSkipCreditsChip = false;
+      _publishOverlays();
     }
   }
 
@@ -281,7 +312,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _introSkipperAutoTimer = null;
     await _player.seek(intro.end);
     if (mounted) {
-      setState(() => _showSkipIntroChip = false);
+      _showSkipIntroChip = false;
+      _publishOverlays();
     }
   }
 
@@ -292,7 +324,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _creditsSkipperAutoTimer = null;
     await _player.seek(credits.end);
     if (mounted) {
-      setState(() => _showSkipCreditsChip = false);
+      _showSkipCreditsChip = false;
+      _publishOverlays();
     }
   }
 
@@ -320,10 +353,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (nextIntroChip != _showSkipIntroChip ||
         nextCreditsChip != _showSkipCreditsChip) {
       if (mounted) {
-        setState(() {
-          _showSkipIntroChip = nextIntroChip;
-          _showSkipCreditsChip = nextCreditsChip;
-        });
+        _showSkipIntroChip = nextIntroChip;
+        _showSkipCreditsChip = nextCreditsChip;
+        _publishOverlays();
       }
     }
 
@@ -340,7 +372,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _player.state.playing &&
             ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
           await _player.seek(i.end);
-          if (mounted) setState(() => _showSkipIntroChip = false);
+          if (mounted) {
+            _showSkipIntroChip = false;
+            _publishOverlays();
+          }
         }
       });
     } else {
@@ -360,7 +395,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _player.state.playing &&
             ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
           await _player.seek(c.end);
-          if (mounted) setState(() => _showSkipCreditsChip = false);
+          if (mounted) {
+            _showSkipCreditsChip = false;
+            _publishOverlays();
+          }
         }
       });
     } else {
@@ -370,19 +408,42 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _resolveNextEpisode() async {
-    final seriesId = widget.seriesId;
-    final season = widget.seasonNumber;
-    final episode = widget.episodeNumber;
-    if (seriesId == null || season == null || episode == null) return;
-    _nextEpisode = await ref
-        .read(jellyfinRepositoryProvider)
-        .getNextEpisode(
+    var seriesId = widget.seriesId;
+    var season = widget.seasonNumber;
+    var episodeNum = widget.episodeNumber;
+
+    final routingIncomplete = seriesId == null ||
+        seriesId.isEmpty ||
+        season == null ||
+        episodeNum == null;
+    if (routingIncomplete) {
+      try {
+        final ep =
+            await ref.read(jellyfinRepositoryProvider).getEpisode(widget.itemId);
+        if (ep.seriesId.isEmpty ||
+            ep.parentIndexNumber == null ||
+            ep.indexNumber == null) {
+          if (!mounted) return;
+          _publishOverlays();
+          return;
+        }
+        seriesId = ep.seriesId;
+        season = ep.parentIndexNumber!;
+        episodeNum = ep.indexNumber!;
+      } catch (_) {
+        if (!mounted) return;
+        _publishOverlays();
+        return;
+      }
+    }
+
+    _nextEpisode = await ref.read(jellyfinRepositoryProvider).getNextEpisode(
           seriesId: seriesId,
           seasonNumber: season,
-          episodeNumber: episode,
+          episodeNumber: episodeNum,
         );
     if (!mounted) return;
-    setState(() {});
+    _publishOverlays();
   }
 
   void _setSubVisibility(bool visible) {
@@ -510,10 +571,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           if (autoplay) {
             _startAutoplay();
           } else if (mounted) {
-            setState(() {
-              _showNextUp = true;
-              _autoplayCountdown = 0;
-            });
+            _showNextUp = true;
+            _autoplayCountdown = 0;
+            _publishOverlays();
           }
         }
       }
@@ -531,16 +591,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (_nextEpisode == null || _mediaDuration <= Duration.zero) return;
     final remaining = _mediaDuration - _lastPosition;
     if (remaining <= const Duration(seconds: 30) && !_showNextUp) {
-      setState(() => _showNextUp = true);
+      _showNextUp = true;
+      _publishOverlays();
     }
   }
 
   void _startAutoplay() {
     if (!mounted || _nextEpisode == null) return;
-    setState(() {
-      _showNextUp = true;
-      _autoplayCountdown = 8;
-    });
+    _showNextUp = true;
+    _autoplayCountdown = 8;
+    _publishOverlays();
     _autoplayTimer?.cancel();
     _autoplayTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_autoplayCountdown <= 1) {
@@ -549,7 +609,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         return;
       }
       if (!mounted) return;
-      setState(() => _autoplayCountdown -= 1);
+      _autoplayCountdown -= 1;
+      _publishOverlays();
     });
   }
 
@@ -557,7 +618,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _autoplayTimer?.cancel();
     _autoplayTimer = null;
     if (mounted && _showNextUp) {
-      setState(() => _showNextUp = false);
+      _showNextUp = false;
+      _publishOverlays();
     }
   }
 
@@ -600,19 +662,74 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _player.dispose();
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
+    _overlaySnapshots.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
+  Widget _buildVideoControls(VideoState videoState) {
+    return ValueListenableBuilder<_PlayerOverlaysSnapshot>(
+      valueListenable: _overlaySnapshots,
+      builder: (context, snap, _) {
+        final pad = MediaQuery.paddingOf(context);
+        final nextUpLift =
+            (snap.showNextUp && snap.nextEpisode != null) ? 132.0 : 0.0;
+        final skipperStackBottom =
+            pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
+
+        return Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            MaterialVideoControls(videoState),
+            if (snap.showSkipCredits)
+              Positioned(
+                left: pad.left + 16,
+                right: pad.right + 16,
+                bottom: skipperStackBottom,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _IntroSkipChipButton(
+                    label: 'Skip credits',
+                    onPressed: () => unawaited(_manualSkipCredits()),
+                  ),
+                ),
+              ),
+            if (snap.showSkipIntro)
+              Positioned(
+                left: pad.left + 16,
+                right: pad.right + 16,
+                bottom: skipperStackBottom +
+                    (snap.showSkipCredits ? 52 : 0),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _IntroSkipChipButton(
+                    label: 'Skip intro',
+                    onPressed: () => unawaited(_manualSkipIntro()),
+                  ),
+                ),
+              ),
+            if (snap.showNextUp && snap.nextEpisode != null)
+              Positioned(
+                right: pad.right + 16,
+                bottom: pad.bottom + 16,
+                child: _NextUpCard(
+                  episode: snap.nextEpisode!,
+                  countdownForAutoplay: snap.autoplayCountdown,
+                  onCancel: _cancelAutoplay,
+                  onPlayNow: _playNextEpisode,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pad = MediaQuery.paddingOf(context);
-    final nextUpLift =
-        (_showNextUp && _nextEpisode != null) ? 132.0 : 0.0;
-    final skipperStackBottom =
-        pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
       onClosePlayer: _closePlayer,
@@ -633,7 +750,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               child: Video(
                 key: _videoKey,
                 controller: _controller,
-                controls: MaterialVideoControls,
+                controls: _buildVideoControls,
                 fit: BoxFit.contain,
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
                   visible: true,
@@ -659,45 +776,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
           const _EdgeScrim(top: true, height: 110),
           const _EdgeScrim(top: false, height: 86),
-          if (_showSkipCreditsChip)
-            Positioned(
-              left: pad.left + 16,
-              right: pad.right + 16,
-              bottom: skipperStackBottom,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: _IntroSkipChipButton(
-                  label: 'Skip credits',
-                  onPressed: () => unawaited(_manualSkipCredits()),
-                ),
-              ),
-            ),
-          if (_showSkipIntroChip)
-            Positioned(
-              left: pad.left + 16,
-              right: pad.right + 16,
-              bottom: skipperStackBottom + (_showSkipCreditsChip ? 52 : 0),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: _IntroSkipChipButton(
-                  label: 'Skip intro',
-                  onPressed: () => unawaited(_manualSkipIntro()),
-                ),
-              ),
-            ),
-          if (_showNextUp && _nextEpisode != null)
-            Positioned(
-              right: pad.right + 16,
-              bottom: pad.bottom + 16,
-              child: _NextUpCard(
-                episode: _nextEpisode!,
-                countdownForAutoplay: _autoplayTimer != null
-                    ? _autoplayCountdown
-                    : null,
-                onCancel: _cancelAutoplay,
-                onPlayNow: _playNextEpisode,
-              ),
-            ),
         ],
       ),
     );
