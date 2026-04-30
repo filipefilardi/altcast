@@ -704,15 +704,17 @@ class JellyfinRepository {
   ///
   ///   /Videos/{itemId}/{mediaSourceId}/Subtitles/{index}/Stream.vtt?api_key=…
   ///
-  /// We always request **VTT**, even when the source is SRT/ASS — Jellyfin
-  /// converts text subs on the fly, and VTT is the only format the Flutter
-  /// SubtitleView reliably renders across iOS/Android. Bitmap subs (PGS)
-  /// can't be text-converted and won't appear, matching jellyfin-web.
+  /// Prefer Jellyfin's `DeliveryUrl` whenever present because it already
+  /// encodes the server-selected subtitle delivery format/path and tends to
+  /// match what jellyfin-web uses.
   ///
-  /// We don't trust `DeliveryUrl` for the format — newer servers sometimes
-  /// hand back a URL pointing to the source codec (PGS), which mpv won't
-  /// decode for SubtitleView consumption. Forcing the path keeps us
-  /// independent of that.
+  /// If `DeliveryUrl` is absent, text subtitle codecs fall back to a forced
+  /// VTT path. Bitmap codecs (PGS/PGSSUB/DVDSub/VobSub) cannot be converted to
+  /// VTT, so they require `DeliveryUrl`.
+  ///
+  /// Returning `null` for bitmap codecs without a `DeliveryUrl` keeps them out
+  /// of the external-track picker instead of showing a selectable row that can
+  /// never render text.
   ///
   /// `api_key` is URL-encoded (Jellyfin tokens are usually plain hex but
   /// we encode defensively) and only injected once.
@@ -725,15 +727,25 @@ class JellyfinRepository {
     required String token,
     required String serverUrl,
   }) {
+    final normalizedCodec = codec?.toLowerCase();
+    final isBitmapCodec =
+        normalizedCodec == 'pgs' ||
+        normalizedCodec == 'pgssub' ||
+        normalizedCodec == 'dvdsub' ||
+        normalizedCodec == 'vobsub';
+    final hasDeliveryUrl = deliveryUrl != null && deliveryUrl.isNotEmpty;
+
     String? raw;
-    if (index != null) {
-      raw =
-          '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/'
-          'Stream.vtt';
-    } else if (deliveryUrl != null && deliveryUrl.isNotEmpty) {
+    if (hasDeliveryUrl) {
       raw = deliveryUrl.startsWith('http')
           ? deliveryUrl
           : '$serverUrl$deliveryUrl';
+    } else if (isBitmapCodec) {
+      return null;
+    } else if (index != null) {
+      raw =
+          '$serverUrl/Videos/$itemId/$mediaSourceId/Subtitles/$index/'
+          'Stream.vtt';
     }
     if (raw == null) return null;
     if (raw.contains('api_key=')) return raw;

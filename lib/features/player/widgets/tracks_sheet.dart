@@ -172,9 +172,27 @@ class _SubtitleSection extends StatelessWidget {
               t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id,
         )
         .toList();
-    final hasExternal = selectedExternalSubId != null;
-    final isOff = current.id == SubtitleTrack.no().id && !hasExternal;
-    final hasAny = embedded.isNotEmpty || externalSubtitles.isNotEmpty;
+    final filteredExternal = _filterExternalSubtitles(
+      embeddedTracks: embedded,
+      externalTracks: externalSubtitles,
+    );
+    final effectiveExternalSubId =
+        selectedExternalSubId ??
+        _inferExternalSelectionFromCurrent(
+          current: current,
+          externalTracks: filteredExternal,
+        );
+    final hasExternal = effectiveExternalSubId != null;
+    final selectedEmbeddedId = _resolveEmbeddedSelectionId(
+      current: current,
+      embeddedTracks: embedded,
+      hasExternalSelection: hasExternal,
+    );
+    final isOff =
+        current.id == SubtitleTrack.no().id &&
+        !hasExternal &&
+        selectedEmbeddedId == null;
+    final hasAny = embedded.isNotEmpty || filteredExternal.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -201,7 +219,7 @@ class _SubtitleSection extends StatelessWidget {
         for (final t in embedded)
           _TrackRow(
             label: _embeddedLabel(t),
-            selected: !hasExternal && !isOff && t.id == current.id,
+            selected: selectedEmbeddedId != null && t.id == selectedEmbeddedId,
             onTap: () {
               // Picking an embedded track clears any external selection.
               onSelectExternalSubtitle(null);
@@ -210,10 +228,10 @@ class _SubtitleSection extends StatelessWidget {
               Navigator.of(context).pop();
             },
           ),
-        for (final sub in externalSubtitles)
+        for (final sub in filteredExternal)
           _TrackRow(
             label: '${_externalLabel(sub)} (external)',
-            selected: hasExternal && sub.id == selectedExternalSubId,
+            selected: hasExternal && sub.id == effectiveExternalSubId,
             onTap: () {
               onSelectExternalSubtitle(sub);
               Navigator.of(context).pop();
@@ -235,6 +253,110 @@ class _SubtitleSection extends StatelessWidget {
       language: sub.language,
       fallbackId: sub.codec ?? 'subs',
     );
+  }
+
+  List<ExternalSubtitle> _filterExternalSubtitles({
+    required List<SubtitleTrack> embeddedTracks,
+    required List<ExternalSubtitle> externalTracks,
+  }) {
+    if (externalTracks.isEmpty) return const [];
+
+    final embeddedKeys = <String>{
+      for (final t in embeddedTracks) ..._trackIdentityKeys(
+        title: t.title,
+        language: t.language,
+      ),
+    };
+    final seenExternalKeys = <String>{};
+    final out = <ExternalSubtitle>[];
+
+    for (final sub in externalTracks) {
+      final keys = _trackIdentityKeys(title: sub.title, language: sub.language);
+      if (keys.isEmpty) continue;
+      final duplicatesEmbedded = keys.any(embeddedKeys.contains);
+      if (duplicatesEmbedded) continue;
+      final duplicatesExternal = keys.any(seenExternalKeys.contains);
+      if (duplicatesExternal) continue;
+      seenExternalKeys.addAll(keys);
+      out.add(sub);
+    }
+    return out;
+  }
+
+  String? _inferExternalSelectionFromCurrent({
+    required SubtitleTrack current,
+    required List<ExternalSubtitle> externalTracks,
+  }) {
+    if (externalTracks.isEmpty) return null;
+    if (current.id == SubtitleTrack.no().id ||
+        current.id == SubtitleTrack.auto().id) {
+      return null;
+    }
+    final currentKeys = _trackIdentityKeys(
+      title: current.title,
+      language: current.language,
+    );
+    if (currentKeys.isEmpty) return null;
+    for (final sub in externalTracks) {
+      final extKeys = _trackIdentityKeys(title: sub.title, language: sub.language);
+      if (extKeys.isEmpty) continue;
+      if (extKeys.any(currentKeys.contains)) return sub.id;
+    }
+    return null;
+  }
+
+  String? _resolveEmbeddedSelectionId({
+    required SubtitleTrack current,
+    required List<SubtitleTrack> embeddedTracks,
+    required bool hasExternalSelection,
+  }) {
+    if (hasExternalSelection || embeddedTracks.isEmpty) return null;
+    for (final t in embeddedTracks) {
+      if (t.id == current.id) return t.id;
+    }
+    final currentKeys = _trackIdentityKeys(
+      title: current.title,
+      language: current.language,
+    );
+    if (currentKeys.isNotEmpty) {
+      for (final t in embeddedTracks) {
+        final keys = _trackIdentityKeys(title: t.title, language: t.language);
+        if (keys.any(currentKeys.contains)) return t.id;
+      }
+    }
+    // mpv sometimes reports "auto" as current id while one embedded track is
+    // effectively active. If there is only one option, mark it selected.
+    if (current.id == SubtitleTrack.auto().id && embeddedTracks.length == 1) {
+      return embeddedTracks.first.id;
+    }
+    return null;
+  }
+
+  Set<String> _trackIdentityKeys({required String? title, required String? language}) {
+    final normalizedLanguage = _normalizeLanguage(language);
+    final normalizedTitle = _normalizeTitle(title);
+    if (normalizedLanguage == null && normalizedTitle == null) return const {};
+    return {
+      if (normalizedLanguage != null) 'lang:$normalizedLanguage',
+      if (normalizedTitle != null) 'title:$normalizedTitle',
+      if (normalizedLanguage != null && normalizedTitle != null)
+        'pair:$normalizedLanguage|$normalizedTitle',
+    };
+  }
+
+  String? _normalizeLanguage(String? language) {
+    final raw = language?.trim().toLowerCase();
+    if (raw == null || raw.isEmpty || raw == 'und') return null;
+    final mapped = languageDisplay(raw)?.trim().toLowerCase();
+    return (mapped == null || mapped.isEmpty) ? raw : mapped;
+  }
+
+  String? _normalizeTitle(String? title) {
+    final raw = title?.trim().toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+    // Remove punctuation-like separators to collapse minor formatting variants.
+    final compact = raw.replaceAll(RegExp(r'[\s\-\._\(\)\[\]]+'), '');
+    return compact.isEmpty ? null : compact;
   }
 }
 
