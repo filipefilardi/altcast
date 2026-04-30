@@ -36,13 +36,32 @@ class HomeScreen extends ConsumerWidget {
       ref.invalidate(continueWatchingProvider);
       ref.invalidate(recentMoviesProvider);
       ref.invalidate(recentShowsProvider);
+      final errors = <Object?>[];
       await Future.wait([
-        ref
-            .read(continueWatchingProvider.future)
-            .catchError((_) => <BrowseItem>[]),
-        ref.read(recentMoviesProvider.future).catchError((_) => <BrowseItem>[]),
-        ref.read(recentShowsProvider.future).catchError((_) => <BrowseItem>[]),
+        ref.read(continueWatchingProvider.future).catchError((e, _) {
+          errors.add(e);
+          return <BrowseItem>[];
+        }),
+        ref.read(recentMoviesProvider.future).catchError((e, _) {
+          errors.add(e);
+          return <BrowseItem>[];
+        }),
+        ref.read(recentShowsProvider.future).catchError((e, _) {
+          errors.add(e);
+          return <BrowseItem>[];
+        }),
       ]);
+      if (context.mounted && errors.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errors.length == 3
+                  ? "Couldn't refresh home. Check your connection."
+                  : "Some sections didn't refresh. Pull to try again.",
+            ),
+          ),
+        );
+      }
     }
 
     return Scaffold(
@@ -52,7 +71,10 @@ class HomeScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
-            _Greeting(username: username),
+            _Greeting(
+              username: username,
+              greetingPhrase: _timeBasedGreeting(),
+            ),
             const SizedBox(height: 24),
             if (everythingFailed)
               ErrorStateView(
@@ -79,6 +101,7 @@ class HomeScreen extends ConsumerWidget {
                 builder: (items) => _ResumeRow(items: items),
                 hideWhenEmpty: true,
                 skeletonHeight: 168,
+                skeletonCardWidth: 240,
               ),
               _Section<List<BrowseItem>>(
                 title: 'Recently added movies',
@@ -87,14 +110,16 @@ class HomeScreen extends ConsumerWidget {
                 builder: (items) => _PosterRow(items: items),
                 hideWhenEmpty: true,
                 skeletonHeight: 248,
+                onSeeAll: () => context.push('/library/movies'),
               ),
               _Section<List<BrowseItem>>(
-                title: 'New episodes',
+                title: 'Recently added shows',
                 state: showsAsync,
                 onRetry: () => ref.invalidate(recentShowsProvider),
                 builder: (items) => _PosterRow(items: items),
                 hideWhenEmpty: true,
                 skeletonHeight: 248,
+                onSeeAll: () => context.push('/library/shows'),
               ),
             ],
             const SizedBox(height: 24),
@@ -105,15 +130,27 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// Local-time greeting for the home header (5–12 morning, 12–17 afternoon, else evening).
+String _timeBasedGreeting() {
+  final h = DateTime.now().hour;
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 class _Greeting extends StatelessWidget {
-  const _Greeting({this.username});
+  const _Greeting({this.username, required this.greetingPhrase});
+
   final String? username;
+  final String greetingPhrase;
 
   @override
   Widget build(BuildContext context) {
-    final displayTitle = Theme.of(
-      context,
-    ).textTheme.displayMedium!.copyWith(color: Colors.white);
+    final displayTitle = Theme.of(context).textTheme.displayMedium!.copyWith(
+      // ShaderMask + BlendMode.srcIn: fill must be a solid light color so the
+      // accent gradient reads correctly (matches previous white treatment).
+      color: AppColors.textPrimary,
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -129,7 +166,9 @@ class _Greeting extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                username == null ? 'Welcome' : 'Welcome back, $username',
+                username == null || username!.isEmpty
+                    ? greetingPhrase
+                    : '$greetingPhrase, $username',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -157,6 +196,8 @@ class _Section<T> extends StatelessWidget {
     required this.builder,
     required this.skeletonHeight,
     this.hideWhenEmpty = false,
+    this.skeletonCardWidth = 132,
+    this.onSeeAll,
   });
 
   final String title;
@@ -164,7 +205,9 @@ class _Section<T> extends StatelessWidget {
   final VoidCallback onRetry;
   final Widget Function(T value) builder;
   final double skeletonHeight;
+  final double skeletonCardWidth;
   final bool hideWhenEmpty;
+  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
@@ -177,13 +220,32 @@ class _Section<T> extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            title.toUpperCase(),
-            style: Theme.of(context).textTheme.labelLarge,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              if (onSeeAll != null)
+                TextButton(
+                  onPressed: onSeeAll,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('See all'),
+                ),
+            ],
           ),
         ),
         if (state.isLoading)
-          _SkeletonRow(height: skeletonHeight)
+          _SkeletonRow(
+            height: skeletonHeight,
+            cardWidth: skeletonCardWidth,
+          )
         else if (state.hasError)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -201,8 +263,9 @@ class _Section<T> extends StatelessWidget {
 }
 
 class _SkeletonRow extends StatelessWidget {
-  const _SkeletonRow({required this.height});
+  const _SkeletonRow({required this.height, required this.cardWidth});
   final double height;
+  final double cardWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -210,10 +273,12 @@ class _SkeletonRow extends StatelessWidget {
       height: height,
       child: Skeleton.group(
         child: ListView.separated(
+          primary: false,
           scrollDirection: Axis.horizontal,
           itemCount: 4,
           separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, _) => Skeleton.box(width: 132, height: height - 8),
+          itemBuilder: (_, _) =>
+              Skeleton.box(width: cardWidth, height: height - 8),
         ),
       ),
     );
@@ -229,6 +294,7 @@ class _ResumeRow extends StatelessWidget {
     return SizedBox(
       height: 168,
       child: ListView.separated(
+        primary: false,
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
@@ -250,6 +316,7 @@ class _PosterRow extends StatelessWidget {
     return SizedBox(
       height: 248,
       child: ListView.separated(
+        primary: false,
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
