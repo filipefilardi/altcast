@@ -32,6 +32,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+  
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/icons/app_icon.png
+  remove_alpha_ios: true
 
 # volume_controller 3.4.2+ uses FlutterSceneLifeCycleDelegate / addSceneDelegate,
 # which require a newer Flutter engine than stable 3.32 ships in framework headers.
