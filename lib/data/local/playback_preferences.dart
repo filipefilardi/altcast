@@ -20,6 +20,8 @@ class PlaybackPreferences {
   const PlaybackPreferences({
     this.streamingQuality = StreamingQuality.auto,
     this.wifiOnlyStreaming = false,
+    this.autoSkipIntroCredits = true,
+    this.autoplayNextTvEpisode = true,
     this.defaultAudioMode = DefaultAudioMode.auto,
     this.defaultAudioLanguage,
     this.defaultSubtitleMode = DefaultSubtitleMode.auto,
@@ -28,6 +30,15 @@ class PlaybackPreferences {
 
   final StreamingQuality streamingQuality;
   final bool wifiOnlyStreaming;
+
+  /// When true, seeks past intro/credits when the Jellyfin Intro Skipper
+  /// plugin reports segments for the item. No-op if the plugin is missing.
+  final bool autoSkipIntroCredits;
+
+  /// When true, shows the next-episode card with a countdown after an
+  /// episode ends. When false, the card still appears but only manual play.
+  final bool autoplayNextTvEpisode;
+
   final DefaultAudioMode defaultAudioMode;
 
   /// Used when [defaultAudioMode] is [DefaultAudioMode.fixedLanguage].
@@ -53,6 +64,8 @@ class PlaybackPreferences {
   PlaybackPreferences copyWith({
     StreamingQuality? streamingQuality,
     bool? wifiOnlyStreaming,
+    bool? autoSkipIntroCredits,
+    bool? autoplayNextTvEpisode,
     DefaultAudioMode? defaultAudioMode,
     String? defaultAudioLanguage,
     bool clearDefaultAudioLanguage = false,
@@ -63,6 +76,8 @@ class PlaybackPreferences {
     return PlaybackPreferences(
       streamingQuality: streamingQuality ?? this.streamingQuality,
       wifiOnlyStreaming: wifiOnlyStreaming ?? this.wifiOnlyStreaming,
+      autoSkipIntroCredits: autoSkipIntroCredits ?? this.autoSkipIntroCredits,
+      autoplayNextTvEpisode: autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
       defaultAudioMode: defaultAudioMode ?? this.defaultAudioMode,
       defaultAudioLanguage: clearDefaultAudioLanguage
           ? null
@@ -77,6 +92,8 @@ class PlaybackPreferences {
   Map<String, dynamic> toJson() => {
     'streamingQuality': streamingQuality.name,
     'wifiOnlyStreaming': wifiOnlyStreaming,
+    'autoSkipIntroCredits': autoSkipIntroCredits,
+    'autoplayNextTvEpisode': autoplayNextTvEpisode,
     'defaultAudioMode': defaultAudioMode.name,
     'defaultAudioLanguage': defaultAudioLanguage,
     'defaultSubtitleMode': defaultSubtitleMode.name,
@@ -115,6 +132,8 @@ class PlaybackPreferences {
     return PlaybackPreferences(
       streamingQuality: quality,
       wifiOnlyStreaming: json['wifiOnlyStreaming'] as bool? ?? false,
+      autoSkipIntroCredits: json['autoSkipIntroCredits'] as bool? ?? true,
+      autoplayNextTvEpisode: json['autoplayNextTvEpisode'] as bool? ?? true,
       defaultAudioMode: audioMode,
       defaultAudioLanguage: langForFixed,
       defaultSubtitleMode: subtitleMode,
@@ -155,6 +174,16 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
 
   Future<void> setWifiOnlyStreaming(bool enabled) async {
     state = state.copyWith(wifiOnlyStreaming: enabled);
+    await _persist();
+  }
+
+  Future<void> setAutoSkipIntroCredits(bool enabled) async {
+    state = state.copyWith(autoSkipIntroCredits: enabled);
+    await _persist();
+  }
+
+  Future<void> setAutoplayNextTvEpisode(bool enabled) async {
+    state = state.copyWith(autoplayNextTvEpisode: enabled);
     await _persist();
   }
 
