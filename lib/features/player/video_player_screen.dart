@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
@@ -17,6 +18,7 @@ import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
+import 'player_material_theme.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
@@ -25,9 +27,9 @@ const _ticksPerMs = 10000;
 /// `/play/:id?resumeTicks=N` — the optional `resumeTicks` (Jellyfin tick
 /// count, 100 ns) is applied with [Player.seek] right after open.
 ///
-/// We intentionally lean on [MaterialVideoControls] for the on-screen UI
-/// (scrubber, play/pause, skip ±10 s, volume, fullscreen). Customising it
-/// is a follow-up — the goal here is "video plays, can be scrubbed".
+/// Uses [MaterialVideoControls] with AltCast theming: −10s / +30s seek
+/// buttons, brightness and volume (edge gestures + sheet sliders), and
+/// automatic media_kit fullscreen (no separate fullscreen control).
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   const VideoPlayerScreen({
     super.key,
@@ -87,6 +89,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Timer? _autoplayTimer;
   Duration _mediaDuration = Duration.zero;
 
+  final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
+  bool _scheduledFullscreen = false;
+
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
   /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
   /// rebuild when the external-subs list arrives, even if it was opened
@@ -125,7 +130,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     _positionSub = _player.stream.position.listen((p) => _lastPosition = p);
 
+    // iOS: default animated brightness updates cancel each other during fast
+    // vertical drags, so the OS level never settles — disable animation.
+    unawaited(_prepareScreenBrightnessForGestures());
+
     _open();
+  }
+
+  Future<void> _prepareScreenBrightnessForGestures() async {
+    try {
+      await ScreenBrightness().setAnimate(false);
+    } catch (_) {}
   }
 
   Future<void> _open() async {
@@ -178,10 +193,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
       if (mounted) _applyTrackPreferences();
       await _resolveNextEpisode();
+      if (mounted) _tryEnterFullscreenAfterOpen();
     } catch (e) {
       if (!mounted) return;
       setState(() => _openError = e);
     }
+  }
+
+  void _tryEnterFullscreenAfterOpen() {
+    if (_scheduledFullscreen || !mounted) return;
+    _scheduledFullscreen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _videoKey.currentState?.enterFullscreen();
+      });
+    });
   }
 
   Future<void> _resolveNextEpisode() async {
@@ -402,6 +429,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _player.dispose();
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
+    unawaited(ScreenBrightness().resetApplicationScreenBrightness());
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -409,24 +437,29 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
+    final controlsTheme = buildAltCastMaterialVideoControlsTheme(
+      player: _player,
+      onClosePlayer: _closePlayer,
+      onOpenTracks: _showTracksSheet,
+    );
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (_openError != null)
-              _PlaybackError(error: _openError!, onClose: () => context.pop())
-            else
-              Video(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_openError != null)
+            _PlaybackError(error: _openError!, onClose: () => context.pop())
+          else
+            MaterialVideoControlsTheme(
+              normal: controlsTheme,
+              fullscreen: controlsTheme,
+              child: Video(
+                key: _videoKey,
                 controller: _controller,
-                controls: AdaptiveVideoControls,
+                controls: MaterialVideoControls,
                 fit: BoxFit.contain,
-                // Force the Flutter-side subtitle overlay on with a clear
-                // style. media_kit defaults this to visible, but on iOS the
-                // libmpv-rendered overlay sometimes loses the compositor
-                // race against the Flutter video texture — drawing subs as
-                // Text widgets on top sidesteps that.
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
                   visible: true,
                   textAlign: TextAlign.center,
@@ -448,45 +481,33 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   ),
                 ),
               ),
-            const _EdgeScrim(top: true, height: 110),
-            const _EdgeScrim(top: false, height: 86),
-            // Always-visible close button — the built-in controls auto-hide,
-            // and a video that's failed to open has no controls at all, so
-            // we keep this anchored.
+            ),
+          const _EdgeScrim(top: true, height: 110),
+          const _EdgeScrim(top: false, height: 86),
+          if (_showNextUp && _nextEpisode != null)
             Positioned(
-              top: 8,
-              left: 8,
-              child: _CornerButton(
-                icon: Icons.close,
-                tooltip: 'Close',
-                onPressed: () => context.pop(),
+              right: pad.right + 16,
+              bottom: pad.bottom + 16,
+              child: _NextUpCard(
+                episode: _nextEpisode!,
+                countdown: _autoplayCountdown,
+                onCancel: _cancelAutoplay,
+                onPlayNow: _playNextEpisode,
               ),
             ),
-            if (_openError == null)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _CornerButton(
-                  icon: Icons.subtitles_outlined,
-                  tooltip: 'Audio & Subtitles',
-                  onPressed: () => _showTracksSheet(context),
-                ),
-              ),
-            if (_showNextUp && _nextEpisode != null)
-              Positioned(
-                right: 16,
-                bottom: 16,
-                child: _NextUpCard(
-                  episode: _nextEpisode!,
-                  countdown: _autoplayCountdown,
-                  onCancel: _cancelAutoplay,
-                  onPlayNow: _playNextEpisode,
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
+  }
+
+  /// Pops media_kit fullscreen (if active) then the player route.
+  Future<void> _closePlayer() async {
+    final vs = _videoKey.currentState;
+    if (vs != null && vs.isFullscreen()) {
+      await vs.exitFullscreen();
+    }
+    if (!mounted) return;
+    if (context.canPop()) context.pop();
   }
 
   void _showTracksSheet(BuildContext context) {
@@ -573,49 +594,6 @@ class _NextUpCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Round translucent button used for the always-visible top-corner overlays.
-class _CornerButton extends StatelessWidget {
-  const _CornerButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.2),
-            Colors.black.withValues(alpha: 0.48),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white.withValues(alpha: 0.95)),
-        tooltip: tooltip,
-        onPressed: onPressed,
       ),
     );
   }
