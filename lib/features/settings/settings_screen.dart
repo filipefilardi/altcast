@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../core/theme/app_gradients.dart';
 import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
+import '../../data/local/download_preferences.dart';
 import '../../data/local/playback_preferences.dart';
 import '../../features/auth/auth_controller.dart';
 
@@ -36,7 +39,6 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     final session = auth is AuthAuthenticated ? auth.session : null;
-    final downloads = ref.watch(downloadManagerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -50,24 +52,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 28),
           ],
-          _SettingsGroup(
-            label: 'Library',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.download_outlined),
-                title: const Text('Downloads'),
-                subtitle: Text(
-                  _downloadsSubtitle(downloads),
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textSecondary,
-                ),
-                onTap: () => context.push('/downloads'),
-              ),
-            ],
-          ),
+          const _DownloadGroup(),
           const SizedBox(height: 24),
           const _PlaybackGroup(),
           const SizedBox(height: 28),
@@ -79,7 +64,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  String _downloadsSubtitle(DownloadsState s) {
+  static String _downloadsSubtitle(DownloadsState s) {
     if (!s.bootstrapped) return 'Loading...';
     final pending = s.progress.length;
     final done = s.items.length;
@@ -89,6 +74,81 @@ class SettingsScreen extends ConsumerWidget {
       if (pending > 0) '$pending downloading',
     ];
     return parts.join(' • ');
+  }
+}
+
+class _DownloadGroup extends ConsumerWidget {
+  const _DownloadGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(downloadPreferencesProvider);
+    final notifier = ref.read(downloadPreferencesProvider.notifier);
+    final downloads = ref.watch(downloadManagerProvider);
+
+    return _SettingsGroup(
+      label: 'Library',
+      children: [
+        ListTile(
+          leading: const Icon(Icons.download_outlined),
+          title: const Text('Downloads'),
+          subtitle: Text(
+            SettingsScreen._downloadsSubtitle(downloads),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => context.push('/downloads'),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.auto_awesome_outlined),
+          title: const Text('Auto-download next'),
+          subtitle: const Text('New episodes arrive while you watch'),
+          value: prefs.autoDownloadNextEpisode,
+          onChanged: notifier.setAutoDownloadNextEpisode,
+          activeThumbColor: AppColors.primary,
+        ),
+        if (Platform.isAndroid)
+          ListTile(
+            leading: const Icon(Icons.sd_storage_outlined),
+            title: const Text('Storage location'),
+            subtitle: Text(
+              prefs.downloadLocation.label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(Icons.expand_more, color: AppColors.textSecondary),
+            onTap: () => _showLocationPicker(context, ref),
+          ),
+      ],
+    );
+  }
+
+  void _showLocationPicker(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: DownloadLocation.values.map((loc) {
+            final selected = ref.watch(downloadPreferencesProvider).downloadLocation == loc;
+            return ListTile(
+              leading: Icon(
+                loc == DownloadLocation.internal ? Icons.phone_android : Icons.sd_card,
+                color: selected ? AppColors.primary : null,
+              ),
+              title: Text(loc.label),
+              trailing: selected ? const Icon(Icons.check, color: AppColors.primary) : null,
+              onTap: () {
+                ref.read(downloadPreferencesProvider.notifier).setDownloadLocation(loc);
+                Navigator.pop(context);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 }
 
@@ -319,7 +379,7 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: 52,
       height: 52,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: AppGradients.accent,
         shape: BoxShape.circle,
       ),
