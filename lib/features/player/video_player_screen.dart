@@ -10,19 +10,20 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_gradients.dart';
-import '../../core/utils/dio_error_message.dart';
 import '../../core/utils/language.dart';
-import '../../core/widgets/local_or_network_image.dart';
 import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
-import '../../data/jellyfin/jellyfin_api.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
 import 'player_material_theme.dart';
+import 'scrobbler.dart';
+import 'widgets/next_up_card.dart';
+import 'widgets/playback_error.dart';
+import 'widgets/skip_chips.dart';
+import 'widgets/tracks_sheet.dart';
 
 /// Jellyfin's PositionTicks unit: 1 ms = 10000 ticks (100-ns ticks).
 const _ticksPerMs = 10000;
@@ -104,7 +105,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late final Player _player;
   late final VideoController _controller;
-  _Scrobbler? _scrobbler;
+  Scrobbler? _scrobbler;
   Object? _openError;
 
   // Tracks the latest known position so we can report it on pause/stop
@@ -378,8 +379,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     // Delayed auto-skip while actively playing inside each segment.
     if (autoSkip && intro != null && playing && inIntro) {
-      _introSkipperAutoTimer ??=
-          Timer(_introSkipperAutoSkipDelay, () async {
+      _introSkipperAutoTimer ??= Timer(_introSkipperAutoSkipDelay, () async {
         _introSkipperAutoTimer = null;
         if (!mounted) return;
         final pos = _lastPosition;
@@ -401,8 +401,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
 
     if (autoSkip && credits != null && playing && inCredits) {
-      _creditsSkipperAutoTimer ??=
-          Timer(_introSkipperAutoSkipDelay, () async {
+      _creditsSkipperAutoTimer ??= Timer(_introSkipperAutoSkipDelay, () async {
         _creditsSkipperAutoTimer = null;
         if (!mounted) return;
         final pos = _lastPosition;
@@ -431,7 +430,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     var season = widget.seasonNumber;
     var episodeNum = widget.episodeNumber;
 
-    final routingIncomplete = seriesId == null ||
+    final routingIncomplete =
+        seriesId == null ||
         seriesId.isEmpty ||
         season == null ||
         episodeNum == null;
@@ -546,7 +546,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// so resume positions, "played" state, and Continue Watching update.
   void _attachScrobbler() {
     final api = ref.read(jellyfinApiProvider);
-    final scrobbler = _Scrobbler(
+    final scrobbler = Scrobbler(
       api: api,
       itemId: widget.itemId,
       playMethod: _source?.playMethod ?? 'DirectStream',
@@ -620,7 +620,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   void _startAutoplay() {
     if (!mounted || _nextEpisode == null) return;
-    final seconds = ref.read(playbackPreferencesProvider).autoplayCountdownSeconds;
+    final seconds = ref
+        .read(playbackPreferencesProvider)
+        .autoplayCountdownSeconds;
     _autoplayDuration = seconds;
     _autoplayCountdown = seconds;
     _showNextUp = true;
@@ -702,8 +704,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         // screen so they don't visually collide near the bottom-right.
         // Card is ~300 px tall (16:9 thumb + body); 224 lift puts the chip
         // comfortably above its top edge.
-        final nextUpLift =
-            (snap.showNextUp && snap.nextEpisode != null) ? 224.0 : 0.0;
+        final nextUpLift = (snap.showNextUp && snap.nextEpisode != null)
+            ? 224.0
+            : 0.0;
         final skipperBottom =
             pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
 
@@ -716,7 +719,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               Positioned(
                 right: pad.right + 16,
                 bottom: skipperBottom,
-                child: _SkipChipStack(
+                child: SkipChipStack(
                   showIntro: snap.showSkipIntro,
                   showCredits: snap.showSkipCredits,
                   onSkipIntro: () => unawaited(_manualSkipIntro()),
@@ -727,7 +730,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               Positioned(
                 right: pad.right + 16,
                 bottom: pad.bottom + 16,
-                child: _NextUpCard(
+                child: NextUpCard(
                   episode: snap.nextEpisode!,
                   posterUrl: snap.nextEpisodePosterUrl,
                   countdownForAutoplay: snap.autoplayCountdown,
@@ -756,7 +759,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         fit: StackFit.expand,
         children: [
           if (_openError != null)
-            _PlaybackError(error: _openError!, onClose: () => context.pop())
+            PlaybackError(error: _openError!, onClose: () => context.pop())
           else
             MaterialVideoControlsTheme(
               normal: controlsTheme,
@@ -811,7 +814,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       backgroundColor: AppColors.surfaceElevated,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => _TracksSheet(
+      builder: (_) => TracksSheet(
         player: _player,
         sourceListenable: _sourceNotifier,
         selectedExternalSubListenable: _selectedExternalSubNotifier,
@@ -833,432 +836,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _setSubVisibility(true);
           }
         },
-      ),
-    );
-  }
-}
-
-/// Stack of skip-intro / skip-credits pills. Vertically stacks chips when
-/// both segments overlap (rare, but handled). Right-anchored to avoid the
-/// player's bottom seek bar and to align with the Next Up card.
-class _SkipChipStack extends StatelessWidget {
-  const _SkipChipStack({
-    required this.showIntro,
-    required this.showCredits,
-    required this.onSkipIntro,
-    required this.onSkipCredits,
-  });
-
-  final bool showIntro;
-  final bool showCredits;
-  final VoidCallback onSkipIntro;
-  final VoidCallback onSkipCredits;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (showIntro)
-          _SkipChip(
-            label: 'Skip intro',
-            icon: Icons.fast_forward_rounded,
-            onPressed: onSkipIntro,
-          ),
-        if (showIntro && showCredits) const SizedBox(height: 10),
-        if (showCredits)
-          _SkipChip(
-            label: 'Skip credits',
-            icon: Icons.skip_next_rounded,
-            onPressed: onSkipCredits,
-          ),
-      ],
-    );
-  }
-}
-
-/// Glass-style pill that matches AltCast's brand: dark navy fill, subtle
-/// cyan stroke + glow, accent-coloured leading icon. Sized for a single
-/// crisp tap target, never stretches edge-to-edge.
-class _SkipChip extends StatelessWidget {
-  const _SkipChip({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: AppColors.background.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.55),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.18),
-              blurRadius: 18,
-              spreadRadius: -2,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onPressed,
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom-right card that previews the next episode and offers a play CTA
-/// matching the brand's accent-gradient pill. Shows a live countdown ring
-/// while autoplay is running, otherwise a static play arrow.
-class _NextUpCard extends StatelessWidget {
-  const _NextUpCard({
-    required this.episode,
-    required this.posterUrl,
-    required this.countdownForAutoplay,
-    required this.countdownDuration,
-    required this.onCancel,
-    required this.onPlayNow,
-  });
-
-  final Episode episode;
-  final String? posterUrl;
-
-  /// Live remaining seconds — non-null means autoplay is running. Null means
-  /// the card is offering only a manual "Play next" action.
-  final int? countdownForAutoplay;
-
-  /// Total countdown length, used to fill the progress arc.
-  final int countdownDuration;
-
-  final VoidCallback onCancel;
-  final VoidCallback onPlayNow;
-
-  bool get _autoplayRunning =>
-      countdownForAutoplay != null && countdownForAutoplay! > 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 320,
-        decoration: BoxDecoration(
-          color: AppColors.surface.withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.28),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _NextUpThumb(
-              posterUrl: posterUrl,
-              countdownRemaining: countdownForAutoplay,
-              countdownTotal: countdownDuration,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (b) =>
-                        AppGradients.accent.createShader(b),
-                    child: Text(
-                      'NEXT UP',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: Colors.white,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (episode.shortLabel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(
-                        episode.shortLabel,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ),
-                  Text(
-                    episode.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _NextUpPlayPill(
-                          label: _autoplayRunning ? 'Play now' : 'Play next',
-                          onPressed: onPlayNow,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _NextUpCancelButton(
-                        label: _autoplayRunning ? 'Cancel' : 'Dismiss',
-                        onPressed: onCancel,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NextUpThumb extends StatelessWidget {
-  const _NextUpThumb({
-    required this.posterUrl,
-    required this.countdownRemaining,
-    required this.countdownTotal,
-  });
-
-  final String? posterUrl;
-  final int? countdownRemaining;
-  final int countdownTotal;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(
-            color: AppColors.surfaceElevated,
-            child: LocalOrNetworkImage(
-              source: posterUrl,
-              errorBuilder: (_) => const Center(
-                child: Icon(
-                  Icons.movie_outlined,
-                  color: AppColors.textTertiary,
-                  size: 28,
-                ),
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  AppColors.surface.withValues(alpha: 0.85),
-                ],
-                stops: const [0.55, 1],
-              ),
-            ),
-          ),
-          if (countdownRemaining != null && countdownTotal > 0)
-            Positioned(
-              right: 10,
-              top: 10,
-              child: _CountdownRing(
-                remaining: countdownRemaining!,
-                total: countdownTotal,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CountdownRing extends StatelessWidget {
-  const _CountdownRing({required this.remaining, required this.total});
-
-  final int remaining;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    // Sweep from full → empty as the countdown ticks down.
-    final value = (remaining / total).clamp(0.0, 1.0);
-    return SizedBox(
-      width: 36,
-      height: 36,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.background.withValues(alpha: 0.72),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.25),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: CircularProgressIndicator(
-              value: value,
-              strokeWidth: 2.5,
-              backgroundColor: Colors.transparent,
-              valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-            ),
-          ),
-          Text(
-            '$remaining',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NextUpPlayPill extends StatelessWidget {
-  const _NextUpPlayPill({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: AppGradients.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.play_arrow_rounded,
-                  color: AppColors.onAccent,
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.onAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NextUpCancelButton extends StatelessWidget {
-  const _NextUpCancelButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onPressed,
-        child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -1289,448 +866,6 @@ class _EdgeScrim extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom sheet listing the audio and subtitle tracks the [Player] has
-/// detected. Tapping a row tells media_kit to switch tracks and pops the
-/// sheet. The selected row is highlighted via a check mark.
-///
-/// We watch [Player.stream.tracks] / [Player.stream.track] so the list and
-/// selection stay live: e.g. an HLS stream that adds tracks mid-playback
-/// will show up automatically the next time the sheet is opened (or while
-/// it's open, since [StreamBuilder] rebuilds).
-class _TracksSheet extends StatelessWidget {
-  const _TracksSheet({
-    required this.player,
-    required this.sourceListenable,
-    required this.selectedExternalSubListenable,
-    required this.onSelectExternalSubtitle,
-    required this.onSetSubVisibility,
-  });
-
-  final Player player;
-
-  /// Live source — driven by a [ValueNotifier] in the player screen so the
-  /// external-subs list refreshes if the sheet opened *before* PlaybackInfo
-  /// finished resolving (small but real timing window).
-  final ValueListenable<StreamSource?> sourceListenable;
-
-  /// Live external-sub selection. Same pattern.
-  final ValueListenable<String?> selectedExternalSubListenable;
-
-  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
-  final ValueChanged<bool> onSetSubVisibility;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: StreamBuilder<Tracks>(
-        stream: player.stream.tracks,
-        initialData: player.state.tracks,
-        builder: (context, tracksSnap) {
-          return StreamBuilder<Track>(
-            stream: player.stream.track,
-            initialData: player.state.track,
-            builder: (context, currentSnap) {
-              return ValueListenableBuilder<StreamSource?>(
-                valueListenable: sourceListenable,
-                builder: (context, source, _) {
-                  return ValueListenableBuilder<String?>(
-                    valueListenable: selectedExternalSubListenable,
-                    builder: (context, selectedExternalSubId, child) {
-                      final tracks = tracksSnap.data ?? player.state.tracks;
-                      final current = currentSnap.data ?? player.state.track;
-                      final externalSubs =
-                          source?.externalSubtitles ?? const [];
-                      return SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _AudioSection(
-                                player: player,
-                                tracks: tracks.audio,
-                                current: current.audio,
-                              ),
-                              const SizedBox(height: 16),
-                              _SubtitleSection(
-                                player: player,
-                                tracks: tracks.subtitle,
-                                current: current.subtitle,
-                                externalSubtitles: externalSubs,
-                                selectedExternalSubId: selectedExternalSubId,
-                                onSelectExternalSubtitle:
-                                    onSelectExternalSubtitle,
-                                onSetSubVisibility: onSetSubVisibility,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _AudioSection extends StatelessWidget {
-  const _AudioSection({
-    required this.player,
-    required this.tracks,
-    required this.current,
-  });
-
-  final Player player;
-  final List<AudioTrack> tracks;
-  final AudioTrack current;
-
-  @override
-  Widget build(BuildContext context) {
-    // Drop the synthetic auto/no entries — for audio we always have a real
-    // track playing, so showing "Auto" is just noise.
-    final real = tracks
-        .where(
-          (t) => t.id != AudioTrack.auto().id && t.id != AudioTrack.no().id,
-        )
-        .toList();
-    if (real.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeader(label: 'Audio'),
-        for (final t in real)
-          _TrackRow(
-            label: _audioLabel(t),
-            selected: t.id == current.id,
-            onTap: () {
-              player.setAudioTrack(t);
-              Navigator.of(context).pop();
-            },
-          ),
-      ],
-    );
-  }
-
-  String _audioLabel(AudioTrack t) => _trackDisplayLabel(
-    title: t.title,
-    language: t.language,
-    fallbackId: t.id,
-  );
-}
-
-class _SubtitleSection extends StatelessWidget {
-  const _SubtitleSection({
-    required this.player,
-    required this.tracks,
-    required this.current,
-    required this.externalSubtitles,
-    required this.selectedExternalSubId,
-    required this.onSelectExternalSubtitle,
-    required this.onSetSubVisibility,
-  });
-
-  final Player player;
-  final List<SubtitleTrack> tracks;
-  final SubtitleTrack current;
-  final List<ExternalSubtitle> externalSubtitles;
-  final String? selectedExternalSubId;
-  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
-  final ValueChanged<bool> onSetSubVisibility;
-
-  @override
-  Widget build(BuildContext context) {
-    final embedded = tracks
-        .where(
-          (t) =>
-              t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id,
-        )
-        .toList();
-    final hasExternal = selectedExternalSubId != null;
-    final isOff = current.id == SubtitleTrack.no().id && !hasExternal;
-    final hasAny = embedded.isNotEmpty || externalSubtitles.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHeader(label: 'Subtitles'),
-        _TrackRow(
-          label: 'Off',
-          selected: isOff,
-          onTap: () {
-            onSelectExternalSubtitle(null);
-            player.setSubtitleTrack(SubtitleTrack.no());
-            onSetSubVisibility(false);
-            Navigator.of(context).pop();
-          },
-        ),
-        if (!hasAny)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Text(
-              'No subtitle tracks available.',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
-            ),
-          ),
-        for (final t in embedded)
-          _TrackRow(
-            label: _embeddedLabel(t),
-            selected: !hasExternal && !isOff && t.id == current.id,
-            onTap: () {
-              // Picking an embedded track clears any external selection.
-              onSelectExternalSubtitle(null);
-              player.setSubtitleTrack(t);
-              onSetSubVisibility(true);
-              Navigator.of(context).pop();
-            },
-          ),
-        for (final sub in externalSubtitles)
-          _TrackRow(
-            label: '${_externalLabel(sub)} (external)',
-            selected: hasExternal && sub.id == selectedExternalSubId,
-            onTap: () {
-              onSelectExternalSubtitle(sub);
-              Navigator.of(context).pop();
-            },
-          ),
-      ],
-    );
-  }
-
-  String _embeddedLabel(SubtitleTrack t) => _trackDisplayLabel(
-    title: t.title,
-    language: t.language,
-    fallbackId: t.id,
-  );
-
-  String _externalLabel(ExternalSubtitle sub) {
-    return _trackDisplayLabel(
-      title: sub.title,
-      language: sub.language,
-      fallbackId: sub.codec ?? 'subs',
-    );
-  }
-}
-
-/// Builds a friendly label for an audio/subtitle track.
-///
-/// Priority: server-provided title → ISO 639 → raw language code → "Track {id}".
-/// Returns the placeholder for empty everything so the row is never blank.
-String _trackDisplayLabel({
-  required String? title,
-  required String? language,
-  required String fallbackId,
-}) {
-  final t = title?.trim();
-  if (t != null && t.isNotEmpty) {
-    // If the title already encodes the language (mpv often emits "English (eng)"),
-    // skip the redundant trailing code.
-    final mapped = languageDisplay(language);
-    if (mapped != null && t.toLowerCase() != mapped.toLowerCase()) {
-      return '$t · $mapped';
-    }
-    return t;
-  }
-  final mapped = languageDisplay(language);
-  if (mapped != null) return mapped;
-  // Last-resort: a normalised raw code, never the literal "und".
-  final raw = language?.trim();
-  if (raw != null && raw.isNotEmpty && raw.toLowerCase() != 'und') {
-    return raw;
-  }
-  return fallbackId.isEmpty ? 'Track' : 'Track $fallbackId';
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      child: ShaderMask(
-        blendMode: BlendMode.srcIn,
-        shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
-        child: Text(
-          label.toUpperCase(),
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrackRow extends StatelessWidget {
-  const _TrackRow({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Material(
-        color: selected
-            ? AppColors.primary.withValues(alpha: 0.16)
-            : AppColors.surfaceHighlight.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (selected)
-                  const Icon(Icons.check, size: 18, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Posts playback events to Jellyfin's `/Sessions/Playing*` endpoints so
-/// resume positions, watched-state, and Continue Watching stay in sync.
-///
-/// All posts are best-effort: failures are swallowed because scrobbling
-/// must never crash playback. Tied 1-to-1 with a [VideoPlayerScreen]
-/// instance — there's no global scrobbler today (unlike AltSound, where
-/// audio plays outside the now-playing screen).
-class _Scrobbler {
-  _Scrobbler({
-    required this.api,
-    required this.itemId,
-    required this.playMethod,
-    this.playSessionId,
-  });
-
-  final JellyfinApi api;
-  final String itemId;
-
-  /// `'DirectStream'` or `'Transcode'` — comes from the negotiated
-  /// [StreamSource]. Some Jellyfin housekeeping (e.g. transcoder cleanup
-  /// on stop) keys off this value.
-  final String playMethod;
-
-  final String? playSessionId;
-
-  Future<void> start({required int positionTicks}) {
-    return _post('/Sessions/Playing', {
-      'ItemId': itemId,
-      'PositionTicks': positionTicks,
-      'IsPaused': false,
-      'PlayMethod': playMethod,
-      if (playSessionId != null) 'PlaySessionId': playSessionId,
-    });
-  }
-
-  Future<void> progress({
-    required int positionTicks,
-    required bool isPaused,
-    required String eventName,
-  }) {
-    return _post('/Sessions/Playing/Progress', {
-      'ItemId': itemId,
-      'PositionTicks': positionTicks,
-      'IsPaused': isPaused,
-      'EventName': eventName,
-      'PlayMethod': playMethod,
-      if (playSessionId != null) 'PlaySessionId': playSessionId,
-    });
-  }
-
-  Future<void> stop({required int positionTicks}) {
-    return _post('/Sessions/Playing/Stopped', {
-      'ItemId': itemId,
-      'PositionTicks': positionTicks,
-      if (playSessionId != null) 'PlaySessionId': playSessionId,
-    });
-  }
-
-  Future<void> _post(String path, Map<String, dynamic> body) async {
-    if (api.session == null) return;
-    try {
-      await api.dio.post<dynamic>(path, data: body);
-    } catch (_) {
-      // Swallow: scrobbling is best-effort.
-    }
-  }
-}
-
-class _PlaybackError extends StatelessWidget {
-  const _PlaybackError({required this.error, required this.onClose});
-  final Object error;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 40),
-            const SizedBox(height: 16),
-            const Text(
-              'Playback failed',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              userFacingNetworkMessage(error),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton(onPressed: onClose, child: const Text('Back')),
-          ],
         ),
       ),
     );
