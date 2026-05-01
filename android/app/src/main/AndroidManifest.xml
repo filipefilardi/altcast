@@ -2,7 +2,7 @@
     <!-- Required for Jellyfin API calls in release (debug/profile manifests are not merged into release). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="altcast"
+        android:label="AltCast"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
