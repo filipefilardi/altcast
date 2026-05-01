@@ -158,7 +158,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _player = Player();
+    // Keep subtitle rendering in Flutter for consistent behavior across
+    // Android, iOS, and desktop. Native mpv/libass rendering needs platform
+    // specific font setup on Android and can diverge between devices.
+    _player = Player(configuration: const PlayerConfiguration(libass: false));
     final useAndroidSoftwareDecode =
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.android &&
@@ -171,15 +174,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             )
           : const VideoControllerConfiguration(),
     );
-
-    // Use libmpv's native subtitle rasterizer for maximum format compatibility
-    // (ASS/SSA styling, positioning, bitmap subtitles, etc.).
-    try {
-      final impl = _player.platform as dynamic;
-      impl?.setProperty('sub-visibility', 'yes');
-      // mpv: 100 = bottom edge, lower values move subtitles up.
-      impl?.setProperty('sub-pos', '92');
-    } catch (_) {}
 
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
@@ -485,11 +479,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _publishOverlays();
   }
 
-  void _setSubVisibility(bool visible) {
+  void _setSubVisibility(bool _) {
+    // Track selection controls the Flutter subtitle overlay. Keep mpv's native
+    // subtitle compositing disabled so subtitles render the same on every
+    // platform and do not duplicate with the Flutter layer.
     try {
       final impl = _player.platform as dynamic;
       if (impl != null) {
-        impl.setProperty('sub-visibility', visible ? 'yes' : 'no');
+        impl.setProperty('sub-visibility', 'no');
       }
     } catch (_) {}
   }
@@ -708,9 +705,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _overlaySnapshots.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
     // Restore app default orientation after leaving the landscape-only player.
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -790,11 +785,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 controls: _buildVideoControls,
                 fit: BoxFit.contain,
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
-                  visible: false,
+                  visible: true,
                   textAlign: TextAlign.center,
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  textScaler: TextScaler.noScaling,
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 44),
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 24,
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                     height: 1.2,
