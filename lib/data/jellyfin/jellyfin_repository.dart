@@ -14,6 +14,7 @@ import 'models/movie.dart';
 import 'models/person_details.dart';
 import 'models/series.dart';
 import 'models/stream_source.dart';
+import '../local/playback_preferences.dart';
 
 enum LibrarySort { recentlyAdded, nameAsc, nameDesc, yearDesc }
 
@@ -547,6 +548,42 @@ class JellyfinRepository {
     return Episode.fromJson(data);
   }
 
+  /// Lightweight title lookup for the player chrome.
+  Future<String> getItemDisplayTitle(String itemId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$itemId',
+      queryParameters: const {
+        'Fields':
+            'SeriesName,ParentIndexNumber,IndexNumber,ProductionYear,PremiereDate',
+      },
+    );
+    final data = res.data;
+    if (data == null) return 'Now playing';
+    final name = (data['Name'] as String?)?.trim();
+    final seriesName = (data['SeriesName'] as String?)?.trim();
+    final season = data['ParentIndexNumber'] as int?;
+    final episode = data['IndexNumber'] as int?;
+    final year =
+        data['ProductionYear'] as int? ??
+        DateTime.tryParse((data['PremiereDate'] as String?) ?? '')?.year;
+    final title = name == null || name.isEmpty
+        ? null
+        : year == null
+        ? name
+        : '$name ($year)';
+    if (seriesName != null &&
+        seriesName.isNotEmpty &&
+        name != null &&
+        name.isNotEmpty) {
+      final number = season != null && episode != null
+          ? 'S$season E${episode.toString().padLeft(2, '0')}'
+          : null;
+      return [seriesName, ?number, title].join(' · ');
+    }
+    return title == null || title.isEmpty ? 'Now playing' : title;
+  }
+
   /// Picks the episode that follows S[seasonNumber]E[episodeNumber] for
   /// autoplay/Next-Up. Searches the current season first, then falls back to
   /// the start of the next season — bounded queries so long-running shows
@@ -665,22 +702,28 @@ class JellyfinRepository {
   ///
   /// Falls back to the static [streamUrl] if `PlaybackInfo` errors out so a
   /// flaky negotiation never blocks playback entirely.
-  Future<StreamSource> getStreamSource(String itemId) async {
+  Future<StreamSource> getStreamSource(
+    String itemId, {
+    StreamingQuality quality = StreamingQuality.auto,
+  }) async {
     final s = _session;
+    final maxBitrate = _maxStreamingBitrate(quality);
     try {
       final res = await _api.dio.post<Map<String, dynamic>>(
         '/Items/$itemId/PlaybackInfo',
         queryParameters: {'UserId': s.userId},
         data: {
-          // 140 Mbps — effectively "no cap" for everything short of UHD raw.
-          'MaxStreamingBitrate': 140000000,
+          'MaxStreamingBitrate': maxBitrate,
           'EnableDirectPlay': true,
           'EnableDirectStream': true,
           'EnableTranscoding': true,
           'AutoOpenLiveStream': true,
           'AllowVideoStreamCopy': true,
           'AllowAudioStreamCopy': true,
-          'DeviceProfile': _libmpvDeviceProfile,
+          'DeviceProfile': {
+            ..._libmpvDeviceProfile,
+            'MaxStreamingBitrate': maxBitrate,
+          },
         },
       );
       final data = res.data;
@@ -1034,3 +1077,14 @@ const Map<String, dynamic> _libmpvDeviceProfile = {
     {'Format': 'pgssub', 'Method': 'Embed'},
   ],
 };
+
+int _maxStreamingBitrate(StreamingQuality quality) {
+  switch (quality) {
+    case StreamingQuality.dataSaver:
+      return 4000000;
+    case StreamingQuality.auto:
+      return 20000000;
+    case StreamingQuality.high:
+      return 140000000;
+  }
+}

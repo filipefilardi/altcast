@@ -118,7 +118,10 @@ class _DownloadGroup extends ConsumerWidget {
               prefs.downloadLocation.label,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
-            trailing: const Icon(Icons.expand_more, color: AppColors.textSecondary),
+            trailing: const Icon(
+              Icons.expand_more,
+              color: AppColors.textSecondary,
+            ),
             onTap: () => _showLocationPicker(context, ref),
           ),
       ],
@@ -132,16 +135,23 @@ class _DownloadGroup extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: DownloadLocation.values.map((loc) {
-            final selected = ref.watch(downloadPreferencesProvider).downloadLocation == loc;
+            final selected =
+                ref.watch(downloadPreferencesProvider).downloadLocation == loc;
             return ListTile(
               leading: Icon(
-                loc == DownloadLocation.internal ? Icons.phone_android : Icons.sd_card,
+                loc == DownloadLocation.internal
+                    ? Icons.phone_android
+                    : Icons.sd_card,
                 color: selected ? AppColors.primary : null,
               ),
               title: Text(loc.label),
-              trailing: selected ? const Icon(Icons.check, color: AppColors.primary) : null,
+              trailing: selected
+                  ? const Icon(Icons.check, color: AppColors.primary)
+                  : null,
               onTap: () {
-                ref.read(downloadPreferencesProvider.notifier).setDownloadLocation(loc);
+                ref
+                    .read(downloadPreferencesProvider.notifier)
+                    .setDownloadLocation(loc);
                 Navigator.pop(context);
               },
             );
@@ -295,7 +305,8 @@ class _PlaybackGroup extends ConsumerWidget {
       case DefaultSubtitleMode.off:
         return 'Off';
       case DefaultSubtitleMode.byLanguage:
-        return languageDisplay(code) ?? (code == null || code.isEmpty ? 'Auto' : code);
+        return languageDisplay(code) ??
+            (code == null || code.isEmpty ? 'Auto' : code);
     }
   }
 }
@@ -574,8 +585,9 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
     showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
-        final current =
-            ref.watch(playbackPreferencesProvider).autoplayCountdownSeconds;
+        final current = ref
+            .watch(playbackPreferencesProvider)
+            .autoplayCountdownSeconds;
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -591,21 +603,26 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
                   padding: EdgeInsets.only(top: 4, bottom: 8),
                   child: Text(
                     'How long the Next Up card waits before jumping to the next episode.',
-                    style:
-                        TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 for (final seconds in autoplayCountdownPresets)
-                  RadioListTile<int>(
-                    value: seconds,
-                    groupValue: current,
+                  ListTile(
                     title: Text('$seconds seconds'),
                     contentPadding: EdgeInsets.zero,
-                    onChanged: (v) async {
-                      if (v == null) return;
+                    trailing: seconds == current
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppColors.primary,
+                          )
+                        : null,
+                    onTap: () async {
                       await ref
                           .read(playbackPreferencesProvider.notifier)
-                          .setAutoplayCountdownSeconds(v);
+                          .setAutoplayCountdownSeconds(seconds);
                       if (context.mounted) Navigator.of(context).pop();
                     },
                   ),
@@ -638,20 +655,23 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
                 ),
                 const SizedBox(height: 8),
                 for (final q in StreamingQuality.values)
-                  RadioListTile<StreamingQuality>(
-                    value: q,
-                    groupValue: current,
+                  ListTile(
                     title: Text(q.label),
                     subtitle: Text(
                       q.subtitle,
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     contentPadding: EdgeInsets.zero,
-                    onChanged: (v) async {
-                      if (v == null) return;
+                    trailing: q == current
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppColors.primary,
+                          )
+                        : null,
+                    onTap: () async {
                       await ref
                           .read(playbackPreferencesProvider.notifier)
-                          .setStreamingQuality(v);
+                          .setStreamingQuality(q);
                       if (context.mounted) Navigator.of(context).pop();
                     },
                   ),
@@ -685,7 +705,10 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
                   'Uses TMDB “original language” from Jellyfin when available.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               _defaultTrackOption(
@@ -704,8 +727,7 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
                 selected:
                     prefs.defaultAudioMode == DefaultAudioMode.originalLanguage,
                 label: 'Original language (metadata)',
-                subtitle:
-                    'When unknown for a title, behaves like Auto.',
+                subtitle: 'When unknown for a title, behaves like Auto.',
                 onTap: () async {
                   await ref
                       .read(playbackPreferencesProvider.notifier)
@@ -723,7 +745,8 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
                 _defaultTrackOption(
                   context: context,
                   selected:
-                      prefs.defaultAudioMode == DefaultAudioMode.fixedLanguage &&
+                      prefs.defaultAudioMode ==
+                          DefaultAudioMode.fixedLanguage &&
                       prefs.defaultAudioLanguage == code,
                   label: languageDisplay(code) ?? code,
                   onTap: () async {
@@ -785,7 +808,8 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
                 _defaultTrackOption(
                   context: context,
                   selected:
-                      prefs.defaultSubtitleMode == DefaultSubtitleMode.byLanguage &&
+                      prefs.defaultSubtitleMode ==
+                          DefaultSubtitleMode.byLanguage &&
                       prefs.defaultSubtitleLanguage == code,
                   label: languageDisplay(code) ?? code,
                   onTap: () async {
@@ -817,7 +841,10 @@ Widget _defaultTrackOption({
         ? null
         : Text(
             subtitle,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
           ),
     trailing: selected
         ? const Icon(Icons.check, color: AppColors.primary, size: 18)
