@@ -27,6 +27,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     brightnessGesture: true,
     seekGesture: true,
     gesturesEnabledWhileControlsVisible: true,
+    shiftSubtitlesOnControlsVisibilityChange: true,
     seekOnDoubleTap: true,
     seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
     seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
@@ -73,10 +74,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       ),
     ],
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    bottomButtonBar: const [
-      MaterialPositionIndicator(),
-      Spacer(),
-    ],
+    bottomButtonBar: const [MaterialPositionIndicator(), Spacer()],
     bottomButtonBarMargin: const EdgeInsets.only(
       left: 16,
       right: 8,
