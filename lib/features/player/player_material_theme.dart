@@ -18,6 +18,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required Player player,
   required Future<void> Function() onClosePlayer,
   required void Function(BuildContext origin) onOpenTracks,
+  required void Function(BuildContext origin) onOpenSettings,
+  required void Function(BuildContext origin) onOpenCast,
+  required String title,
 }) {
   final screenBrightness = ScreenBrightness();
   return MaterialVideoControlsThemeData(
@@ -64,12 +67,27 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           onPressed: () => unawaited(onClosePlayer()),
         ),
       ),
-      const Spacer(),
+      const SizedBox(width: 8),
+      Expanded(child: AltCastPlayerTitle(title: title)),
+      Builder(
+        builder: (ctx) => AltCastChromeIconButton(
+          icon: Icons.cast_rounded,
+          tooltip: 'Cast',
+          onPressed: () => onOpenCast(ctx),
+        ),
+      ),
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
           icon: Icons.closed_caption_outlined,
           tooltip: 'Audio & subtitles',
           onPressed: () => onOpenTracks(ctx),
+        ),
+      ),
+      Builder(
+        builder: (ctx) => AltCastChromeIconButton(
+          icon: Icons.settings_outlined,
+          tooltip: 'Playback settings',
+          onPressed: () => onOpenSettings(ctx),
         ),
       ),
     ],
@@ -117,6 +135,36 @@ class AltCastSeekRelativeButton extends StatelessWidget {
   }
 }
 
+class AltCastPlayerTitle extends StatelessWidget {
+  const AltCastPlayerTitle({super.key, required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = title.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.95),
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+        shadows: [
+          Shadow(
+            color: Colors.black.withValues(alpha: 0.75),
+            blurRadius: 8,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Prefer **system** backlight when allowed (real change on the panel).
 /// On **Android** without `WRITE_SETTINGS`, skip system so we don’t spam the
 /// permission screen — use **application** window brightness instead.
@@ -154,7 +202,7 @@ Future<void> _resetScreenBrightness(ScreenBrightness sb) async {
   }
 }
 
-/// Round translucent control matching the player’s corner affordances.
+/// Minimal player chrome action: icon-only, with a slightly larger tap target.
 class AltCastChromeIconButton extends StatelessWidget {
   const AltCastChromeIconButton({
     super.key,
@@ -169,31 +217,20 @@ class AltCastChromeIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.2),
-            Colors.black.withValues(alpha: 0.48),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return IconButton(
+      icon: Icon(
+        icon,
+        color: Colors.white.withValues(alpha: 0.95),
+        shadows: [
+          Shadow(
+            color: Colors.black.withValues(alpha: 0.75),
+            blurRadius: 8,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white.withValues(alpha: 0.95)),
-        tooltip: tooltip,
-        onPressed: onPressed,
-      ),
+      tooltip: tooltip,
+      onPressed: onPressed,
     );
   }
 }

@@ -18,6 +18,7 @@ import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
+import '../remote/remote_sessions_sheet.dart';
 import 'player_material_theme.dart';
 import 'scrobbler.dart';
 import 'widgets/next_up_card.dart';
@@ -34,6 +35,8 @@ const _introSkipperAutoSkipDelay = Duration(seconds: 3);
 
 /// Clears MaterialVideoControls (seek bar + bottom bar) so chips stay visible.
 const _introSkipperChipLiftFromSafeBottom = 104.0;
+
+enum _PlayerControlOverlay { none, settings, subtitleOffset }
 
 /// Snapshot pushed to [ValueNotifier] so skip / next-up UI rebuilds inside
 /// [MaterialVideoControls] — required because media_kit fullscreen is a
@@ -108,6 +111,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late final VideoController _controller;
   Scrobbler? _scrobbler;
   Object? _openError;
+  String _playerTitle = '';
+  bool _isReloadingSource = false;
+  double _playbackRate = 1.0;
+  Duration _subtitleOffset = Duration.zero;
+  final ValueNotifier<_PlayerControlOverlay> _controlOverlayNotifier =
+      ValueNotifier(_PlayerControlOverlay.none);
 
   // Tracks the latest known position so we can report it on pause/stop
   // without awaiting an async getter.
@@ -189,7 +198,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // vertical drags, so the OS level never settles — disable animation.
     unawaited(_prepareScreenBrightnessForGestures());
 
+    unawaited(_loadPlayerTitle());
     _open();
+  }
+
+  Future<void> _loadPlayerTitle() async {
+    try {
+      final title = await ref
+          .read(jellyfinRepositoryProvider)
+          .getItemDisplayTitle(widget.itemId);
+      if (!mounted) return;
+      setState(() => _playerTitle = title);
+    } catch (_) {}
   }
 
   void _publishOverlays() {
@@ -211,13 +231,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _open() async {
+  Future<void> _open({Duration? startPosition, bool play = true}) async {
     try {
+      if (mounted && _openError != null) {
+        setState(() => _openError = null);
+      }
       // Capture providers upfront — calling `ref.read` after an await on a
       // disposed widget throws.
       final downloads = ref.read(downloadManagerProvider);
       final repo = ref.read(jellyfinRepositoryProvider);
       final api = ref.read(jellyfinApiProvider);
+      final quality = ref.read(playbackPreferencesProvider).streamingQuality;
       // Prefer the local file if this item was downloaded — saves a server
       // round-trip and lets playback work fully offline.
       final localPath = downloads.localPath(widget.itemId);
@@ -228,7 +252,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           isTranscoding: false,
         );
       } else {
-        source = await repo.getStreamSource(widget.itemId);
+        source = await repo.getStreamSource(widget.itemId, quality: quality);
       }
       if (!mounted) return;
       _sourceNotifier.value = source;
@@ -240,8 +264,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               ? {'Authorization': auth}
               : null,
         ),
+        play: play,
       );
-      await _seekToResumePosition(widget.resumeTicks);
+      await _seekToStartPosition(startPosition ?? _resumePositionFromRoute());
+      await _applyPlaybackRate(_playbackRate);
+      await _applySubtitleOffset(_subtitleOffset);
       _attachScrobbler();
 
       // Wait until media_kit has populated the tracks lists. This is more
@@ -265,10 +292,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  Future<void> _seekToResumePosition(int? resumeTicks) async {
-    final ticks = resumeTicks ?? 0;
-    if (ticks <= 0) return;
-    final target = Duration(microseconds: ticks ~/ 10);
+  Duration _resumePositionFromRoute() {
+    final ticks = widget.resumeTicks ?? 0;
+    if (ticks <= 0) return Duration.zero;
+    return Duration(microseconds: ticks ~/ 10);
+  }
+
+  Future<void> _seekToStartPosition(Duration target) async {
+    if (target <= Duration.zero) return;
 
     // Some sources (especially transcodes/HLS) may ignore an immediate seek
     // right after open. Retry briefly until playback position settles.
@@ -491,6 +522,59 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     } catch (_) {}
   }
 
+  Future<void> _applyPlaybackRate(double rate) async {
+    _playbackRate = rate;
+    await _player.setRate(rate);
+  }
+
+  Future<void> _applySubtitleOffset(Duration offset) async {
+    _subtitleOffset = offset;
+    try {
+      final impl = _player.platform as dynamic;
+      if (impl != null) {
+        final seconds = offset.inMilliseconds / 1000.0;
+        await impl.setProperty('sub-delay', seconds.toStringAsFixed(3));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _reloadStreamForQualityChange() async {
+    if (_isReloadingSource) return;
+    setState(() => _isReloadingSource = true);
+    final position = _lastPosition;
+    final wasPlaying = _player.state.playing;
+    _stopPlaybackReporting();
+    await _closeActiveEncoding(_source);
+    unawaited(
+      _scrobbler?.stop(positionTicks: position.inMilliseconds * _ticksPerMs) ??
+          Future<void>.value(),
+    );
+    try {
+      await _open(startPosition: position, play: wasPlaying);
+    } finally {
+      if (mounted) setState(() => _isReloadingSource = false);
+    }
+  }
+
+  void _stopPlaybackReporting() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+    _playingSub?.cancel();
+    _playingSub = null;
+    _completedSub?.cancel();
+    _completedSub = null;
+    _durationSub?.cancel();
+    _durationSub = null;
+  }
+
+  Future<void> _closeActiveEncoding(StreamSource? src) async {
+    if (src != null && src.isTranscoding && src.playSessionId != null) {
+      await ref
+          .read(jellyfinRepositoryProvider)
+          .closeActiveEncoding(playSessionId: src.playSessionId!);
+    }
+  }
+
   /// Applies the audio/subtitle language preferences passed via /play/:id
   /// query params. No-op when neither was set, when the matching track
   /// isn't available, or after dispose.
@@ -703,6 +787,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
     _overlaySnapshots.dispose();
+    _controlOverlayNotifier.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
     // Restore app default orientation after leaving the landscape-only player.
     SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
@@ -730,6 +815,53 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           clipBehavior: Clip.none,
           children: [
             MaterialVideoControls(videoState),
+            ValueListenableBuilder<_PlayerControlOverlay>(
+              valueListenable: _controlOverlayNotifier,
+              builder: (context, overlay, _) {
+                if (overlay == _PlayerControlOverlay.none) {
+                  return const SizedBox.shrink();
+                }
+                final size = MediaQuery.sizeOf(context);
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: _hideControlOverlay,
+                      ),
+                    ),
+                    if (overlay == _PlayerControlOverlay.settings)
+                      Positioned(
+                        top: pad.top + 58,
+                        right: pad.right + 12,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: size.width < 360 ? size.width - 24 : 236,
+                          ),
+                          child: _PlaybackSettingsOverlay(
+                            initialRate: _playbackRate,
+                            initialSubtitleOffset: _subtitleOffset,
+                            onRateChanged: _applyPlaybackRate,
+                            onQualityChanged: _reloadStreamForQualityChange,
+                            onOpenSubtitleOffset: _showSubtitleOffsetOverlay,
+                          ),
+                        ),
+                      ),
+                    if (overlay == _PlayerControlOverlay.subtitleOffset)
+                      Positioned(
+                        top: pad.top + 58,
+                        left: pad.left + 20,
+                        right: pad.right + 20,
+                        child: _SubtitleOffsetOverlay(
+                          initialSubtitleOffset: _subtitleOffset,
+                          onSubtitleOffsetChanged: _applySubtitleOffset,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
                 right: pad.right + 16,
@@ -766,6 +898,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       player: _player,
       onClosePlayer: _closePlayer,
       onOpenTracks: _showTracksSheet,
+      onOpenSettings: _togglePlaybackSettings,
+      onOpenCast: _showCastSheet,
+      title: _playerTitle,
     );
 
     return Scaffold(
@@ -830,6 +965,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _showTracksSheet(BuildContext context) {
+    _hideControlOverlay();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -857,6 +993,352 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             _setSubVisibility(true);
           }
         },
+      ),
+    );
+  }
+
+  void _togglePlaybackSettings(BuildContext context) {
+    _controlOverlayNotifier.value =
+        _controlOverlayNotifier.value == _PlayerControlOverlay.settings
+        ? _PlayerControlOverlay.none
+        : _PlayerControlOverlay.settings;
+  }
+
+  void _showSubtitleOffsetOverlay() {
+    _controlOverlayNotifier.value = _PlayerControlOverlay.subtitleOffset;
+  }
+
+  void _hideControlOverlay() {
+    _controlOverlayNotifier.value = _PlayerControlOverlay.none;
+  }
+
+  void _showCastSheet(BuildContext context) {
+    _hideControlOverlay();
+    showRemoteSessionsSheet(
+      context,
+      itemId: widget.itemId,
+      startPositionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
+    );
+  }
+}
+
+class _PlaybackSettingsOverlay extends ConsumerStatefulWidget {
+  const _PlaybackSettingsOverlay({
+    required this.initialRate,
+    required this.initialSubtitleOffset,
+    required this.onRateChanged,
+    required this.onQualityChanged,
+    required this.onOpenSubtitleOffset,
+  });
+
+  final double initialRate;
+  final Duration initialSubtitleOffset;
+  final Future<void> Function(double rate) onRateChanged;
+  final Future<void> Function() onQualityChanged;
+  final VoidCallback onOpenSubtitleOffset;
+
+  @override
+  ConsumerState<_PlaybackSettingsOverlay> createState() =>
+      _PlaybackSettingsOverlayState();
+}
+
+class _PlaybackSettingsOverlayState
+    extends ConsumerState<_PlaybackSettingsOverlay> {
+  static const _speedOptions = <double>[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  late double _rate = widget.initialRate;
+  bool _qualityBusy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentQuality = ref
+        .watch(playbackPreferencesProvider)
+        .streamingQuality;
+    return Material(
+      color: Colors.transparent,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.56),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.38),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 10, 10),
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              letterSpacing: 0,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Text('Speed')),
+                    _CompactDropdown<double>(
+                      value: _rate,
+                      items: _speedOptions,
+                      itemLabel: _speedLabel,
+                      onChanged: (value) {
+                        if (value != null) _setRate(value);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Expanded(child: Text('Quality')),
+                    if (_qualityBusy)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      _CompactDropdown<StreamingQuality>(
+                        value: currentQuality,
+                        items: StreamingQuality.values,
+                        itemLabel: (quality) => quality.label,
+                        onChanged: (value) {
+                          if (value != null) _setQuality(value);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: widget.onOpenSubtitleOffset,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const Expanded(child: Text('Subtitle offset')),
+                        Text(
+                          _offsetLabel(widget.initialSubtitleOffset),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setRate(double value) async {
+    setState(() => _rate = value);
+    await widget.onRateChanged(value);
+  }
+
+  Future<void> _setQuality(StreamingQuality value) async {
+    final current = ref.read(playbackPreferencesProvider).streamingQuality;
+    if (value == current) return;
+    setState(() => _qualityBusy = true);
+    await ref
+        .read(playbackPreferencesProvider.notifier)
+        .setStreamingQuality(value);
+    await widget.onQualityChanged();
+    if (mounted) setState(() => _qualityBusy = false);
+  }
+
+  String _speedLabel(double value) {
+    return value == 1.0 ? 'Normal' : '${value.toStringAsFixed(2)}x';
+  }
+
+  String _offsetLabel(Duration offset) {
+    final seconds = offset.inMilliseconds / 1000.0;
+    if (seconds == 0) return '0.00s';
+    final sign = seconds > 0 ? '+' : '';
+    return '$sign${seconds.toStringAsFixed(2)}s';
+  }
+}
+
+class _SubtitleOffsetOverlay extends StatefulWidget {
+  const _SubtitleOffsetOverlay({
+    required this.initialSubtitleOffset,
+    required this.onSubtitleOffsetChanged,
+  });
+
+  final Duration initialSubtitleOffset;
+  final Future<void> Function(Duration offset) onSubtitleOffsetChanged;
+
+  @override
+  State<_SubtitleOffsetOverlay> createState() => _SubtitleOffsetOverlayState();
+}
+
+class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
+  static const _minOffsetSeconds = -30.0;
+  static const _maxOffsetSeconds = 30.0;
+  static const _zeroMarkerWidth = 2.0;
+  static const _zeroMarkerHeight = 16.0;
+
+  late Duration _subtitleOffset = widget.initialSubtitleOffset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.56),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.38),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 54,
+                child: Text(
+                  _offsetLabel(_subtitleOffset),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: AppColors.primary,
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.24),
+                    thumbColor: AppColors.primary,
+                    overlayColor: AppColors.primary.withValues(alpha: 0.16),
+                    valueIndicatorColor: AppColors.surfaceElevated,
+                    valueIndicatorTextStyle: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IgnorePointer(
+                        child: SizedBox(
+                          width: _zeroMarkerWidth,
+                          height: _zeroMarkerHeight,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Slider(
+                        min: _minOffsetSeconds,
+                        max: _maxOffsetSeconds,
+                        divisions: 240,
+                        label: _offsetLabel(_subtitleOffset),
+                        value: _subtitleOffset.inMilliseconds / 1000.0,
+                        onChanged: _setOffsetSeconds,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Reset',
+                visualDensity: VisualDensity.compact,
+                color: AppColors.textSecondary,
+                onPressed: () => _setOffset(Duration.zero),
+                icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _setOffsetSeconds(double value) {
+    final offset = Duration(milliseconds: (value * 1000).round());
+    _setOffset(offset);
+  }
+
+  Future<void> _setOffset(Duration value) async {
+    setState(() => _subtitleOffset = value);
+    await widget.onSubtitleOffsetChanged(value);
+  }
+
+  String _offsetLabel(Duration offset) {
+    final seconds = offset.inMilliseconds / 1000.0;
+    if (seconds == 0) return '0.00s';
+    final sign = seconds > 0 ? '+' : '';
+    return '$sign${seconds.toStringAsFixed(2)}s';
+  }
+}
+
+class _CompactDropdown<T> extends StatelessWidget {
+  const _CompactDropdown({
+    required this.value,
+    required this.items,
+    required this.itemLabel,
+    required this.onChanged,
+  });
+
+  final T value;
+  final List<T> items;
+  final String Function(T value) itemLabel;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: value,
+        dropdownColor: Colors.black.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(8),
+        icon: const SizedBox.shrink(),
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+        selectedItemBuilder: (context) => [
+          for (final item in items)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(itemLabel(item), overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        items: [
+          for (final item in items)
+            DropdownMenuItem<T>(value: item, child: Text(itemLabel(item))),
+        ],
+        onChanged: onChanged,
+        isDense: true,
+        alignment: AlignmentDirectional.centerEnd,
+        menuMaxHeight: 260,
+        menuWidth: 148,
       ),
     );
   }
