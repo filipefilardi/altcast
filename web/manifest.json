@@ -1,6 +1,6 @@
 {
-    "name": "altcast",
-    "short_name": "altcast",
+    "name": "AltCast",
+    "short_name": "AltCast",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
