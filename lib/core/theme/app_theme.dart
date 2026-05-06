@@ -79,7 +79,7 @@ class AppTheme {
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: const ColorScheme.dark(
-        surface: AppColors.background,
+        surface: AppColors.surface,
         surfaceContainerHighest: AppColors.surfaceElevated,
         primary: AppColors.primary,
         secondary: AppColors.accent,
@@ -189,11 +189,19 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.surfaceElevated,
-        modalBackgroundColor: AppColors.surfaceElevated,
+        backgroundColor: AppColors.surface,
+        modalBackgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       sliderTheme: SliderThemeData(
         trackHeight: 3,
