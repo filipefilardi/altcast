@@ -8,6 +8,7 @@ import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/meta_pill_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
@@ -64,7 +65,8 @@ class _EpisodeBody extends ConsumerWidget {
       fallbackPrimaryTag: episode.imageTag,
     );
     final ticks = episode.userData?.playbackPositionTicks ?? 0;
-    final hasResume = (episode.userData?.resumePosition ?? Duration.zero) >
+    final hasResume =
+        (episode.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
     final seriesName = episode.seriesName?.trim();
 
@@ -144,15 +146,16 @@ class _EpisodeBody extends ConsumerWidget {
                       Text(
                         'Continues from ${formatDuration(episode.userData!.resumePosition)}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textTertiary,
-                              fontSize: 12,
-                            ),
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
+                        ),
                       ),
                       InkWell(
                         onTap: () => _play(context, fromStart: true),
                         child: Text(
                           'Play from start',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: AppColors.primary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -171,13 +174,10 @@ class _EpisodeBody extends ConsumerWidget {
               ],
               if (episode.overview != null && episode.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text(
-                  'OVERVIEW',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
+                Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Text(
-                  episode.overview!,
+                ExpandableText(
+                  text: episode.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
@@ -207,14 +207,16 @@ class _EpisodeBody extends ConsumerWidget {
   }
 
   void _play(BuildContext context, {required bool fromStart}) {
-    final ticks =
-        fromStart ? 0 : (episode.userData?.playbackPositionTicks ?? 0);
+    final ticks = fromStart
+        ? 0
+        : (episode.userData?.playbackPositionTicks ?? 0);
     final query = <String, String>{
       if (ticks > 0) 'resumeTicks': '$ticks',
       if (episode.seriesId.isNotEmpty) 'seriesId': episode.seriesId,
       if (episode.parentIndexNumber != null)
         'seasonNumber': '${episode.parentIndexNumber}',
-      if (episode.indexNumber != null) 'episodeNumber': '${episode.indexNumber}',
+      if (episode.indexNumber != null)
+        'episodeNumber': '${episode.indexNumber}',
     };
     final uri = Uri(
       path: '/play/${episode.id}',
@@ -242,8 +244,11 @@ class _OpenSeriesTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              const Icon(Icons.tv_outlined,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.tv_outlined,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -259,8 +264,11 @@ class _OpenSeriesTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(Icons.chevron_right,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),
@@ -271,8 +279,18 @@ class _OpenSeriesTile extends StatelessWidget {
 
 String _formatAirDate(DateTime d) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
 }
@@ -318,4 +336,3 @@ class _EpisodeSkeleton extends StatelessWidget {
     );
   }
 }
-
