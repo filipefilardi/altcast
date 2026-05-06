@@ -165,6 +165,10 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           );
     final episodes = episodesAsync.value ?? const <Episode>[];
     final next = _nextEpisode(episodes);
+    final nextHasResume =
+        (next?.userData?.resumePosition ?? Duration.zero) >
+        const Duration(seconds: 5);
+    final tagline = series.tagline?.trim();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -194,6 +198,17 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                     icon: Icons.play_arrow_rounded,
                   ),
                   const Spacer(),
+                  if (next != null && nextHasResume)
+                    IconButton(
+                      icon: const Icon(Icons.replay),
+                      tooltip: 'Play from start',
+                      onPressed: () => _playEpisode(
+                        context,
+                        next,
+                        preference: _preference,
+                        fromStart: true,
+                      ),
+                    ),
                   UserDataActions(
                     initialPlayed: series.userData?.played ?? false,
                     onSetPlayed: (v) async {
@@ -222,6 +237,16 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                 ),
               if (series.overview != null && series.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
+                if (tagline != null && tagline.isNotEmpty) ...[
+                  Text(
+                    tagline,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 ExpandableText(
                   text: series.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
@@ -546,8 +571,9 @@ void _playEpisode(
   BuildContext context,
   Episode ep, {
   TrackPreference preference = const TrackPreference(),
+  bool fromStart = false,
 }) {
-  final ticks = ep.userData?.playbackPositionTicks ?? 0;
+  final ticks = fromStart ? 0 : (ep.userData?.playbackPositionTicks ?? 0);
   final query = <String, String>{
     if (ticks > 0) 'resumeTicks': '$ticks',
     if (ep.seriesId.isNotEmpty) 'seriesId': ep.seriesId,

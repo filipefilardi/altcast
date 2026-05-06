@@ -8,6 +8,7 @@ class Episode {
     required this.seriesId,
     this.seasonId,
     this.seriesName,
+    this.tagline,
     this.overview,
     this.indexNumber,
     this.parentIndexNumber,
@@ -24,6 +25,7 @@ class Episode {
   final String seriesId;
   final String? seasonId;
   final String? seriesName;
+  final String? tagline;
   final String? overview;
 
   /// Episode number within the season (1-based).
@@ -55,6 +57,11 @@ class Episode {
     final tags = json['ImageTags'];
     final people =
         (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final taglines = (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
+    final firstTagline = taglines.firstWhere(
+      (tagline) => tagline.trim().isNotEmpty,
+      orElse: () => '',
+    );
     final premiere = json['PremiereDate'] as String?;
     return Episode(
       id: json['Id'] as String,
@@ -62,6 +69,9 @@ class Episode {
       seriesId: json['SeriesId'] as String? ?? '',
       seasonId: json['SeasonId'] as String?,
       seriesName: json['SeriesName'] as String?,
+      tagline: firstTagline.isNotEmpty
+          ? firstTagline
+          : (json['Tagline'] as String?),
       overview: json['Overview'] as String?,
       indexNumber: json['IndexNumber'] as int?,
       parentIndexNumber: json['ParentIndexNumber'] as int?,

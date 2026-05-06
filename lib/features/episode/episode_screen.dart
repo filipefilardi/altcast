@@ -69,6 +69,7 @@ class _EpisodeBody extends ConsumerWidget {
         (episode.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
     final seriesName = episode.seriesName?.trim();
+    final tagline = episode.tagline?.trim();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -106,6 +107,12 @@ class _EpisodeBody extends ConsumerWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (hasResume)
+                        IconButton(
+                          icon: const Icon(Icons.replay),
+                          tooltip: 'Play from start',
+                          onPressed: () => _play(context, fromStart: true),
+                        ),
                       UserDataActions(
                         initialPlayed: episode.userData?.played ?? false,
                         onSetPlayed: (v) async {
@@ -131,35 +138,6 @@ class _EpisodeBody extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (hasResume)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        'Continues from ${formatDuration(episode.userData!.resumePosition)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => _play(context, fromStart: true),
-                        child: Text(
-                          'Play from start',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               if (episode.seriesId.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _OpenSeriesTile(
@@ -171,6 +149,16 @@ class _EpisodeBody extends ConsumerWidget {
                 const SizedBox(height: 24),
                 Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
+                if (tagline != null && tagline.isNotEmpty) ...[
+                  Text(
+                    tagline,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 ExpandableText(
                   text: episode.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
