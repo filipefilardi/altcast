@@ -7,6 +7,7 @@ import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/genre_chips.dart';
 import '../../core/widgets/more_like_this_row.dart';
 import '../../core/widgets/play_button.dart';
@@ -226,11 +227,9 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                 ),
               if (series.overview != null && series.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text(
-                  series.overview!,
+                ExpandableText(
+                  text: series.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
               if (series.genres.isNotEmpty) ...[
@@ -429,11 +428,7 @@ class _EpisodeList extends ConsumerWidget {
                 episode: ep,
                 seriesName: seriesName,
                 seriesPosterTag: seriesPosterTag,
-                onTap: () => _playEpisode(
-                  context,
-                  ep,
-                  preference: preference,
-                ),
+                onTap: () => _playEpisode(context, ep, preference: preference),
               ),
           ],
         );
@@ -571,4 +566,3 @@ void _playEpisode(
   );
   context.push(uri.toString());
 }
-

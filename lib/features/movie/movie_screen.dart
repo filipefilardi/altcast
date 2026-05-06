@@ -8,6 +8,7 @@ import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/cast_crew_row.dart';
 import '../../core/widgets/detail_hero.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/genre_chips.dart';
 import '../../core/widgets/meta_pill_row.dart';
 import '../../core/widgets/more_like_this_row.dart';
@@ -38,7 +39,9 @@ class MovieScreen extends ConsumerWidget {
           ref.invalidate(similarMoviesProvider(movieId));
           await Future.wait([
             ref.read(movieProvider(movieId).future),
-            ref.read(similarMoviesProvider(movieId).future).catchError((_) => <BrowseItem>[]),
+            ref
+                .read(similarMoviesProvider(movieId).future)
+                .catchError((_) => <BrowseItem>[]),
           ]);
         },
         child: async.when(
@@ -105,7 +108,8 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
       movie.backdropTag,
       fallbackPrimaryTag: movie.imageTag,
     );
-    final hasResume = (movie.userData?.resumePosition ?? Duration.zero) >
+    final hasResume =
+        (movie.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
 
     return ListView(
@@ -182,20 +186,20 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                       Text(
                         'Continues from ${formatDuration(movie.userData!.resumePosition)}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textTertiary,
-                              fontSize: 12,
-                            ),
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
+                        ),
                       ),
                       InkWell(
                         onTap: () => _play(context, movie, fromStart: true),
                         child: Text(
                           'Play from start',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.primary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ],
@@ -221,13 +225,10 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
               ],
               if (movie.overview != null && movie.overview!.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text(
-                  'OVERVIEW',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
+                Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Text(
-                  movie.overview!,
+                ExpandableText(
+                  text: movie.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
@@ -246,7 +247,10 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 12),
-              MoreLikeThisRow(itemsAsync: similarAsync, currentItemId: movie.id),
+              MoreLikeThisRow(
+                itemsAsync: similarAsync,
+                currentItemId: movie.id,
+              ),
               const SizedBox(height: 32),
             ],
           ),
@@ -263,13 +267,15 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
   }
 
   void _play(BuildContext context, Movie movie, {required bool fromStart}) {
-    final ticks =
-        fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
+    final ticks = fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
     final query = <String, String>{
       if (ticks > 0) 'resumeTicks': '$ticks',
       ..._preference.toQuery(),
     };
-    final uri = Uri(path: '/play/${movie.id}', queryParameters: query.isEmpty ? null : query);
+    final uri = Uri(
+      path: '/play/${movie.id}',
+      queryParameters: query.isEmpty ? null : query,
+    );
     context.push(uri.toString());
   }
 }
@@ -317,4 +323,3 @@ class _MovieSkeleton extends StatelessWidget {
     );
   }
 }
-

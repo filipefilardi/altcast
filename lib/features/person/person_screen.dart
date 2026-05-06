@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/navigation.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/local_or_network_image.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
@@ -36,7 +37,9 @@ class PersonScreen extends ConsumerWidget {
           ref.invalidate(personItemsProvider(personId));
           await Future.wait([
             ref.read(personProvider(personId).future),
-            ref.read(personItemsProvider(personId).future).catchError((_) => <BrowseItem>[]),
+            ref
+                .read(personItemsProvider(personId).future)
+                .catchError((_) => <BrowseItem>[]),
           ]);
         },
         child: ListView(
@@ -81,7 +84,11 @@ class _PersonHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
-    final photoUrl = repo.personImageUrl(person.id, person.imageTag, width: 300);
+    final photoUrl = repo.personImageUrl(
+      person.id,
+      person.imageTag,
+      width: 300,
+    );
     final life = _lifeLabel(person);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +119,10 @@ class _PersonHeader extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(person.name, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    person.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   if (person.placeOfBirth != null &&
                       person.placeOfBirth!.isNotEmpty) ...[
                     const SizedBox(height: 6),
@@ -135,8 +145,8 @@ class _PersonHeader extends ConsumerWidget {
         ),
         if (person.overview != null && person.overview!.isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(
-            person.overview!,
+          ExpandableText(
+            text: person.overview!,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -230,7 +240,8 @@ class _WorksSkeleton extends StatelessWidget {
           childAspectRatio: 0.55,
         ),
         itemCount: 9,
-        itemBuilder: (_, _) => Skeleton.box(width: double.infinity, height: 180),
+        itemBuilder: (_, _) =>
+            Skeleton.box(width: double.infinity, height: 180),
       ),
     );
   }
