@@ -107,12 +107,7 @@ class _EpisodeBody extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       UserDataActions(
-                        initialFavorite: episode.userData?.isFavorite ?? false,
                         initialPlayed: episode.userData?.played ?? false,
-                        onSetFavorite: (v) async {
-                          await repo.setFavorite(episode.id, favorite: v);
-                          ref.invalidate(episodeProvider(episode.id));
-                        },
                         onSetPlayed: (v) async {
                           await repo.setPlayed(episode.id, played: v);
                           ref.invalidate(episodeProvider(episode.id));
