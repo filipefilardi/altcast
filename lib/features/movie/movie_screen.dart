@@ -150,12 +150,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       UserDataActions(
-                        initialFavorite: movie.userData?.isFavorite ?? false,
                         initialPlayed: movie.userData?.played ?? false,
-                        onSetFavorite: (v) async {
-                          await repo.setFavorite(movie.id, favorite: v);
-                          ref.invalidate(movieProvider(movie.id));
-                        },
                         onSetPlayed: (v) async {
                           await repo.setPlayed(movie.id, played: v);
                           ref.invalidate(movieProvider(movie.id));

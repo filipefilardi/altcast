@@ -195,12 +195,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                   ),
                   const Spacer(),
                   UserDataActions(
-                    initialFavorite: series.userData?.isFavorite ?? false,
                     initialPlayed: series.userData?.played ?? false,
-                    onSetFavorite: (v) async {
-                      await repo.setFavorite(series.id, favorite: v);
-                      ref.invalidate(seriesProvider(series.id));
-                    },
                     onSetPlayed: (v) async {
                       await repo.setPlayed(series.id, played: v);
                       ref.invalidate(seriesProvider(series.id));
