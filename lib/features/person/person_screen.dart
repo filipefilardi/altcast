@@ -89,7 +89,7 @@ class _PersonHeader extends ConsumerWidget {
       person.imageTag,
       width: 300,
     );
-    final life = _lifeLabel(person);
+    final infoRows = _personalInfoRows(person);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -123,20 +123,9 @@ class _PersonHeader extends ConsumerWidget {
                     person.name,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (person.placeOfBirth != null &&
-                      person.placeOfBirth!.isNotEmpty) ...[
+                  if (infoRows.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      person.placeOfBirth!,
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ],
-                  if (life != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      life,
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
+                    ...infoRows,
                   ],
                 ],
               ),
@@ -154,13 +143,62 @@ class _PersonHeader extends ConsumerWidget {
     );
   }
 
-  String? _lifeLabel(PersonDetails p) {
-    final born = p.birthDate;
-    final died = p.deathDate;
-    if (born == null && died == null) return null;
-    final b = born != null ? '${born.year}' : '?';
-    final d = died != null ? '${died.year}' : 'present';
-    return '$b - $d';
+  List<Widget> _personalInfoRows(PersonDetails person) {
+    final rows = <Widget>[];
+    final birthDate = person.birthDate != null
+        ? _formatDate(person.birthDate!)
+        : null;
+    final place = person.placeOfBirth?.trim();
+    final deathDate = person.deathDate != null
+        ? _formatDate(person.deathDate!)
+        : null;
+    if (birthDate != null) {
+      rows.add(_InfoRow(value: birthDate));
+    }
+    if (place != null && place.isNotEmpty) {
+      rows.add(_InfoRow(value: place));
+    }
+    if (deathDate != null) {
+      rows.add(_InfoRow(value: 'Died $deathDate'));
+    }
+    return rows;
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        value,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
   }
 }
 

@@ -486,7 +486,9 @@ class JellyfinRepository {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$personId',
-      queryParameters: const {'Fields': 'Overview'},
+      queryParameters: const {
+        'Fields': 'Overview,PremiereDate,EndDate,ProductionLocations',
+      },
     );
     final data = res.data;
     if (data == null) {
