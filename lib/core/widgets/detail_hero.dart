@@ -49,11 +49,28 @@ class DetailHero extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0.35, 1.0],
+                stops: const [0.15, 0.55, 0.82, 1.0],
                 colors: [
                   AppColors.background.withValues(alpha: 0.0),
+                  AppColors.background.withValues(alpha: 0.34),
+                  AppColors.background.withValues(alpha: 0.8),
                   AppColors.background,
                 ],
+              ),
+            ),
+          ),
+          // Soft bottom vignette to tame very bright backdrops near the title
+          // while keeping enough detail visible above.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, 1.15),
+                radius: 1.08,
+                colors: [
+                  Colors.black.withValues(alpha: 0.46),
+                  Colors.black.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 1.0],
               ),
             ),
           ),
