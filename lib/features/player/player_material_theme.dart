@@ -30,7 +30,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     brightnessGesture: true,
     seekGesture: true,
     gesturesEnabledWhileControlsVisible: true,
-    shiftSubtitlesOnControlsVisibilityChange: true,
+    // Keep captions anchored in a stable position; don't lift them when
+    // controls fade in/out.
+    shiftSubtitlesOnControlsVisibilityChange: false,
     seekOnDoubleTap: true,
     seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
     seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
