@@ -6,6 +6,7 @@ class Series {
   const Series({
     required this.id,
     required this.name,
+    this.tagline,
     this.overview,
     this.year,
     this.endYear,
@@ -22,6 +23,7 @@ class Series {
 
   final String id;
   final String name;
+  final String? tagline;
   final String? overview;
   final int? year;
   final int? endYear;
@@ -49,6 +51,11 @@ class Series {
     final tags = json['ImageTags'];
     final backdrops = json['BackdropImageTags'];
     final people = (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final taglines = (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
+    final firstTagline = taglines.firstWhere(
+      (tagline) => tagline.trim().isNotEmpty,
+      orElse: () => '',
+    );
     final endDate = json['EndDate'] as String?;
     int? endYear;
     if (endDate != null) {
@@ -57,6 +64,9 @@ class Series {
     return Series(
       id: json['Id'] as String,
       name: json['Name'] as String? ?? 'Untitled',
+      tagline: firstTagline.isNotEmpty
+          ? firstTagline
+          : (json['Tagline'] as String?),
       overview: json['Overview'] as String?,
       year: json['ProductionYear'] as int?,
       endYear: endYear,

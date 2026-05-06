@@ -111,6 +111,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
     final hasResume =
         (movie.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
+    final tagline = movie.tagline?.trim();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -149,6 +150,12 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (hasResume)
+                        IconButton(
+                          icon: const Icon(Icons.replay),
+                          tooltip: 'Play from start',
+                          onPressed: () => _play(context, movie, fromStart: true),
+                        ),
                       UserDataActions(
                         initialPlayed: movie.userData?.played ?? false,
                         onSetPlayed: (v) async {
@@ -171,35 +178,6 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   ),
                 ],
               ),
-              if (hasResume)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        'Continues from ${formatDuration(movie.userData!.resumePosition)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textTertiary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => _play(context, movie, fromStart: true),
-                        child: Text(
-                          'Play from start',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               TrackPreferenceRow(
                 itemId: movie.id,
                 preference: _preference,
@@ -222,6 +200,16 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                 const SizedBox(height: 24),
                 Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
+                if (tagline != null && tagline.isNotEmpty) ...[
+                  Text(
+                    tagline,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 ExpandableText(
                   text: movie.overview!,
                   style: Theme.of(context).textTheme.bodyLarge,
