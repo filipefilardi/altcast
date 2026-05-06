@@ -93,10 +93,11 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         ),
       ),
     ],
-    topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    bottomButtonBar: const [
-      Expanded(child: AltCastSplitPositionIndicator()),
-    ],
+    topButtonBarMargin: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 16,
+    ),
+    bottomButtonBar: const [Expanded(child: AltCastSplitPositionIndicator())],
     bottomButtonBarMargin: const EdgeInsets.only(
       left: 16,
       right: 16,
