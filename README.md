@@ -1,6 +1,23 @@
 # AltCast
 
-A Flutter movie & TV-show client for [Jellyfin](https://jellyfin.org/). Sister project to [AltSound](https://github.com/filipefilardi/altsound) — same brand, same architecture, video instead of audio.
+Stream your Jellyfin movies and shows with a clean, modern player.
+
+### Description
+
+AltCast is a modern Jellyfin client for movies and TV shows, built for a fast,
+clean, and enjoyable browsing experience.
+
+Sign in with your Jellyfin server and instantly explore your library with a
+simple, polished interface inspired by the Alt brand.
+
+Current highlights:
+
+- Secure Jellyfin login
+- Home screen with personalized sections
+- Smooth navigation and responsive UI
+
+AltCast is actively evolving, with upcoming improvements including richer
+detail screens, expanded playback features, downloads, and remote casting.
 
 ## Dev
 
