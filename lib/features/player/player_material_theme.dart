@@ -64,7 +64,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     topButtonBar: [
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.close_rounded,
+          icon: Icons.arrow_back_rounded,
           tooltip: 'Close',
           onPressed: () => unawaited(onClosePlayer()),
         ),
@@ -94,10 +94,12 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       ),
     ],
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    bottomButtonBar: const [MaterialPositionIndicator(), Spacer()],
+    bottomButtonBar: const [
+      Expanded(child: AltCastSplitPositionIndicator()),
+    ],
     bottomButtonBarMargin: const EdgeInsets.only(
       left: 16,
-      right: 8,
+      right: 16,
       bottom: 42,
     ),
     seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 42),
@@ -165,6 +167,44 @@ class AltCastPlayerTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Position labels aligned to opposite sides of the controls row:
+/// elapsed on the left, total on the right.
+class AltCastSplitPositionIndicator extends StatelessWidget {
+  const AltCastSplitPositionIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final player = video_ctrl.controller(context).player;
+    return StreamBuilder<Duration>(
+      stream: player.stream.position,
+      initialData: player.state.position,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final duration = player.state.duration;
+        return Row(
+          children: [
+            Text(_formatPlayerTimestamp(position)),
+            const Spacer(),
+            Text(_formatPlayerTimestamp(duration)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+String _formatPlayerTimestamp(Duration value) {
+  if (value.isNegative) value = Duration.zero;
+  final hours = value.inHours;
+  final minutes = value.inMinutes.remainder(60);
+  final seconds = value.inSeconds.remainder(60);
+
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 /// Prefer **system** backlight when allowed (real change on the panel).
