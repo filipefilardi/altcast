@@ -18,7 +18,7 @@ class _DownloadButton extends ConsumerWidget {
     required this.itemId,
     required this.itemName,
     required this.onEnqueue,
-    this.iconSize = 24,
+    this.iconSize = 22,
   });
 
   final String itemId;
@@ -136,12 +136,13 @@ class EpisodeDownloadButton extends ConsumerWidget {
       itemId: episode.id,
       itemName: '$seriesName — ${episode.name}',
       iconSize: 20,
-      onEnqueue: () =>
-          ref.read(downloadManagerProvider.notifier).enqueueEpisode(
-                episode,
-                seriesName: seriesName,
-                seriesPosterTag: seriesPosterTag,
-              ),
+      onEnqueue: () => ref
+          .read(downloadManagerProvider.notifier)
+          .enqueueEpisode(
+            episode,
+            seriesName: seriesName,
+            seriesPosterTag: seriesPosterTag,
+          ),
     );
   }
 }

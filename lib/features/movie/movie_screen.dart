@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/back_chip.dart';
-import '../../core/widgets/cast_crew_row.dart';
+import '../../core/widgets/detail_action_row.dart';
 import '../../core/widgets/detail_hero.dart';
+import '../../core/widgets/detail_sections.dart';
 import '../../core/widgets/error_state.dart';
-import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/genre_chips.dart';
 import '../../core/widgets/meta_pill_row.dart';
-import '../../core/widgets/more_like_this_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/user_data_actions.dart';
@@ -134,48 +132,38 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Wrap so the secondary actions drop to a second line on
-              // narrow phones (long "Resume" labels + 4 trailing icons can
-              // otherwise overflow a single Row).
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 4,
-                children: [
-                  PlayButton(
-                    onPressed: () => _play(context, movie, fromStart: false),
-                    label: hasResume ? 'Resume' : 'Play',
+              DetailActionRow(
+                primary: PlayButton(
+                  onPressed: () => _play(context, movie, fromStart: false),
+                  label: hasResume ? 'Resume' : 'Play',
+                ),
+                actions: [
+                  if (hasResume)
+                    IconButton(
+                      iconSize: 22,
+                      icon: const Icon(Icons.replay),
+                      tooltip: 'Play from start',
+                      onPressed: () => _play(context, movie, fromStart: true),
+                    ),
+                  UserDataActions(
+                    initialPlayed: movie.userData?.played ?? false,
+                    onSetPlayed: (v) async {
+                      await repo.setPlayed(movie.id, played: v);
+                      ref.invalidate(movieProvider(movie.id));
+                    },
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasResume)
-                        IconButton(
-                          icon: const Icon(Icons.replay),
-                          tooltip: 'Play from start',
-                          onPressed: () => _play(context, movie, fromStart: true),
-                        ),
-                      UserDataActions(
-                        initialPlayed: movie.userData?.played ?? false,
-                        onSetPlayed: (v) async {
-                          await repo.setPlayed(movie.id, played: v);
-                          ref.invalidate(movieProvider(movie.id));
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.cast),
-                        tooltip: 'Play on…',
-                        onPressed: () => showRemoteSessionsSheet(
-                          context,
-                          itemId: movie.id,
-                          startPositionTicks:
-                              movie.userData?.playbackPositionTicks ?? 0,
-                        ),
-                      ),
-                      MovieDownloadButton(movie: movie),
-                    ],
+                  IconButton(
+                    iconSize: 22,
+                    icon: const Icon(Icons.cast),
+                    tooltip: 'Play on…',
+                    onPressed: () => showRemoteSessionsSheet(
+                      context,
+                      itemId: movie.id,
+                      startPositionTicks:
+                          movie.userData?.playbackPositionTicks ?? 0,
+                    ),
                   ),
+                  MovieDownloadButton(movie: movie),
                 ],
               ),
               TrackPreferenceRow(
@@ -196,41 +184,13 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   ),
                 ),
               ],
-              if (movie.overview != null && movie.overview!.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text('OVERVIEW', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                if (tagline != null && tagline.isNotEmpty) ...[
-                  Text(
-                    tagline,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                ExpandableText(
-                  text: movie.overview!,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ],
-              if (movie.artists.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text(
-                  'CAST & CREW',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                CastCrewRow(people: movie.artists),
-              ],
-              const SizedBox(height: 24),
-              Text(
-                'MORE LIKE THIS',
-                style: Theme.of(context).textTheme.labelLarge,
+              DetailOverviewSection(
+                overview: movie.overview,
+                tagline: tagline,
+                title: 'OVERVIEW',
               ),
-              const SizedBox(height: 12),
-              MoreLikeThisRow(
+              DetailCastCrewSection(people: movie.artists),
+              DetailMoreLikeThisSection(
                 itemsAsync: similarAsync,
                 currentItemId: movie.id,
               ),
