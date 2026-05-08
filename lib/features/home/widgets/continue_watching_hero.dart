@@ -93,7 +93,7 @@ class _ContinueWatchingHeroState extends ConsumerState<ContinueWatchingHero> {
       children: [
         LayoutBuilder(
           builder: (context, c) {
-            final h = (c.maxWidth * 1.08).clamp(340.0, 520.0);
+            final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
             return SizedBox(
               height: h,
               child: DecoratedBox(
@@ -167,8 +167,8 @@ class _HeroSlide extends ConsumerWidget {
     );
     final progress = item.userData?.progress ?? 0;
     final title = _heroTitle(item);
-    final metadata = _heroMetadata(item, progress);
     final remaining = _heroRemaining(item);
+    final metadata = _heroMetadata(item, remaining);
 
     return Material(
       color: AppColors.surfaceElevated,
@@ -191,12 +191,26 @@ class _HeroSlide extends ConsumerWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: const [0.15, 0.55, 0.82, 1.0],
                 colors: [
-                  Colors.black.withValues(alpha: 0.15),
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.72),
+                  AppColors.background.withValues(alpha: 0.0),
+                  AppColors.background.withValues(alpha: 0.34),
+                  AppColors.background.withValues(alpha: 0.8),
+                  AppColors.background,
                 ],
-                stops: const [0, 0.45, 1],
+              ),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, 1.15),
+                radius: 1.08,
+                colors: [
+                  Colors.black.withValues(alpha: 0.46),
+                  Colors.black.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 1.0],
               ),
             ),
           ),
@@ -285,19 +299,6 @@ class _HeroSlide extends ConsumerWidget {
                                   ),
                                 ),
                               ],
-                              if (remaining.isNotEmpty) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  remaining,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),
@@ -380,7 +381,7 @@ class _ContinueWatchingHeroSkeleton extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             child: LayoutBuilder(
               builder: (context, c) {
-                final h = (c.maxWidth * 1.08).clamp(340.0, 520.0);
+                final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
                 return Skeleton.box(width: c.maxWidth, height: h, radius: 0);
               },
             ),
@@ -434,7 +435,7 @@ String _heroTitle(BrowseItem item) {
   return item.name;
 }
 
-String _heroMetadata(BrowseItem item, double progress) {
+String _heroMetadata(BrowseItem item, String remaining) {
   final parts = <String>[];
   if (item.kind == MediaKind.episode &&
       item.seasonNumber != null &&
@@ -448,9 +449,8 @@ String _heroMetadata(BrowseItem item, double progress) {
     parts.add(item.subtitle!);
   }
 
-  final percent = (progress * 100).round();
-  if (percent > 0) {
-    parts.add('$percent% watched');
+  if (remaining.isNotEmpty) {
+    parts.add(remaining);
   }
   return parts.join(' • ');
 }
