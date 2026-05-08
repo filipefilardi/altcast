@@ -47,7 +47,9 @@ class _UserDataActionsState extends State<UserDataActions> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _played = !next);
-      _showError(next ? "Couldn't mark as watched" : "Couldn't mark as unwatched");
+      _showError(
+        next ? "Couldn't mark as watched" : "Couldn't mark as unwatched",
+      );
     } finally {
       if (mounted) setState(() => _playedBusy = false);
     }
@@ -65,7 +67,7 @@ class _UserDataActionsState extends State<UserDataActions> {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          visualDensity: VisualDensity.compact,
+          iconSize: 22,
           tooltip: _played ? 'Mark as unwatched' : 'Mark as watched',
           onPressed: _togglePlayed,
           icon: Icon(

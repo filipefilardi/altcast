@@ -4,12 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/back_chip.dart';
-import '../../core/widgets/cast_crew_row.dart';
+import '../../core/widgets/detail_action_row.dart';
 import '../../core/widgets/detail_hero.dart';
+import '../../core/widgets/detail_sections.dart';
 import '../../core/widgets/error_state.dart';
-import '../../core/widgets/expandable_text.dart';
 import '../../core/widgets/genre_chips.dart';
-import '../../core/widgets/more_like_this_row.dart';
 import '../../core/widgets/play_button.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/user_data_actions.dart';
@@ -184,22 +183,22 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  PlayButton(
-                    onPressed: next == null
-                        ? null
-                        : () => _playEpisode(
-                            context,
-                            next,
-                            preference: _preference,
-                          ),
-                    label: _playLabel(next),
-                    icon: Icons.play_arrow_rounded,
-                  ),
-                  const Spacer(),
+              DetailActionRow(
+                primary: PlayButton(
+                  onPressed: next == null
+                      ? null
+                      : () => _playEpisode(
+                          context,
+                          next,
+                          preference: _preference,
+                        ),
+                  label: _playLabel(next),
+                  icon: Icons.play_arrow_rounded,
+                ),
+                actions: [
                   if (next != null && nextHasResume)
                     IconButton(
+                      iconSize: 22,
                       icon: const Icon(Icons.replay),
                       tooltip: 'Play from start',
                       onPressed: () => _playEpisode(
@@ -235,23 +234,10 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                     ),
                   ),
                 ),
-              if (series.overview != null && series.overview!.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                if (tagline != null && tagline.isNotEmpty) ...[
-                  Text(
-                    tagline,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                ExpandableText(
-                  text: series.overview!,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ],
+              DetailOverviewSection(
+                overview: series.overview,
+                tagline: tagline,
+              ),
               if (series.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 GenreChips(
@@ -264,22 +250,8 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                   ),
                 ),
               ],
-              if (series.artists.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text(
-                  'CAST & CREW',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                CastCrewRow(people: series.artists),
-              ],
-              const SizedBox(height: 24),
-              Text(
-                'MORE LIKE THIS',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-              MoreLikeThisRow(
+              DetailCastCrewSection(people: series.artists),
+              DetailMoreLikeThisSection(
                 itemsAsync: similarAsync,
                 currentItemId: series.id,
               ),
