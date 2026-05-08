@@ -121,19 +121,50 @@ class DownloadManager extends Notifier<DownloadsState> {
     required String seriesName,
     String? seriesPosterTag,
   }) async {
-    if (state.items.containsKey(episode.id)) return;
-    if (state.isDownloading(episode.id)) return;
     final entry = _QueueEntry.episode(
       episode,
       seriesName: seriesName,
       seriesPosterTag: seriesPosterTag,
     );
-    _queue.add(entry);
+    _enqueueEntries([entry]);
+  }
+
+  /// Enqueue a group of episodes, skipping anything already downloaded or in
+  /// progress. Used by season/series download controls.
+  Future<int> enqueueEpisodes(
+    List<Episode> episodes, {
+    required String seriesName,
+    String? seriesPosterTag,
+  }) async {
+    final entries = episodes
+        .map(
+          (episode) => _QueueEntry.episode(
+            episode,
+            seriesName: seriesName,
+            seriesPosterTag: seriesPosterTag,
+          ),
+        )
+        .toList(growable: false);
+    return _enqueueEntries(entries);
+  }
+
+  int _enqueueEntries(List<_QueueEntry> entries) {
+    final fresh = entries
+        .where((entry) => !state.items.containsKey(entry.itemId))
+        .where((entry) => !state.isDownloading(entry.itemId))
+        .toList(growable: false);
+    if (fresh.isEmpty) return 0;
+
+    _queue.addAll(fresh);
     state = state.copyWith(
-      progress: {...state.progress, episode.id: entry.toProgress(0)},
-      queueLength: state.queueLength + 1,
+      progress: {
+        ...state.progress,
+        for (final entry in fresh) entry.itemId: entry.toProgress(0),
+      },
+      queueLength: state.queueLength + fresh.length,
     );
     _drain();
+    return fresh.length;
   }
 
   /// Cancel a running or queued download.
@@ -286,10 +317,13 @@ class DownloadManager extends Notifier<DownloadsState> {
 
   Future<Directory> _downloadsDir() async {
     final prefs = ref.read(downloadPreferencesProvider);
-    
+
     Directory? baseDir;
-    if (Platform.isAndroid && prefs.downloadLocation == DownloadLocation.external) {
-      final externals = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+    if (Platform.isAndroid &&
+        prefs.downloadLocation == DownloadLocation.external) {
+      final externals = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
       // Pick the first one that isn't the primary internal storage if possible,
       // though getExternalStorageDirectories usually returns internal first.
       // This is a simplified heuristic.
@@ -301,7 +335,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     }
 
     baseDir ??= await getApplicationDocumentsDirectory();
-    
+
     final dir = Directory('${baseDir.path}/downloads');
     if (!dir.existsSync()) await dir.create(recursive: true);
     return dir;
@@ -386,14 +420,14 @@ class _QueueEntry {
   }
 
   DownloadProgress toProgress(double fraction) => DownloadProgress(
-        itemId: itemId,
-        name: name,
-        fraction: fraction,
-        kind: kind,
-        imageTag: imageTag,
-        seriesId: seriesId,
-        seriesName: seriesName,
-        seasonNumber: seasonNumber,
-        episodeNumber: episodeNumber,
-      );
+    itemId: itemId,
+    name: name,
+    fraction: fraction,
+    kind: kind,
+    imageTag: imageTag,
+    seriesId: seriesId,
+    seriesName: seriesName,
+    seasonNumber: seasonNumber,
+    episodeNumber: episodeNumber,
+  );
 }

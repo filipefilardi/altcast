@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/downloads/download_manager.dart';
+import '../../../data/jellyfin/jellyfin_repository.dart';
 import '../../../data/jellyfin/models/episode.dart';
 import '../../../data/jellyfin/models/movie.dart';
+import '../../../data/jellyfin/models/series.dart';
 
 /// Generic three-state download control:
 ///  - idle: outlined download icon, taps [onEnqueue].
@@ -145,4 +147,102 @@ class EpisodeDownloadButton extends ConsumerWidget {
           ),
     );
   }
+}
+
+class SeriesDownloadButton extends ConsumerStatefulWidget {
+  const SeriesDownloadButton({
+    super.key,
+    required this.series,
+    required this.seasons,
+  });
+
+  final Series series;
+  final List<Season> seasons;
+
+  @override
+  ConsumerState<SeriesDownloadButton> createState() =>
+      _SeriesDownloadButtonState();
+}
+
+class _SeriesDownloadButtonState extends ConsumerState<SeriesDownloadButton> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_busy) {
+      return const SizedBox(
+        width: 48,
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    return IconButton(
+      iconSize: 22,
+      icon: const Icon(Icons.download_outlined),
+      tooltip: 'Download series',
+      onPressed: widget.seasons.isEmpty ? null : _downloadSeries,
+    );
+  }
+
+  Future<void> _downloadSeries() async {
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(jellyfinRepositoryProvider);
+      final seasonEpisodes = await Future.wait(
+        widget.seasons.map(
+          (season) => repo.getEpisodes(widget.series.id, season.id),
+        ),
+      );
+      final episodes = seasonEpisodes
+          .expand((season) => season)
+          .toList(growable: false);
+      final queued = await ref
+          .read(downloadManagerProvider.notifier)
+          .enqueueEpisodes(
+            episodes,
+            seriesName: widget.series.name,
+            seriesPosterTag: widget.series.imageTag,
+          );
+      if (!mounted) return;
+      _showBatchQueuedSnackBar(
+        ScaffoldMessenger.of(context),
+        queued,
+        widget.series.name,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text("Couldn't queue ${widget.series.name}")),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+void _showBatchQueuedSnackBar(
+  ScaffoldMessengerState messenger,
+  int queued,
+  String label,
+) {
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          queued == 0
+              ? '$label is already downloaded or queued.'
+              : 'Queued $queued episode${queued == 1 ? '' : 's'} from $label.',
+        ),
+      ),
+    );
 }
