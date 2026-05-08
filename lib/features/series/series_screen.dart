@@ -17,6 +17,7 @@ import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/jellyfin/models/series.dart';
 import '../../data/local/playback_preferences.dart';
+import '../downloads/widgets/download_button.dart';
 import 'series_providers.dart';
 import 'widgets/episode_tile.dart';
 import 'widgets/season_picker.dart';
@@ -215,6 +216,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                       ref.invalidate(seriesProvider(series.id));
                     },
                   ),
+                  SeriesDownloadButton(series: series, seasons: seasons),
                 ],
               ),
               TrackPreferenceRow(
