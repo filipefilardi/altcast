@@ -337,13 +337,6 @@ class _ResumePill extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: AppGradients.accent,
         borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: const Padding(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
