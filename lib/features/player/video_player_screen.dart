@@ -280,13 +280,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       await _applyPlaybackRate(_playbackRate);
       await _applySubtitleOffset(_subtitleOffset);
       _attachScrobbler();
-      final syncState = ref.read(syncPlayControllerProvider);
-      if (syncState.activeGroup != null &&
-          syncState.currentItemId == widget.itemId) {
-        await ref
-            .read(syncPlayControllerProvider.notifier)
-            .ready(position: _lastPosition, isPlaying: play);
-      }
+      await _publishSyncPlayOpenIfNeeded(isPlaying: play);
 
       // Wait until media_kit has populated the tracks lists. This is more
       // robust than a fixed delay, especially for slow network streams
@@ -766,6 +760,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
     _lastSyncSeekSentAt = now;
     await ref.read(syncPlayControllerProvider.notifier).seek(position);
+  }
+
+  Future<void> _publishSyncPlayOpenIfNeeded({required bool isPlaying}) async {
+    if (!_syncPlayActive) return;
+    final state = ref.read(syncPlayControllerProvider);
+    final controller = ref.read(syncPlayControllerProvider.notifier);
+    if (state.currentItemId != widget.itemId) {
+      await controller.setCurrentVideo(
+        widget.itemId,
+        startPosition: _lastPosition,
+      );
+      if (!isPlaying) {
+        await controller.pause();
+      }
+      return;
+    }
+    await controller.ready(position: _lastPosition, isPlaying: isPlaying);
   }
 
   void _maybeShowNextUp() {
