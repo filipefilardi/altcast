@@ -4,8 +4,9 @@ import 'auth_repository.dart';
 import 'jellyfin_api.dart';
 import 'models/remote_session.dart';
 
-final remoteSessionsRepositoryProvider =
-    Provider<RemoteSessionsRepository>((ref) {
+final remoteSessionsRepositoryProvider = Provider<RemoteSessionsRepository>((
+  ref,
+) {
   return RemoteSessionsRepository(ref.watch(jellyfinApiProvider));
 });
 
@@ -15,19 +16,24 @@ class RemoteSessionsRepository {
   RemoteSessionsRepository(this._api);
   final JellyfinApi _api;
 
-  /// All remote-controllable sessions other than ours, currently active.
+  /// All remote-controllable sessions for this user, excluding this device.
   Future<List<RemoteSession>> listSessions() async {
+    final ownUserId = _api.session?.userId;
+    if (ownUserId == null) return const [];
     final res = await _api.dio.get<List<dynamic>>(
       '/Sessions',
-      queryParameters: {'ActiveWithinSeconds': 360},
+      queryParameters: {'ControllableByUserId': ownUserId},
     );
-    final mine = _api.deviceId;
+    final ownDeviceId = _api.deviceId;
     return (res.data ?? const [])
         .cast<Map<String, dynamic>>()
         .map(RemoteSession.fromJson)
-        .where((s) => s.supportsRemoteControl)
-        // Don't list our own session — picking it would be a no-op loop.
-        .where((s) => s.id != mine)
+        .where(
+          (s) =>
+              s.supportsRemoteControl &&
+              s.deviceId != ownDeviceId &&
+              s.userId == ownUserId,
+        )
         .toList();
   }
 
@@ -56,6 +62,19 @@ class RemoteSessionsRepository {
     return _api.dio.post<void>('/Sessions/$sessionId/Playing/$command');
   }
 
+  Future<void> playPause(String sessionId) =>
+      sendCommand(sessionId: sessionId, command: 'PlayPause');
+
+  Future<void> stop(String sessionId) =>
+      sendCommand(sessionId: sessionId, command: 'Stop');
+
+  Future<void> seek(String sessionId, Duration position) {
+    return seekOnSession(
+      sessionId: sessionId,
+      positionTicks: position.inMicroseconds * 10,
+    );
+  }
+
   Future<void> seekOnSession({
     required String sessionId,
     required int positionTicks,
@@ -63,6 +82,30 @@ class RemoteSessionsRepository {
     return _api.dio.post<void>(
       '/Sessions/$sessionId/Playing/Seek',
       queryParameters: {'SeekPositionTicks': positionTicks},
+    );
+  }
+
+  Future<void> setVolume(String sessionId, int volume) {
+    return _generalCommand(sessionId, 'SetVolume', {
+      'Volume': volume.clamp(0, 100).toString(),
+    });
+  }
+
+  Future<void> setMute(String sessionId, {required bool muted}) {
+    return _generalCommand(sessionId, muted ? 'Mute' : 'Unmute');
+  }
+
+  Future<void> _generalCommand(
+    String sessionId,
+    String name, [
+    Map<String, String>? arguments,
+  ]) {
+    return _api.dio.post<void>(
+      '/Sessions/$sessionId/Command',
+      data: {
+        'Name': name,
+        ...?arguments == null ? null : {'Arguments': arguments},
+      },
     );
   }
 }
