@@ -253,10 +253,11 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
     final repo = ref.watch(remoteSessionsRepositoryProvider);
     final session = widget.session;
     final totalTicks = session.runTimeTicks ?? 0;
-    final liveTicks = session.positionTicks ?? 0;
+    final liveMicroseconds = session.estimatedPosition()?.inMicroseconds ?? 0;
     final hasDuration = totalTicks > 0;
     final value =
-        _scrubOverride ?? (hasDuration ? liveTicks / totalTicks : 0.0);
+        _scrubOverride ??
+        (hasDuration ? (liveMicroseconds * 10) / totalTicks : 0.0);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -289,10 +290,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                   color: AppColors.primary,
                 ),
                 tooltip: session.isPaused ? 'Play' : 'Pause',
-                onPressed: () => repo.sendCommand(
-                  sessionId: session.id,
-                  command: 'PlayPause',
-                ),
+                onPressed: () => repo.playPause(session.id),
               ),
               IconButton(
                 icon: const Icon(
@@ -300,11 +298,47 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                   color: AppColors.textSecondary,
                 ),
                 tooltip: 'Stop',
-                onPressed: () =>
-                    repo.sendCommand(sessionId: session.id, command: 'Stop'),
+                onPressed: () => repo.stop(session.id),
               ),
             ],
           ),
+          if (session.volumeLevel != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    session.isMuted
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  tooltip: session.isMuted ? 'Unmute' : 'Mute',
+                  onPressed: () =>
+                      repo.setMute(session.id, muted: !session.isMuted),
+                ),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 5,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
+                    ),
+                    child: Slider(
+                      min: 0,
+                      max: 100,
+                      value: session.volumeLevel!.clamp(0, 100).toDouble(),
+                      onChanged: (v) => repo.setVolume(session.id, v.round()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (hasDuration) ...[
             // Scrub bar — Slider.theme honors AppTheme so it picks up the
             // accent + height we set globally. Using the raw widget so we

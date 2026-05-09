@@ -11,13 +11,16 @@ const _appVersion = '0.0.1';
 
 class JellyfinApi {
   JellyfinApi({Dio? dio, String? deviceId})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               connectTimeout: const Duration(seconds: 5),
               receiveTimeout: const Duration(seconds: 10),
               sendTimeout: const Duration(seconds: 10),
-            )),
-        _deviceId = deviceId ?? const Uuid().v4();
+            ),
+          ),
+      _deviceId = deviceId ?? const Uuid().v4();
 
   final Dio _dio;
   final String _deviceId;
@@ -28,12 +31,16 @@ class JellyfinApi {
   /// Used to identify (and filter out) our own session in `/Sessions` listings.
   String get deviceId => _deviceId;
 
+  String get authorizationHeader => _authHeader(token: _session?.accessToken);
+
   JellyfinSession? _session;
 
   void bind(JellyfinSession session) {
     _session = session;
     _dio.options.baseUrl = _normalizeBase(session.serverUrl);
-    _dio.options.headers['Authorization'] = _authHeader(token: session.accessToken);
+    _dio.options.headers['Authorization'] = _authHeader(
+      token: session.accessToken,
+    );
   }
 
   void clear() {
@@ -66,7 +73,8 @@ class JellyfinApi {
 
   String _normalizeBase(String url) {
     var normalized = url.trim();
-    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    if (!normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')) {
       normalized = 'https://$normalized';
     }
     if (normalized.endsWith('/')) {
@@ -84,10 +92,12 @@ class JellyfinApi {
     final response = await _dio.post<Map<String, dynamic>>(
       '$base/Users/AuthenticateByName',
       data: {'Username': username, 'Pw': password},
-      options: Options(headers: {
-        'Authorization': _authHeader(),
-        'Content-Type': 'application/json',
-      }),
+      options: Options(
+        headers: {
+          'Authorization': _authHeader(),
+          'Content-Type': 'application/json',
+        },
+      ),
     );
 
     final data = response.data;

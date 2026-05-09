@@ -15,10 +15,12 @@ import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
+import '../../data/jellyfin/models/syncplay.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
 import '../remote/remote_sessions_sheet.dart';
+import '../syncplay/syncplay_controller.dart';
 import 'player_material_theme.dart';
 import 'scrobbler.dart';
 import 'widgets/next_up_card.dart';
@@ -81,6 +83,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     this.seriesId,
     this.seasonNumber,
     this.episodeNumber,
+    this.syncPlayStartPlaying,
   });
 
   final String itemId;
@@ -101,6 +104,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String? seriesId;
   final int? seasonNumber;
   final int? episodeNumber;
+  final bool? syncPlayStartPlaying;
 
   @override
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -149,6 +153,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
+  bool _applyingSyncPlayCommand = false;
+  int _lastSyncQueueSerial = 0;
+  int _lastSyncCommandSerial = 0;
+  String? _lastSyncCommandKey;
+  DateTime? _lastSyncCommandAt;
+  DateTime? _lastSyncSeekSentAt;
 
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
   /// completes. Exposed as a [ValueNotifier] so the tracks sheet can
@@ -199,7 +209,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     unawaited(_prepareScreenBrightnessForGestures());
 
     unawaited(_loadPlayerTitle());
-    _open();
+    _open(play: widget.syncPlayStartPlaying ?? true);
   }
 
   Future<void> _loadPlayerTitle() async {
@@ -270,6 +280,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       await _applyPlaybackRate(_playbackRate);
       await _applySubtitleOffset(_subtitleOffset);
       _attachScrobbler();
+      final syncState = ref.read(syncPlayControllerProvider);
+      if (syncState.activeGroup != null &&
+          syncState.currentItemId == widget.itemId) {
+        await ref
+            .read(syncPlayControllerProvider.notifier)
+            .ready(position: _lastPosition, isPlaying: play);
+      }
 
       // Wait until media_kit has populated the tracks lists. This is more
       // robust than a fixed delay, especially for slow network streams
@@ -673,6 +690,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           );
         });
       }
+      if (!_applyingSyncPlayCommand) {
+        unawaited(_publishSyncPlayPlaying(playing));
+      }
       if (mounted) _syncIntroSkipperOverlay(_lastPosition);
     });
 
@@ -701,10 +721,51 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _durationSub = _player.stream.duration.listen((d) => _mediaDuration = d);
     _positionSub?.cancel();
     _positionSub = _player.stream.position.listen((p) {
+      final previous = _lastPosition;
       _lastPosition = p;
+      if (!_applyingSyncPlayCommand) {
+        unawaited(_maybePublishSyncPlaySeek(previous, p));
+      }
       _maybeShowNextUp();
       if (mounted) _syncIntroSkipperOverlay(p);
     });
+  }
+
+  bool get _syncPlayActive =>
+      ref.read(syncPlayControllerProvider).activeGroup != null;
+
+  Future<void> _publishSyncPlayPlaying(bool playing) async {
+    if (!_syncPlayActive) return;
+    final state = ref.read(syncPlayControllerProvider);
+    final controller = ref.read(syncPlayControllerProvider.notifier);
+    if (state.currentItemId != widget.itemId) {
+      await controller.setCurrentVideo(
+        widget.itemId,
+        startPosition: _lastPosition,
+      );
+    }
+    if (playing) {
+      await controller.unpause();
+    } else {
+      await controller.pause();
+    }
+  }
+
+  Future<void> _maybePublishSyncPlaySeek(
+    Duration previous,
+    Duration position,
+  ) async {
+    if (!_syncPlayActive || previous <= Duration.zero) return;
+    final jump = (position - previous).abs();
+    if (jump < const Duration(seconds: 3)) return;
+    final now = DateTime.now();
+    final lastSentAt = _lastSyncSeekSentAt;
+    if (lastSentAt != null &&
+        now.difference(lastSentAt) < const Duration(milliseconds: 700)) {
+      return;
+    }
+    _lastSyncSeekSentAt = now;
+    await ref.read(syncPlayControllerProvider.notifier).seek(position);
   }
 
   void _maybeShowNextUp() {
@@ -894,6 +955,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<SyncPlayState>(
+      syncPlayControllerProvider,
+      _handleSyncPlayStateChange,
+    );
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
       onClosePlayer: _closePlayer,
@@ -1010,6 +1075,137 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   void _hideControlOverlay() {
     _controlOverlayNotifier.value = _PlayerControlOverlay.none;
+  }
+
+  void _handleSyncPlayStateChange(SyncPlayState? previous, SyncPlayState next) {
+    final queue = next.queueEvent;
+    if (queue != null && queue.serial != _lastSyncQueueSerial) {
+      _lastSyncQueueSerial = queue.serial;
+      unawaited(_applySyncPlayQueue(queue));
+    }
+
+    final command = next.commandEvent;
+    if (command != null && command.serial != _lastSyncCommandSerial) {
+      _lastSyncCommandSerial = command.serial;
+      unawaited(_applySyncPlayCommand(command.command));
+    }
+  }
+
+  Future<void> _applySyncPlayQueue(SyncPlayVideoQueueEvent event) async {
+    if (!mounted) return;
+    if (event.itemId != widget.itemId) {
+      final uri = Uri(
+        path: '/play/${event.itemId}',
+        queryParameters: {
+          'resumeTicks': '${event.position.inMilliseconds * _ticksPerMs}',
+          'syncPlayPlaying': event.isPlaying ? '1' : '0',
+        },
+      );
+      context.go(uri.toString());
+      return;
+    }
+    _applyingSyncPlayCommand = true;
+    try {
+      await _player.seek(event.position);
+      if (event.isPlaying) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+      await ref
+          .read(syncPlayControllerProvider.notifier)
+          .ready(position: event.position, isPlaying: event.isPlaying);
+    } finally {
+      _applyingSyncPlayCommand = false;
+    }
+  }
+
+  Future<void> _applySyncPlayCommand(SyncPlayCommand command) async {
+    if (!mounted || _isDuplicateSyncPlayCommand(command)) return;
+    final targetPlaylistItemId = ref
+        .read(syncPlayControllerProvider)
+        .currentPlaylistItemId;
+    final commandPlaylistItemId = command.playlistItemId;
+    final itemIsWildcard =
+        commandPlaylistItemId == null ||
+        commandPlaylistItemId.isEmpty ||
+        commandPlaylistItemId == '00000000000000000000000000000000';
+    if (command.command != 'Stop' &&
+        !itemIsWildcard &&
+        commandPlaylistItemId != targetPlaylistItemId) {
+      return;
+    }
+
+    final delay = _syncPlayDelayUntil(command.when);
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
+    if (!mounted) return;
+
+    _applyingSyncPlayCommand = true;
+    try {
+      final targetPosition = _adjustedSyncPlayPosition(command);
+      switch (command.command) {
+        case 'Unpause':
+          if (targetPosition != null) await _player.seek(targetPosition);
+          await _player.play();
+          break;
+        case 'Pause':
+          if (targetPosition != null) await _player.seek(targetPosition);
+          await _player.pause();
+          break;
+        case 'Seek':
+          if (targetPosition != null) await _player.seek(targetPosition);
+          await ref
+              .read(syncPlayControllerProvider.notifier)
+              .ready(
+                position: targetPosition ?? _lastPosition,
+                isPlaying: _player.state.playing,
+              );
+          break;
+        case 'Stop':
+          await _player.pause();
+          break;
+      }
+    } finally {
+      _applyingSyncPlayCommand = false;
+    }
+  }
+
+  bool _isDuplicateSyncPlayCommand(SyncPlayCommand command) {
+    final key = [
+      command.command,
+      command.playlistItemId ?? '',
+      command.position?.inMilliseconds ?? '',
+      command.when?.toIso8601String() ?? '',
+    ].join('|');
+    final now = DateTime.now();
+    final lastAt = _lastSyncCommandAt;
+    final duplicate =
+        _lastSyncCommandKey == key &&
+        lastAt != null &&
+        now.difference(lastAt) < const Duration(seconds: 2);
+    _lastSyncCommandKey = key;
+    _lastSyncCommandAt = now;
+    return duplicate;
+  }
+
+  Duration _syncPlayDelayUntil(DateTime? when) {
+    if (when == null) return Duration.zero;
+    final delay = when.difference(DateTime.now().toUtc());
+    if (delay <= Duration.zero) return Duration.zero;
+    return delay > const Duration(seconds: 20)
+        ? const Duration(seconds: 20)
+        : delay;
+  }
+
+  Duration? _adjustedSyncPlayPosition(SyncPlayCommand command) {
+    final position = command.position;
+    if (position == null) return null;
+    if (command.command != 'Unpause' || command.when == null) return position;
+    final elapsed = DateTime.now().toUtc().difference(command.when!);
+    if (elapsed <= Duration.zero) return position;
+    return position + elapsed;
   }
 
   void _showCastSheet(BuildContext context) {

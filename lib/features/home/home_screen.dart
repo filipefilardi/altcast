@@ -10,6 +10,8 @@ import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../auth/auth_controller.dart';
 import '../remote/remote_sessions_sheet.dart';
+import '../syncplay/syncplay_controller.dart';
+import '../syncplay/syncplay_sheet.dart';
 import 'home_providers.dart';
 import 'widgets/continue_watching_hero.dart';
 import 'widgets/poster_card.dart';
@@ -126,14 +128,15 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends ConsumerWidget {
   const _HomeHeader({this.username});
 
   final String? username;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final title = username == null || username!.isEmpty ? 'Home' : username!;
+    final syncPlayActive = ref.watch(syncPlayControllerProvider).isActive;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -154,6 +157,12 @@ class _HomeHeader extends StatelessWidget {
               icon: Icons.search_rounded,
               tooltip: 'Search',
               onPressed: () => context.push('/search'),
+            ),
+            _NavIconButton(
+              icon: Icons.groups_rounded,
+              tooltip: 'SyncPlay',
+              isSelected: syncPlayActive,
+              onPressed: () => showSyncPlaySheet(context),
             ),
             _NavIconButton(
               icon: Icons.cast_rounded,
@@ -182,21 +191,25 @@ class _NavIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.isSelected = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: onPressed,
       icon: Icon(icon, size: 21),
-      color: AppColors.textPrimary,
+      color: isSelected ? AppColors.primary : AppColors.textPrimary,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        backgroundColor: AppColors.surfaceElevated,
+        backgroundColor: isSelected
+            ? AppColors.primary.withValues(alpha: 0.16)
+            : AppColors.surfaceElevated,
         minimumSize: const Size(40, 40),
         fixedSize: const Size(40, 40),
         padding: EdgeInsets.zero,
