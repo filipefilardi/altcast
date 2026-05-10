@@ -11,7 +11,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../data/jellyfin/jellyfin_repository.dart';
 import '../../../data/jellyfin/models/browse_item.dart';
 
-/// Home “Continue watching” block: section label, loading / error / hero, and
+/// Home “Keep watching” block: section label, loading / error / content, and
 /// trailing spacing (24 px) for the next shelf.
 class ContinueWatchingShelf extends StatelessWidget {
   const ContinueWatchingShelf({
@@ -34,6 +34,13 @@ class ContinueWatchingShelf extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'KEEP WATCHING',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+        ),
         if (itemsAsync.isLoading)
           const _ContinueWatchingHeroSkeleton()
         else if (itemsAsync.hasError)
@@ -52,8 +59,8 @@ class ContinueWatchingShelf extends StatelessWidget {
   }
 }
 
-/// Full-width 16:9 hero with scrim, progress, and resume affordance; swipe
-/// when there is more than one in-progress title.
+/// Compact desktop shelf, plus a swipeable mobile hero when there is more than
+/// one in-progress title.
 class ContinueWatchingHero extends ConsumerStatefulWidget {
   const ContinueWatchingHero({
     super.key,
@@ -88,65 +95,288 @@ class _ContinueWatchingHeroState extends ConsumerState<ContinueWatchingHero> {
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        LayoutBuilder(
-          builder: (context, c) {
-            final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
-            return SizedBox(
-              height: h,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 28,
-                      offset: const Offset(0, 14),
+    return LayoutBuilder(
+      builder: (context, c) {
+        if (c.maxWidth >= 900) {
+          return _ContinueWatchingRail(items: items, onOpen: widget.onOpen);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Builder(
+              builder: (context) {
+                final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
+                return SizedBox(
+                  height: h,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 28,
+                          offset: const Offset(0, 14),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: items.length,
-                    onPageChanged: (i) => setState(() => _page = i),
-                    itemBuilder: (context, i) => _HeroSlide(
-                      item: items[i],
-                      onOpenDetail: () => widget.onOpen(items[i]),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: items.length,
+                        onPageChanged: (i) => setState(() => _page = i),
+                        itemBuilder: (context, i) => _HeroSlide(
+                          item: items[i],
+                          onOpenDetail: () => widget.onOpen(items[i]),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (items.length > 1) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  items.length,
+                  (i) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: i == _page ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: i == _page
+                            ? AppColors.primary
+                            : AppColors.textTertiary.withValues(alpha: 0.45),
+                      ),
                     ),
                   ),
                 ),
               ),
-            );
-          },
-        ),
-        if (items.length > 1) ...[
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              items.length,
-              (i) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: i == _page ? 18 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: i == _page
-                        ? AppColors.primary
-                        : AppColors.textTertiary.withValues(alpha: 0.45),
-                  ),
-                ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ContinueWatchingRail extends StatelessWidget {
+  const _ContinueWatchingRail({required this.items, required this.onOpen});
+
+  final List<BrowseItem> items;
+  final void Function(BrowseItem item) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        const spacing = 12.0;
+        final cardWidth = _desktopContinueCardWidth(c.maxWidth);
+
+        return SizedBox(
+          height: cardWidth * 9 / 16,
+          child: ListView.separated(
+            primary: false,
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: spacing),
+            itemBuilder: (context, i) => SizedBox(
+              width: cardWidth,
+              child: _ContinueWatchingCard(
+                item: items[i],
+                onOpenDetail: () => onOpen(items[i]),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+double _desktopContinueCardWidth(double availableWidth) {
+  const spacing = 12.0;
+  final visibleCards = availableWidth >= 1400 ? 5 : 4;
+  final rawWidth =
+      (availableWidth - (spacing * (visibleCards - 1))) / visibleCards;
+  return rawWidth.clamp(260.0, 360.0);
+}
+
+class _ContinueWatchingCard extends ConsumerWidget {
+  const _ContinueWatchingCard({required this.item, required this.onOpenDetail});
+
+  final BrowseItem item;
+  final VoidCallback onOpenDetail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.watch(jellyfinRepositoryProvider);
+    final url = repo.backdropUrl(
+      item.id,
+      item.backdropTag,
+      fallbackPrimaryTag: item.imageTag,
+    );
+    final progress = item.userData?.progress ?? 0;
+    final title = _heroTitle(item);
+    final remaining = _heroRemaining(item);
+    final metadata = _heroMetadata(item, remaining);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.42),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
-      ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: AppColors.surfaceElevated,
+          child: InkWell(
+            onTap: onOpenDetail,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                LocalOrNetworkImage(
+                  source: url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_) => const Center(
+                    child: Icon(
+                      Icons.movie_outlined,
+                      color: AppColors.textTertiary,
+                      size: 32,
+                    ),
+                  ),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.2, 0.58, 1.0],
+                      colors: [
+                        AppColors.background.withValues(alpha: 0.02),
+                        AppColors.background.withValues(alpha: 0.34),
+                        AppColors.background.withValues(alpha: 0.92),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 16,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                height: 1.18,
+                              ),
+                            ),
+                            if (metadata.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                metadata,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => _openContinueWatchingResume(
+                          context,
+                          item,
+                          onOpenDetail,
+                        ),
+                        child: const _CompactResumeButton(),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: SizedBox(
+                    height: 4,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColoredBox(
+                          color: AppColors.background.withValues(alpha: 0.62),
+                        ),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: progress.clamp(0, 1).toDouble(),
+                          child: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: AppGradients.accentHorizontal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactResumeButton extends StatelessWidget {
+  const _CompactResumeButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: AppGradients.accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const SizedBox(
+        width: 38,
+        height: 38,
+        child: Icon(
+          Icons.play_arrow_rounded,
+          color: AppColors.onAccent,
+          size: 25,
+        ),
+      ),
     );
   }
 }
@@ -366,21 +596,42 @@ class _ContinueWatchingHeroSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Skeleton.group(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
-                return Skeleton.box(width: c.maxWidth, height: h, radius: 0);
-              },
-            ),
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, c) {
+        return Skeleton.group(
+          child: c.maxWidth >= 900
+              ? SizedBox(
+                  height: _desktopContinueCardWidth(c.maxWidth) * 9 / 16,
+                  child: ListView.separated(
+                    primary: false,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 5,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (_, _) {
+                      final cardWidth = _desktopContinueCardWidth(c.maxWidth);
+                      return Skeleton.box(
+                        width: cardWidth,
+                        height: cardWidth * 9 / 16,
+                        radius: 12,
+                      );
+                    },
+                  ),
+                )
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Builder(
+                    builder: (context) {
+                      final h = (c.maxWidth * 0.62).clamp(220.0, 360.0);
+                      return Skeleton.box(
+                        width: c.maxWidth,
+                        height: h,
+                        radius: 0,
+                      );
+                    },
+                  ),
+                ),
+        );
+      },
     );
   }
 }
