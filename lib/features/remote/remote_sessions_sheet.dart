@@ -126,6 +126,7 @@ class _SessionRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final canCast = itemId != null;
+    final isActive = ref.watch(activeRemoteSessionIdProvider) == session.id;
     return InkWell(
       onTap: canCast ? () => _cast(context, ref) : null,
       child: Padding(
@@ -166,7 +167,9 @@ class _SessionRow extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (canCast)
+                if (isActive)
+                  const Icon(Icons.check_rounded, color: AppColors.primary)
+                else if (canCast)
                   const Icon(Icons.cast, color: AppColors.textTertiary),
               ],
             ),
@@ -189,6 +192,7 @@ class _SessionRow extends ConsumerWidget {
         itemId: itemId!,
         startPositionTicks: startPositionTicks ?? 0,
       );
+      ref.read(activeRemoteSessionIdProvider.notifier).set(session.id);
       if (!context.mounted) return;
       Navigator.of(context).pop();
       messenger.hideCurrentSnackBar();
@@ -198,8 +202,10 @@ class _SessionRow extends ConsumerWidget {
           duration: const Duration(seconds: 3),
           action: SnackBarAction(
             label: 'Stop',
-            onPressed: () =>
-                repo.sendCommand(sessionId: session.id, command: 'Stop'),
+            onPressed: () async {
+              await repo.stop(session.id);
+              ref.read(activeRemoteSessionIdProvider.notifier).clear();
+            },
           ),
         ),
       );
@@ -252,6 +258,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
   Widget build(BuildContext context) {
     final repo = ref.watch(remoteSessionsRepositoryProvider);
     final session = widget.session;
+    final isActive = ref.watch(activeRemoteSessionIdProvider) == session.id;
     final totalTicks = session.runTimeTicks ?? 0;
     final liveMicroseconds = session.estimatedPosition()?.inMicroseconds ?? 0;
     final hasDuration = totalTicks > 0;
@@ -298,7 +305,12 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                   color: AppColors.textSecondary,
                 ),
                 tooltip: 'Stop',
-                onPressed: () => repo.stop(session.id),
+                onPressed: () async {
+                  await repo.stop(session.id);
+                  if (isActive) {
+                    ref.read(activeRemoteSessionIdProvider.notifier).clear();
+                  }
+                },
               ),
             ],
           ),

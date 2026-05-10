@@ -9,6 +9,7 @@ import '../../core/widgets/error_state.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../data/jellyfin/models/browse_item.dart';
 import '../auth/auth_controller.dart';
+import '../remote/remote_providers.dart';
 import '../remote/remote_sessions_sheet.dart';
 import '../syncplay/syncplay_controller.dart';
 import '../syncplay/syncplay_sheet.dart';
@@ -137,6 +138,7 @@ class _HomeHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final title = username == null || username!.isEmpty ? 'Home' : username!;
     final syncPlayActive = ref.watch(syncPlayControllerProvider).isActive;
+    final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -167,6 +169,7 @@ class _HomeHeader extends ConsumerWidget {
             _NavIconButton(
               icon: Icons.cast_rounded,
               tooltip: 'Cast',
+              isSelected: castActive,
               onPressed: () => showRemoteSessionsSheet(context),
             ),
             _NavIconButton(

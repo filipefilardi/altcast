@@ -20,6 +20,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenTracks,
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
+  required bool isCastActive,
   required void Function(BuildContext origin) onOpenSyncPlay,
   required bool isSyncPlayActive,
   required String title,
@@ -77,6 +78,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         builder: (ctx) => AltCastChromeIconButton(
           icon: Icons.cast_rounded,
           tooltip: 'Cast',
+          color: isCastActive ? AppColors.primary : null,
           onPressed: () => onOpenCast(ctx),
         ),
       ),
