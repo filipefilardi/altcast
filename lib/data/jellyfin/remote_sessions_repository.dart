@@ -24,17 +24,25 @@ class RemoteSessionsRepository {
       '/Sessions',
       queryParameters: {'ControllableByUserId': ownUserId},
     );
+    return filterSessions(
+      (res.data ?? const []).cast<Map<String, dynamic>>().map(
+        RemoteSession.fromJson,
+      ),
+    );
+  }
+
+  List<RemoteSession> filterSessions(Iterable<RemoteSession> sessions) {
+    final ownUserId = _api.session?.userId;
+    if (ownUserId == null) return const [];
     final ownDeviceId = _api.deviceId;
-    return (res.data ?? const [])
-        .cast<Map<String, dynamic>>()
-        .map(RemoteSession.fromJson)
+    return sessions
         .where(
           (s) =>
               s.supportsRemoteControl &&
               s.deviceId != ownDeviceId &&
               s.userId == ownUserId,
         )
-        .toList();
+        .toList(growable: false);
   }
 
   /// Tell a remote session to start playing an item now.
