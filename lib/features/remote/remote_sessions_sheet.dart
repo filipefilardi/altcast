@@ -18,6 +18,7 @@ Future<void> showRemoteSessionsSheet(
   BuildContext context, {
   String? itemId,
   int? startPositionTicks,
+  Future<void> Function(String sessionId)? onCastStarted,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -27,19 +28,26 @@ Future<void> showRemoteSessionsSheet(
     builder: (_) => _RemoteSessionsSheet(
       itemId: itemId,
       startPositionTicks: startPositionTicks,
+      onCastStarted: onCastStarted,
     ),
   );
 }
 
 class _RemoteSessionsSheet extends ConsumerWidget {
-  const _RemoteSessionsSheet({this.itemId, this.startPositionTicks});
+  const _RemoteSessionsSheet({
+    this.itemId,
+    this.startPositionTicks,
+    this.onCastStarted,
+  });
 
   final String? itemId;
   final int? startPositionTicks;
+  final Future<void> Function(String sessionId)? onCastStarted;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(remoteSessionsProvider);
+    final activeRemoteId = ref.watch(activeRemoteSessionIdProvider);
     return SafeArea(
       top: false,
       child: ConstrainedBox(
@@ -66,6 +74,26 @@ class _RemoteSessionsSheet extends ConsumerWidget {
                 ],
               ),
             ),
+            if (activeRemoteId != null)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                leading: const Icon(
+                  Icons.phone_iphone_rounded,
+                  color: AppColors.primary,
+                ),
+                title: const Text(
+                  'This device',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Stop remote playback',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                onTap: () => _switchToLocal(context, ref, activeRemoteId),
+              ),
             Flexible(
               child: sessionsAsync.when(
                 data: (sessions) {
@@ -89,6 +117,7 @@ class _RemoteSessionsSheet extends ConsumerWidget {
                       session: sessions[i],
                       itemId: itemId,
                       startPositionTicks: startPositionTicks,
+                      onCastStarted: onCastStarted,
                     ),
                   );
                 },
@@ -112,16 +141,34 @@ class _RemoteSessionsSheet extends ConsumerWidget {
   }
 }
 
+Future<void> _switchToLocal(
+  BuildContext context,
+  WidgetRef ref,
+  String activeRemoteId,
+) async {
+  final navigator = Navigator.of(context);
+  final repo = ref.read(remoteSessionsRepositoryProvider);
+  try {
+    await repo.stop(activeRemoteId);
+  } catch (_) {
+    // The remote may already be gone; clearing local state is what matters.
+  }
+  ref.read(activeRemoteSessionIdProvider.notifier).clear();
+  if (navigator.mounted) navigator.pop();
+}
+
 class _SessionRow extends ConsumerWidget {
   const _SessionRow({
     required this.session,
     required this.itemId,
     required this.startPositionTicks,
+    required this.onCastStarted,
   });
 
   final RemoteSession session;
   final String? itemId;
   final int? startPositionTicks;
+  final Future<void> Function(String sessionId)? onCastStarted;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -193,6 +240,7 @@ class _SessionRow extends ConsumerWidget {
         startPositionTicks: startPositionTicks ?? 0,
       );
       ref.read(activeRemoteSessionIdProvider.notifier).set(session.id);
+      await onCastStarted?.call(session.id);
       if (!context.mounted) return;
       Navigator.of(context).pop();
       messenger.hideCurrentSnackBar();

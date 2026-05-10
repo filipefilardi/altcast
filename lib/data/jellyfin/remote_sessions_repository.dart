@@ -46,9 +46,9 @@ class RemoteSessionsRepository {
     return _api.dio.post<void>(
       '/Sessions/$sessionId/Playing',
       queryParameters: {
-        'ItemIds': itemId,
-        'PlayCommand': 'PlayNow',
-        if (startPositionTicks > 0) 'StartPositionTicks': startPositionTicks,
+        'itemIds': itemId,
+        'playCommand': 'PlayNow',
+        if (startPositionTicks > 0) 'startPositionTicks': startPositionTicks,
       },
     );
   }
@@ -81,7 +81,7 @@ class RemoteSessionsRepository {
   }) {
     return _api.dio.post<void>(
       '/Sessions/$sessionId/Playing/Seek',
-      queryParameters: {'SeekPositionTicks': positionTicks},
+      queryParameters: {'seekPositionTicks': positionTicks},
     );
   }
 

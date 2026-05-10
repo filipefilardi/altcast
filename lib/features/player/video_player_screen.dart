@@ -1227,6 +1227,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       context,
       itemId: widget.itemId,
       startPositionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
+      onCastStarted: (_) async {
+        if (_player.state.playing) {
+          await _player.pause();
+        }
+      },
     );
   }
 
