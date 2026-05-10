@@ -20,6 +20,8 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenTracks,
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
+  required void Function(BuildContext origin) onOpenSyncPlay,
+  required bool isSyncPlayActive,
   required String title,
 }) {
   final screenBrightness = ScreenBrightness();
@@ -76,6 +78,14 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           icon: Icons.cast_rounded,
           tooltip: 'Cast',
           onPressed: () => onOpenCast(ctx),
+        ),
+      ),
+      Builder(
+        builder: (ctx) => AltCastChromeIconButton(
+          icon: Icons.groups_rounded,
+          tooltip: 'SyncPlay',
+          color: isSyncPlayActive ? AppColors.primary : null,
+          onPressed: () => onOpenSyncPlay(ctx),
         ),
       ),
       Builder(
@@ -252,18 +262,20 @@ class AltCastChromeIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.color,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       icon: Icon(
         icon,
-        color: Colors.white.withValues(alpha: 0.95),
+        color: color ?? Colors.white.withValues(alpha: 0.95),
         shadows: [
           Shadow(
             color: Colors.black.withValues(alpha: 0.75),
