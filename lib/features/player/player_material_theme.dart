@@ -11,6 +11,7 @@ import 'package:media_kit_video/media_kit_video_controls/src/controls/methods/vi
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/jellyfin/remote_sessions_repository.dart';
 import '../remote/remote_providers.dart';
 import '../syncplay/syncplay_controller.dart';
 
@@ -24,6 +25,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
   required void Function(BuildContext origin) onOpenSyncPlay,
+  required void Function(double value) onVolumeChanged,
   required String title,
 }) {
   final screenBrightness = ScreenBrightness();
@@ -41,12 +43,37 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
     seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
     initialVolume: (player.state.volume / 100.0).clamp(0.0, 1.0),
-    onVolumeChanged: (v) => unawaited(player.setVolume(v * 100.0)),
+    onVolumeChanged: onVolumeChanged,
     initialBrightness: 0.5,
     onBrightnessChanged: (v) =>
         unawaited(_applyScreenBrightness(screenBrightness, v)),
     onBrightnessReset: () =>
         unawaited(_resetScreenBrightness(screenBrightness)),
+    volumeIndicatorBuilder: (context, value) => Consumer(
+      builder: (_, ref, _) {
+        final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
+        return _VerticalGestureIndicator(
+          alignment: Alignment.centerRight,
+          value: value,
+          icon: value == 0.0
+              ? Icons.volume_off_rounded
+              : value < 0.5
+              ? Icons.volume_down_rounded
+              : Icons.volume_up_rounded,
+          activeColor: castActive ? AppColors.primary : Colors.white,
+        );
+      },
+    ),
+    brightnessIndicatorBuilder: (_, value) => _VerticalGestureIndicator(
+      alignment: Alignment.centerLeft,
+      value: value,
+      icon: value < 1.0 / 3.0
+          ? Icons.brightness_low_rounded
+          : value < 2.0 / 3.0
+          ? Icons.brightness_medium_rounded
+          : Icons.brightness_high_rounded,
+      activeColor: Colors.white,
+    ),
     seekBarPositionColor: AppColors.primary,
     seekBarThumbColor: AppColors.primary,
     buttonBarButtonColor: Colors.white,
@@ -57,7 +84,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         icon: Icons.replay_10_rounded,
       ),
       Spacer(),
-      MaterialPlayOrPauseButton(iconSize: 56),
+      AltCastPlayPauseButton(iconSize: 56),
       Spacer(),
       AltCastSeekRelativeButton(
         delta: Duration(seconds: 30),
@@ -130,7 +157,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   );
 }
 
-class AltCastSeekRelativeButton extends StatelessWidget {
+class AltCastSeekRelativeButton extends ConsumerWidget {
   const AltCastSeekRelativeButton({
     super.key,
     required this.delta,
@@ -141,17 +168,29 @@ class AltCastSeekRelativeButton extends StatelessWidget {
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return IconButton(
       onPressed: () async {
         final p = video_ctrl.controller(context).player;
-        final pos = p.state.position;
-        final dur = p.state.duration;
+        final remote = ref.read(activeRemoteSessionProvider).value;
+        final remotePosition = remote?.estimatedPosition();
+        final remoteDurationTicks = remote?.runTimeTicks;
+        final pos = remotePosition ?? p.state.position;
+        final dur = remoteDurationTicks != null && remoteDurationTicks > 0
+            ? Duration(microseconds: remoteDurationTicks ~/ 10)
+            : p.state.duration;
         if (dur <= Duration.zero) return;
         var next = pos + delta;
         if (next < Duration.zero) next = Duration.zero;
         if (next > dur) next = dur;
-        await p.seek(next);
+        if (remote != null && remote.isPlayingSomething) {
+          await ref
+              .read(remoteSessionsRepositoryProvider)
+              .seek(remote.id, next);
+          await p.seek(next);
+        } else {
+          await p.seek(next);
+        }
       },
       icon: Icon(icon),
       iconSize: 36,
@@ -159,6 +198,159 @@ class AltCastSeekRelativeButton extends StatelessWidget {
       tooltip: delta.isNegative
           ? 'Back 10 seconds'
           : 'Forward ${delta.inSeconds} seconds',
+    );
+  }
+}
+
+class _VerticalGestureIndicator extends StatelessWidget {
+  const _VerticalGestureIndicator({
+    required this.alignment,
+    required this.value,
+    required this.icon,
+    required this.activeColor,
+  });
+
+  final Alignment alignment;
+  final double value;
+  final IconData icon;
+  final Color activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final clamped = value.clamp(0.0, 1.0);
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 34),
+        child: SizedBox(
+          width: 54,
+          height: 164,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.58),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.36),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              child: Column(
+                children: [
+                  Icon(icon, color: activeColor, size: 22),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (_, constraints) {
+                        return Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            Container(
+                              width: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            Container(
+                              width: 4,
+                              height: constraints.maxHeight * clamped,
+                              decoration: BoxDecoration(
+                                color: activeColor,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: (constraints.maxHeight - 10) * clamped,
+                              child: SizedBox.square(
+                                dimension: 12,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: activeColor,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.34,
+                                        ),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${(clamped * 100).round()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AltCastPlayPauseButton extends ConsumerWidget {
+  const AltCastPlayPauseButton({super.key, this.iconSize});
+
+  final double? iconSize;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remote = ref.watch(activeRemoteSessionProvider).value;
+    if (remote != null && remote.isPlayingSomething) {
+      return IconButton(
+        icon: Icon(
+          remote.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+        ),
+        iconSize: iconSize ?? 48,
+        color: Colors.white,
+        tooltip: remote.isPaused ? 'Play' : 'Pause',
+        onPressed: () =>
+            ref.read(remoteSessionsRepositoryProvider).playPause(remote.id),
+      );
+    }
+
+    final player = video_ctrl.controller(context).player;
+    return StreamBuilder<bool>(
+      stream: player.stream.playing,
+      initialData: player.state.playing,
+      builder: (_, snapshot) {
+        final playing = snapshot.data ?? false;
+        return IconButton(
+          icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          iconSize: iconSize ?? 48,
+          color: Colors.white,
+          tooltip: playing ? 'Pause' : 'Play',
+          onPressed: () async {
+            if (player.state.playing) {
+              await player.pause();
+            } else {
+              await player.play();
+            }
+          },
+        );
+      },
     );
   }
 }
