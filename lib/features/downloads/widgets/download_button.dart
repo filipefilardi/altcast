@@ -33,6 +33,7 @@ class _DownloadButton extends ConsumerWidget {
     final state = ref.watch(downloadManagerProvider);
     final downloaded = state.items.containsKey(itemId);
     final progress = state.progress[itemId];
+    final failed = state.failures.containsKey(itemId);
 
     if (downloaded) {
       return IconButton(
@@ -66,6 +67,15 @@ class _DownloadButton extends ConsumerWidget {
                 ref.read(downloadManagerProvider.notifier).cancel(itemId),
           ),
         ],
+      );
+    }
+    if (failed) {
+      return IconButton(
+        iconSize: iconSize,
+        icon: const Icon(Icons.error_outline, color: AppColors.error),
+        tooltip: 'Download failed — tap to retry',
+        onPressed: () =>
+            ref.read(downloadManagerProvider.notifier).retry(itemId),
       );
     }
     return IconButton(

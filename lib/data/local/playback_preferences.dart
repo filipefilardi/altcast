@@ -19,7 +19,6 @@ enum StreamingQuality {
 class PlaybackPreferences {
   const PlaybackPreferences({
     this.streamingQuality = StreamingQuality.auto,
-    this.wifiOnlyStreaming = false,
     this.autoSkipIntroCredits = true,
     this.autoplayNextTvEpisode = true,
     this.autoplayCountdownSeconds = 8,
@@ -31,7 +30,6 @@ class PlaybackPreferences {
   });
 
   final StreamingQuality streamingQuality;
-  final bool wifiOnlyStreaming;
 
   /// When true, seeks past intro/credits automatically after a short delay
   /// while playback stays inside a segment. Skip buttons still appear when
@@ -77,7 +75,6 @@ class PlaybackPreferences {
 
   PlaybackPreferences copyWith({
     StreamingQuality? streamingQuality,
-    bool? wifiOnlyStreaming,
     bool? autoSkipIntroCredits,
     bool? autoplayNextTvEpisode,
     int? autoplayCountdownSeconds,
@@ -91,9 +88,9 @@ class PlaybackPreferences {
   }) {
     return PlaybackPreferences(
       streamingQuality: streamingQuality ?? this.streamingQuality,
-      wifiOnlyStreaming: wifiOnlyStreaming ?? this.wifiOnlyStreaming,
       autoSkipIntroCredits: autoSkipIntroCredits ?? this.autoSkipIntroCredits,
-      autoplayNextTvEpisode: autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
+      autoplayNextTvEpisode:
+          autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
       autoplayCountdownSeconds:
           autoplayCountdownSeconds ?? this.autoplayCountdownSeconds,
       androidSoftwareVideoDecode:
@@ -111,7 +108,6 @@ class PlaybackPreferences {
 
   Map<String, dynamic> toJson() => {
     'streamingQuality': streamingQuality.name,
-    'wifiOnlyStreaming': wifiOnlyStreaming,
     'autoSkipIntroCredits': autoSkipIntroCredits,
     'autoplayNextTvEpisode': autoplayNextTvEpisode,
     'autoplayCountdownSeconds': autoplayCountdownSeconds,
@@ -153,7 +149,6 @@ class PlaybackPreferences {
         : null;
     return PlaybackPreferences(
       streamingQuality: quality,
-      wifiOnlyStreaming: json['wifiOnlyStreaming'] as bool? ?? false,
       autoSkipIntroCredits: json['autoSkipIntroCredits'] as bool? ?? true,
       autoplayNextTvEpisode: json['autoplayNextTvEpisode'] as bool? ?? true,
       autoplayCountdownSeconds: _normalizeAutoplayCountdown(
@@ -217,11 +212,6 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
 
   Future<void> setStreamingQuality(StreamingQuality quality) async {
     state = state.copyWith(streamingQuality: quality);
-    await _persist();
-  }
-
-  Future<void> setWifiOnlyStreaming(bool enabled) async {
-    state = state.copyWith(wifiOnlyStreaming: enabled);
     await _persist();
   }
 

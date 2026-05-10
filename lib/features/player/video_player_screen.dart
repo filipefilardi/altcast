@@ -162,6 +162,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
+  bool _landscapeOrientation = true;
   bool _applyingSyncPlayCommand = false;
   bool _applyingRemoteCastState = false;
   bool _playerReadyForCastMirror = false;
@@ -211,10 +212,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    _applyPlayerOrientation(landscape: true);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _positionSub = _player.stream.position.listen((p) => _lastPosition = p);
@@ -255,6 +253,25 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     try {
       await ScreenBrightness().setAnimate(false);
     } catch (_) {}
+  }
+
+  void _applyPlayerOrientation({required bool landscape}) {
+    _landscapeOrientation = landscape;
+    SystemChrome.setPreferredOrientations(
+      landscape
+          ? const [
+              DeviceOrientation.landscapeLeft,
+              DeviceOrientation.landscapeRight,
+            ]
+          : const [
+              DeviceOrientation.portraitUp,
+              DeviceOrientation.portraitDown,
+            ],
+    );
+  }
+
+  void _togglePlayerOrientation() {
+    _applyPlayerOrientation(landscape: !_landscapeOrientation);
   }
 
   Future<void> _open({Duration? startPosition, bool play = true}) async {
@@ -1183,6 +1200,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
+      onRotateOrientation: _togglePlayerOrientation,
       onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );

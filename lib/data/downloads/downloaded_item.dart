@@ -1,7 +1,9 @@
 enum DownloadedItemKind { movie, episode }
 
 DownloadedItemKind _kindFromName(String? raw) {
-  return raw == 'episode' ? DownloadedItemKind.episode : DownloadedItemKind.movie;
+  return raw == 'episode'
+      ? DownloadedItemKind.episode
+      : DownloadedItemKind.movie;
 }
 
 /// Persisted record for one offline-available video. Kept minimal — enough
@@ -47,9 +49,8 @@ class DownloadedItem {
   final int? seasonNumber;
   final int? episodeNumber;
 
-  Duration? get runTime => runTimeTicks == null
-      ? null
-      : Duration(microseconds: runTimeTicks! ~/ 10);
+  Duration? get runTime =>
+      runTimeTicks == null ? null : Duration(microseconds: runTimeTicks! ~/ 10);
 
   /// "S01·E03" style label for an episode, or null for movies.
   String? get episodeLabel {
@@ -60,19 +61,19 @@ class DownloadedItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'filePath': filePath,
-        'kind': kind.name,
-        if (year != null) 'year': year,
-        if (runTimeTicks != null) 'runTimeTicks': runTimeTicks,
-        if (imageTag != null) 'imageTag': imageTag,
-        if (serverItemId != null) 'serverItemId': serverItemId,
-        if (seriesId != null) 'seriesId': seriesId,
-        if (seriesName != null) 'seriesName': seriesName,
-        if (seasonNumber != null) 'seasonNumber': seasonNumber,
-        if (episodeNumber != null) 'episodeNumber': episodeNumber,
-      };
+    'id': id,
+    'name': name,
+    'filePath': filePath,
+    'kind': kind.name,
+    if (year != null) 'year': year,
+    if (runTimeTicks != null) 'runTimeTicks': runTimeTicks,
+    if (imageTag != null) 'imageTag': imageTag,
+    if (serverItemId != null) 'serverItemId': serverItemId,
+    if (seriesId != null) 'seriesId': seriesId,
+    if (seriesName != null) 'seriesName': seriesName,
+    if (seasonNumber != null) 'seasonNumber': seasonNumber,
+    if (episodeNumber != null) 'episodeNumber': episodeNumber,
+  };
 
   factory DownloadedItem.fromJson(Map<String, dynamic> json) {
     return DownloadedItem(
@@ -130,14 +131,52 @@ class DownloadProgress {
   }
 
   DownloadProgress copyWithFraction(double f) => DownloadProgress(
-        itemId: itemId,
-        name: name,
-        fraction: f,
-        kind: kind,
-        imageTag: imageTag,
-        seriesId: seriesId,
-        seriesName: seriesName,
-        seasonNumber: seasonNumber,
-        episodeNumber: episodeNumber,
-      );
+    itemId: itemId,
+    name: name,
+    fraction: f,
+    kind: kind,
+    imageTag: imageTag,
+    seriesId: seriesId,
+    seriesName: seriesName,
+    seasonNumber: seasonNumber,
+    episodeNumber: episodeNumber,
+  );
+}
+
+/// Visible failed-download state. Kept separate from [DownloadProgress] so the
+/// downloads screen can offer retry/dismiss actions instead of making failed
+/// queue entries disappear.
+class DownloadFailure {
+  const DownloadFailure({
+    required this.itemId,
+    required this.name,
+    required this.message,
+    this.kind = DownloadedItemKind.movie,
+    this.year,
+    this.runTimeTicks,
+    this.imageTag,
+    this.seriesId,
+    this.seriesName,
+    this.seasonNumber,
+    this.episodeNumber,
+  });
+
+  final String itemId;
+  final String name;
+  final String message;
+  final DownloadedItemKind kind;
+  final int? year;
+  final int? runTimeTicks;
+  final String? imageTag;
+  final String? seriesId;
+  final String? seriesName;
+  final int? seasonNumber;
+  final int? episodeNumber;
+
+  String? get episodeLabel {
+    if (kind != DownloadedItemKind.episode) return null;
+    if (seasonNumber == null || episodeNumber == null) return null;
+    final ep = episodeNumber!.toString().padLeft(2, '0');
+    return 'S$seasonNumber·E$ep';
+  }
 }

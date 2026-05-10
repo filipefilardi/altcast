@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,6 +17,7 @@ class DownloadsState {
   const DownloadsState({
     this.items = const {},
     this.progress = const {},
+    this.failures = const {},
     this.queueLength = 0,
     this.bootstrapped = false,
   });
@@ -27,6 +29,9 @@ class DownloadsState {
   /// means the file is downloading right now or queued.
   final Map<String, DownloadProgress> progress;
 
+  /// Failed downloads waiting for a user-visible retry or dismissal.
+  final Map<String, DownloadFailure> failures;
+
   /// Total queue size, including the in-flight item.
   final int queueLength;
 
@@ -37,12 +42,14 @@ class DownloadsState {
   DownloadsState copyWith({
     Map<String, DownloadedItem>? items,
     Map<String, DownloadProgress>? progress,
+    Map<String, DownloadFailure>? failures,
     int? queueLength,
     bool? bootstrapped,
   }) {
     return DownloadsState(
       items: items ?? this.items,
       progress: progress ?? this.progress,
+      failures: failures ?? this.failures,
       queueLength: queueLength ?? this.queueLength,
       bootstrapped: bootstrapped ?? this.bootstrapped,
     );
@@ -109,6 +116,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     _queue.add(entry);
     state = state.copyWith(
       progress: {...state.progress, movie.id: entry.toProgress(0)},
+      failures: Map<String, DownloadFailure>.from(state.failures)
+        ..remove(movie.id),
       queueLength: state.queueLength + 1,
     );
     _drain();
@@ -161,6 +170,8 @@ class DownloadManager extends Notifier<DownloadsState> {
         ...state.progress,
         for (final entry in fresh) entry.itemId: entry.toProgress(0),
       },
+      failures: Map<String, DownloadFailure>.from(state.failures)
+        ..removeWhere((id, _) => fresh.any((entry) => entry.itemId == id)),
       queueLength: state.queueLength + fresh.length,
     );
     _drain();
@@ -179,6 +190,22 @@ class DownloadManager extends Notifier<DownloadsState> {
       progress: newProgress,
       queueLength: state.queueLength > 0 ? state.queueLength - 1 : 0,
     );
+  }
+
+  /// Retry a failed download. No-op if the failure was already dismissed.
+  Future<void> retry(String itemId) async {
+    final failure = state.failures[itemId];
+    if (failure == null) return;
+    final newFailures = Map<String, DownloadFailure>.from(state.failures)
+      ..remove(itemId);
+    state = state.copyWith(failures: newFailures);
+    _enqueueEntries([_QueueEntry.failure(failure)]);
+  }
+
+  void dismissFailure(String itemId) {
+    final newFailures = Map<String, DownloadFailure>.from(state.failures)
+      ..remove(itemId);
+    state = state.copyWith(failures: newFailures);
   }
 
   /// Delete a completed download from disk and the manifest.
@@ -223,6 +250,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     _activeCancel = CancelToken();
 
     try {
+      await _guardDownloadNetwork();
       await Dio().download(
         url,
         tempPath,
@@ -272,10 +300,53 @@ class DownloadManager extends Notifier<DownloadsState> {
       } catch (_) {}
       final newProgress = Map<String, DownloadProgress>.from(state.progress)
         ..remove(entry.itemId);
-      state = state.copyWith(progress: newProgress);
+      final wasCancelled = e is DioException && CancelToken.isCancel(e);
+      state = state.copyWith(
+        progress: newProgress,
+        failures: wasCancelled
+            ? state.failures
+            : {
+                ...state.failures,
+                entry.itemId: entry.toFailure(_downloadFailureMessage(e)),
+              },
+      );
     } finally {
       _activeCancel = null;
     }
+  }
+
+  Future<void> _guardDownloadNetwork() async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!prefs.wifiOnlyDownloads) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity.contains(ConnectivityResult.none)) {
+      throw const _DownloadBlockedException('No network connection.');
+    }
+    final hasUnmeteredNetwork =
+        connectivity.contains(ConnectivityResult.wifi) ||
+        connectivity.contains(ConnectivityResult.ethernet);
+    final mobileOnly =
+        connectivity.contains(ConnectivityResult.mobile) &&
+        !hasUnmeteredNetwork;
+    if (mobileOnly) {
+      throw const _DownloadBlockedException('Waiting for Wi-Fi to download.');
+    }
+  }
+
+  String _downloadFailureMessage(Object error) {
+    if (error is _DownloadBlockedException) return error.message;
+    if (error is DioException) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout) {
+        return 'Connection timed out.';
+      }
+      final status = error.response?.statusCode;
+      if (status != null) return 'Server returned HTTP $status.';
+      return 'Network error while downloading.';
+    }
+    return 'Download failed.';
   }
 
   Future<void> _maybeAutoDownloadNext(_QueueEntry entry) async {
@@ -391,6 +462,21 @@ class _QueueEntry {
     );
   }
 
+  factory _QueueEntry.failure(DownloadFailure f) {
+    return _QueueEntry._(
+      itemId: f.itemId,
+      name: f.name,
+      kind: f.kind,
+      year: f.year,
+      runTimeTicks: f.runTimeTicks,
+      imageTag: f.imageTag,
+      seriesId: f.seriesId,
+      seriesName: f.seriesName,
+      seasonNumber: f.seasonNumber,
+      episodeNumber: f.episodeNumber,
+    );
+  }
+
   final String itemId;
   final String name;
   final DownloadedItemKind kind;
@@ -430,4 +516,24 @@ class _QueueEntry {
     seasonNumber: seasonNumber,
     episodeNumber: episodeNumber,
   );
+
+  DownloadFailure toFailure(String message) => DownloadFailure(
+    itemId: itemId,
+    name: name,
+    message: message,
+    kind: kind,
+    year: year,
+    runTimeTicks: runTimeTicks,
+    imageTag: imageTag,
+    seriesId: seriesId,
+    seriesName: seriesName,
+    seasonNumber: seasonNumber,
+    episodeNumber: episodeNumber,
+  );
+}
+
+class _DownloadBlockedException implements Exception {
+  const _DownloadBlockedException(this.message);
+
+  final String message;
 }

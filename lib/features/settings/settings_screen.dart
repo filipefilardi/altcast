@@ -67,11 +67,13 @@ class SettingsScreen extends ConsumerWidget {
   static String _downloadsSubtitle(DownloadsState s) {
     if (!s.bootstrapped) return 'Loading...';
     final pending = s.progress.length;
+    final failed = s.failures.length;
     final done = s.items.length;
-    if (done == 0 && pending == 0) return 'Nothing offline yet';
+    if (done == 0 && pending == 0 && failed == 0) return 'Nothing offline yet';
     final parts = <String>[
       if (done > 0) '$done available offline',
       if (pending > 0) '$pending downloading',
+      if (failed > 0) '$failed failed',
     ];
     return parts.join(' • ');
   }
@@ -101,6 +103,14 @@ class _DownloadGroup extends ConsumerWidget {
             color: AppColors.textSecondary,
           ),
           onTap: () => context.push('/downloads'),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.wifi_outlined),
+          title: const Text('Wi-Fi only downloads'),
+          subtitle: const Text('Avoid downloading videos on mobile data.'),
+          value: prefs.wifiOnlyDownloads,
+          onChanged: notifier.setWifiOnlyDownloads,
+          activeThumbColor: AppColors.primary,
         ),
         SwitchListTile(
           secondary: const Icon(Icons.auto_awesome_outlined),
@@ -183,18 +193,6 @@ class _PlaybackGroup extends ConsumerWidget {
             color: AppColors.textSecondary,
           ),
           onTap: () => _showStreamingQualitySheet(context),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.wifi_outlined),
-          title: const Text('Wi-Fi only streaming'),
-          subtitle: const Text(
-            'Block playback when only mobile data is available.',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          value: prefs.wifiOnlyStreaming,
-          onChanged: (v) => ref
-              .read(playbackPreferencesProvider.notifier)
-              .setWifiOnlyStreaming(v),
         ),
         SwitchListTile(
           secondary: const Icon(Icons.skip_next_outlined),
