@@ -7,8 +7,9 @@ import '../../data/jellyfin/remote_sessions_repository.dart';
 
 /// Polls Jellyfin for active remote-controllable sessions every 3 seconds
 /// while watched. autoDispose so we stop polling as soon as no UI is open.
-final remoteSessionsProvider =
-    StreamProvider.autoDispose<List<RemoteSession>>((ref) async* {
+final remoteSessionsProvider = StreamProvider.autoDispose<List<RemoteSession>>((
+  ref,
+) async* {
   final repo = ref.watch(remoteSessionsRepositoryProvider);
   // First emit immediately so the picker doesn't flash a loading state for
   // the full poll interval.
@@ -27,3 +28,15 @@ final remoteSessionsProvider =
     }
   }
 });
+
+final activeRemoteSessionIdProvider =
+    NotifierProvider<ActiveRemoteSessionId, String?>(ActiveRemoteSessionId.new);
+
+class ActiveRemoteSessionId extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String id) => state = id;
+
+  void clear() => state = null;
+}

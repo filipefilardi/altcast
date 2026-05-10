@@ -19,6 +19,7 @@ import '../../data/jellyfin/models/syncplay.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
+import '../remote/remote_providers.dart';
 import '../remote/remote_sessions_sheet.dart';
 import '../syncplay/syncplay_controller.dart';
 import '../syncplay/syncplay_sheet.dart';
@@ -971,6 +972,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       syncPlayControllerProvider,
       _handleSyncPlayStateChange,
     );
+    final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
     final syncPlayActive = ref.watch(syncPlayControllerProvider).isActive;
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
@@ -978,6 +980,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onOpenTracks: _showTracksSheet,
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
+      isCastActive: castActive,
       onOpenSyncPlay: _showSyncPlaySheet,
       isSyncPlayActive: syncPlayActive,
       title: _playerTitle,
