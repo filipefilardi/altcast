@@ -84,6 +84,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     this.resumeTicks,
     this.preferredAudioLang,
     this.preferredSubLang,
+    this.preferredSubIndex,
     this.seriesId,
     this.seasonNumber,
     this.episodeNumber,
@@ -105,6 +106,10 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   /// explicitly disable. Matches both embedded and external subs by
   /// language. `null` → no override.
   final String? preferredSubLang;
+
+  /// Jellyfin media stream index from the detail subtitle picker. Used to
+  /// disambiguate multiple subtitle streams with the same language.
+  final int? preferredSubIndex;
   final String? seriesId;
   final int? seasonNumber;
   final int? episodeNumber;
@@ -624,13 +629,48 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
 
     final wantSub = widget.preferredSubLang;
-    if (wantSub == null || wantSub.isEmpty) return;
-    if (wantSub.toLowerCase() == 'off') {
+    final wantSubIndex = widget.preferredSubIndex;
+    if ((wantSub == null || wantSub.isEmpty) && wantSubIndex == null) return;
+    if (wantSub != null && wantSub.toLowerCase() == 'off') {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(SubtitleTrack.no());
       _setSubVisibility(false);
       return;
     }
+
+    if (wantSubIndex != null) {
+      final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
+      for (final ext in externals) {
+        if (ext.streamIndex == wantSubIndex) {
+          _selectedExternalSubNotifier.value = ext.id;
+          _player.setSubtitleTrack(
+            SubtitleTrack.uri(
+              ext.url,
+              title: ext.title,
+              language: ext.language,
+            ),
+          );
+          _setSubVisibility(true);
+          return;
+        }
+      }
+
+      final embedded = _player.state.tracks.subtitle.firstWhere(
+        (t) =>
+            t.id != SubtitleTrack.auto().id &&
+            t.id != SubtitleTrack.no().id &&
+            _subtitleTrackMatchesStreamIndex(t, wantSubIndex),
+        orElse: () => SubtitleTrack.no(),
+      );
+      if (embedded.id != SubtitleTrack.no().id) {
+        _selectedExternalSubNotifier.value = null;
+        _player.setSubtitleTrack(embedded);
+        _setSubVisibility(true);
+        return;
+      }
+    }
+
+    if (wantSub == null || wantSub.isEmpty) return;
 
     // Try embedded first.
     final embedded = _player.state.tracks.subtitle.firstWhere(
@@ -663,6 +703,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         return;
       }
     }
+  }
+
+  bool _subtitleTrackMatchesStreamIndex(SubtitleTrack track, int index) {
+    if (track.id == '$index') return true;
+    return int.tryParse(track.id) == index;
   }
 
   /// Wires the scrobbler to media_kit streams. Reports playback to Jellyfin

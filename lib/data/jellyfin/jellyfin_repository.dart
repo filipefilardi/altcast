@@ -847,6 +847,7 @@ class JellyfinRepository {
         ExternalSubtitle(
           id: url,
           url: url,
+          streamIndex: index,
           title: (st['DisplayTitle'] as String?) ?? (st['Title'] as String?),
           language: st['Language'] as String?,
           codec: codec,

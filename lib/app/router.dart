@@ -100,6 +100,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             preferredAudioLang: st.uri.queryParameters['audioLang'],
             // `subLang=off` is a sentinel meaning "explicitly disable subs".
             preferredSubLang: st.uri.queryParameters['subLang'],
+            preferredSubIndex: int.tryParse(
+              st.uri.queryParameters['subIndex'] ?? '',
+            ),
             seriesId: st.uri.queryParameters['seriesId'],
             seasonNumber: int.tryParse(
               st.uri.queryParameters['seasonNumber'] ?? '',
