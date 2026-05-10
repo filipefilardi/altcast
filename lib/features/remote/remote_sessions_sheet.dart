@@ -238,6 +238,13 @@ class _SessionRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final canCast = itemId != null;
     final isActive = ref.watch(activeRemoteSessionIdProvider) == session.id;
+    final isControlOnly = !canCast;
+    final isIdleControlOnly = isControlOnly && !session.isPlayingSomething;
+    final clientLabel = session.client.trim();
+    final statusLabel = isIdleControlOnly
+        ? 'Open a video to cast here'
+        : (clientLabel.isEmpty ? null : clientLabel);
+
     return Material(
       color: isActive
           ? AppColors.primary.withValues(alpha: 0.10)
@@ -269,14 +276,16 @@ class _SessionRow extends ConsumerWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (session.client.isNotEmpty) ...[
+                        if (statusLabel != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            session.client,
+                            statusLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
+                            style: TextStyle(
+                              color: isIdleControlOnly
+                                  ? AppColors.textTertiary
+                                  : AppColors.textSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -289,6 +298,11 @@ class _SessionRow extends ConsumerWidget {
                   else if (canCast)
                     const Icon(
                       Icons.cast_rounded,
+                      color: AppColors.textTertiary,
+                    )
+                  else if (session.isPlayingSomething)
+                    const Icon(
+                      Icons.tune_rounded,
                       color: AppColors.textTertiary,
                     ),
                 ],

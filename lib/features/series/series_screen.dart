@@ -18,6 +18,8 @@ import '../../data/jellyfin/models/episode.dart';
 import '../../data/jellyfin/models/series.dart';
 import '../../data/local/playback_preferences.dart';
 import '../downloads/widgets/download_button.dart';
+import '../remote/remote_providers.dart';
+import '../remote/remote_sessions_sheet.dart';
 import 'series_providers.dart';
 import 'widgets/episode_tile.dart';
 import 'widgets/season_picker.dart';
@@ -168,6 +170,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
     final nextHasResume =
         (next?.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
+    final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
     final tagline = series.tagline?.trim();
 
     return ListView(
@@ -216,6 +219,21 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                       ref.invalidate(seriesProvider(series.id));
                     },
                   ),
+                  if (next != null)
+                    IconButton(
+                      iconSize: 22,
+                      icon: Icon(
+                        Icons.cast,
+                        color: castActive ? AppColors.primary : null,
+                      ),
+                      tooltip: 'Play on…',
+                      onPressed: () => showRemoteSessionsSheet(
+                        context,
+                        itemId: next.id,
+                        startPositionTicks:
+                            next.userData?.playbackPositionTicks ?? 0,
+                      ),
+                    ),
                   SeriesDownloadButton(series: series, seasons: seasons),
                 ],
               ),

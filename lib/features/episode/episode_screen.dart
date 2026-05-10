@@ -16,6 +16,7 @@ import '../../core/widgets/user_data_actions.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../downloads/widgets/download_button.dart';
+import '../remote/remote_providers.dart';
 import '../remote/remote_sessions_sheet.dart';
 import 'episode_providers.dart';
 
@@ -65,6 +66,7 @@ class _EpisodeBody extends ConsumerWidget {
       fallbackPrimaryTag: episode.imageTag,
     );
     final ticks = episode.userData?.playbackPositionTicks ?? 0;
+    final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
     final hasResume =
         (episode.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
@@ -121,7 +123,10 @@ class _EpisodeBody extends ConsumerWidget {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.cast),
+                        icon: Icon(
+                          Icons.cast,
+                          color: castActive ? AppColors.primary : null,
+                        ),
                         tooltip: 'Play on…',
                         onPressed: () => showRemoteSessionsSheet(
                           context,

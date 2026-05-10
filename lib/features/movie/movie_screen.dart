@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/back_chip.dart';
 import '../../core/widgets/detail_action_row.dart';
@@ -18,6 +19,7 @@ import '../../data/jellyfin/models/browse_item.dart';
 import '../../data/jellyfin/models/movie.dart';
 import '../../data/local/playback_preferences.dart';
 import '../downloads/widgets/download_button.dart';
+import '../remote/remote_providers.dart';
 import '../remote/remote_sessions_sheet.dart';
 import 'movie_providers.dart';
 import 'widgets/track_preference_row.dart';
@@ -101,6 +103,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
     final movie = widget.movie;
     final repo = ref.watch(jellyfinRepositoryProvider);
     final similarAsync = ref.watch(similarMoviesProvider(movie.id));
+    final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
     final backdrop = repo.backdropUrl(
       movie.id,
       movie.backdropTag,
@@ -154,7 +157,10 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   ),
                   IconButton(
                     iconSize: 22,
-                    icon: const Icon(Icons.cast),
+                    icon: Icon(
+                      Icons.cast,
+                      color: castActive ? AppColors.primary : null,
+                    ),
                     tooltip: 'Play on…',
                     onPressed: () => showRemoteSessionsSheet(
                       context,
