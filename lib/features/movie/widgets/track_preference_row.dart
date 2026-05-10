@@ -99,6 +99,8 @@ class TrackPreferenceRow extends ConsumerWidget {
         final hasOriginalHint = hint != null && hint.isNotEmpty;
         final showAudio = streams.audio.isNotEmpty;
         final showSubs = streams.subtitle.isNotEmpty;
+        final canPickAudio = streams.audio.length > 1;
+        final canPickSubs = streams.subtitle.length > 1;
         if (!showAudio && !showSubs) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(top: 16),
@@ -135,7 +137,9 @@ class TrackPreferenceRow extends ConsumerWidget {
                           icon: Icons.volume_up_outlined,
                           title: 'Audio',
                           value: _audioLabel(streams),
-                          onTap: () => _pickAudio(context, streams),
+                          onTap: canPickAudio
+                              ? () => _pickAudio(context, streams)
+                              : null,
                         ),
                       ),
                     if (showAudio && showSubs) const SizedBox(width: 8),
@@ -144,8 +148,10 @@ class TrackPreferenceRow extends ConsumerWidget {
                         child: _TrackTile(
                           icon: Icons.subtitles_outlined,
                           title: 'Subtitles',
-                          value: _subLabel(),
-                          onTap: () => _pickSub(context, streams),
+                          value: _subLabel(streams),
+                          onTap: canPickSubs
+                              ? () => _pickSub(context, streams)
+                              : null,
                         ),
                       ),
                   ],
@@ -175,13 +181,21 @@ class TrackPreferenceRow extends ConsumerWidget {
     return _streamLabel(match, fallback: lang);
   }
 
-  String _subLabel() {
+  String _subLabel(ItemMediaStreams streams) {
     switch (preference.subKind) {
       case SubPreferenceKind.serverDefault:
-        return 'Auto';
+        return _streamLabel(streams.defaultSubtitle(), fallback: 'Auto');
       case SubPreferenceKind.off:
         return 'Off';
       case SubPreferenceKind.byLang:
+        final lang = preference.subLang;
+        if (lang != null && lang.isNotEmpty) {
+          final match = streams.subtitle.firstWhere(
+            (s) => (s.language ?? '').toLowerCase() == lang.toLowerCase(),
+            orElse: () => streams.subtitle.first,
+          );
+          return _streamLabel(match, fallback: lang);
+        }
         final mapped =
             languageDisplay(preference.subLang) ?? preference.subLang ?? 'On';
         return mapped;
@@ -243,7 +257,8 @@ class TrackPreferenceRow extends ConsumerWidget {
           if (hint != null && hint.isNotEmpty)
             _PickerRow(
               label: 'Original (${languageDisplay(hint) ?? hint})',
-              selected: preference.audioLang != null &&
+              selected:
+                  preference.audioLang != null &&
                   preference.audioLang!.toLowerCase() == hint.toLowerCase(),
               onTap: () {
                 onChanged(
@@ -325,14 +340,14 @@ class TrackPreferenceRow extends ConsumerWidget {
   }
 
   String _audioRowLabel(MediaStream s) => _streamRowLabel(s, [
-        if (s.channels != null) '${s.channels}.0',
-        if (s.codec != null) s.codec!,
-      ]);
+    if (s.channels != null) '${s.channels}.0',
+    if (s.codec != null) s.codec!,
+  ]);
 
   String _subRowLabel(MediaStream s) => _streamRowLabel(s, [
-        if (s.codec != null) s.codec!,
-        if (s.isExternal) 'external',
-      ]);
+    if (s.codec != null) s.codec!,
+    if (s.isExternal) 'external',
+  ]);
 
   String _streamRowLabel(MediaStream s, List<String> extra) {
     final mapped = languageDisplay(s.language) ?? s.language ?? 'Track';
@@ -352,10 +367,11 @@ class _TrackTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return Material(
       color: AppColors.surfaceHighlight.withValues(alpha: 0.4),
       borderRadius: BorderRadius.circular(12),
@@ -403,11 +419,12 @@ class _TrackTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.textTertiary,
-              ),
+              if (enabled)
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.textTertiary,
+                ),
             ],
           ),
         ),
@@ -417,11 +434,7 @@ class _TrackTile extends StatelessWidget {
 }
 
 class _PickerSheet extends StatelessWidget {
-  const _PickerSheet({
-    required this.title,
-    required this.rows,
-    this.header,
-  });
+  const _PickerSheet({required this.title, required this.rows, this.header});
   final String title;
   final List<_PickerRow> rows;
   final Widget? header;
