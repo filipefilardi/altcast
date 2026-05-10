@@ -18,6 +18,7 @@ import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
 import '../../data/jellyfin/models/remote_session.dart';
 import '../../data/jellyfin/models/syncplay.dart';
 import '../../data/jellyfin/models/stream_source.dart';
+import '../../data/jellyfin/remote_sessions_repository.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
 import '../remote/remote_providers.dart';
@@ -160,7 +161,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _applyingRemoteCastState = false;
   bool _playerReadyForCastMirror = false;
   double? _volumeBeforeCastMirror;
+  Timer? _castVolumeDebounce;
   DateTime? _lastRemoteCastSeekAt;
+  DateTime? _lastRemoteControlSeekSentAt;
   int _lastSyncQueueSerial = 0;
   int _lastSyncCommandSerial = 0;
   String? _lastSyncCommandKey;
@@ -733,6 +736,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub = _player.stream.position.listen((p) {
       final previous = _lastPosition;
       _lastPosition = p;
+      if (_remoteCastMirrorActive && !_applyingRemoteCastState) {
+        unawaited(_maybePublishRemoteCastSeek(previous, p));
+      }
       if (!_applyingSyncPlayCommand && !_remoteCastMirrorActive) {
         unawaited(_maybePublishSyncPlaySeek(previous, p));
       }
@@ -746,6 +752,47 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   bool get _remoteCastMirrorActive =>
       _applyingRemoteCastState || _volumeBeforeCastMirror != null;
+
+  void _handlePlayerVolumeChanged(double value) {
+    final remoteSessionId = ref.read(activeRemoteSessionIdProvider);
+    if (remoteSessionId == null) {
+      unawaited(_player.setVolume(value * 100.0));
+      return;
+    }
+
+    _castVolumeDebounce?.cancel();
+    _castVolumeDebounce = Timer(const Duration(milliseconds: 90), () {
+      unawaited(
+        ref
+            .read(remoteSessionsRepositoryProvider)
+            .setVolume(remoteSessionId, (value * 100).round()),
+      );
+    });
+  }
+
+  Future<void> _maybePublishRemoteCastSeek(
+    Duration previous,
+    Duration position,
+  ) async {
+    if (previous <= Duration.zero) return;
+    final jump = (position - previous).abs();
+    if (jump < const Duration(milliseconds: 900)) return;
+    final sessionId = ref.read(activeRemoteSessionIdProvider);
+    if (sessionId == null) return;
+    final now = DateTime.now();
+    final lastSentAt = _lastRemoteControlSeekSentAt;
+    if (lastSentAt != null &&
+        now.difference(lastSentAt) < const Duration(milliseconds: 350)) {
+      return;
+    }
+    _lastRemoteControlSeekSentAt = now;
+    _lastRemoteCastSeekAt = now;
+    try {
+      await ref
+          .read(remoteSessionsRepositoryProvider)
+          .seek(sessionId, position);
+    } catch (_) {}
+  }
 
   Future<void> _publishSyncPlayPlaying(bool playing) async {
     if (!_syncPlayActive) return;
@@ -944,6 +991,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   void dispose() {
     _progressTimer?.cancel();
     _autoplayTimer?.cancel();
+    _castVolumeDebounce?.cancel();
     _cancelIntroSkipperTimers();
     _positionSub?.cancel();
     _playingSub?.cancel();
@@ -1090,6 +1138,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
+      onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );
 
