@@ -15,10 +15,12 @@ import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
+import '../../data/jellyfin/models/remote_session.dart';
 import '../../data/jellyfin/models/syncplay.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
+import '../remote/remote_providers.dart';
 import '../remote/remote_sessions_sheet.dart';
 import '../syncplay/syncplay_controller.dart';
 import '../syncplay/syncplay_sheet.dart';
@@ -155,6 +157,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
   bool _applyingSyncPlayCommand = false;
+  bool _applyingRemoteCastState = false;
+  bool _playerReadyForCastMirror = false;
+  double? _volumeBeforeCastMirror;
   int _lastSyncQueueSerial = 0;
   int _lastSyncCommandSerial = 0;
   String? _lastSyncCommandKey;
@@ -210,7 +215,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     unawaited(_prepareScreenBrightnessForGestures());
 
     unawaited(_loadPlayerTitle());
-    _open(play: widget.syncPlayStartPlaying ?? true);
+    final castActiveOnOpen = ref.read(activeRemoteSessionIdProvider) != null;
+    _open(play: widget.syncPlayStartPlaying ?? !castActiveOnOpen);
   }
 
   Future<void> _loadPlayerTitle() async {
@@ -244,6 +250,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   Future<void> _open({Duration? startPosition, bool play = true}) async {
     try {
+      _playerReadyForCastMirror = false;
       if (mounted && _openError != null) {
         setState(() => _openError = null);
       }
@@ -281,6 +288,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       await _applyPlaybackRate(_playbackRate);
       await _applySubtitleOffset(_subtitleOffset);
       _attachScrobbler();
+      _playerReadyForCastMirror = true;
       await _publishSyncPlayOpenIfNeeded(isPlaying: play);
 
       // Wait until media_kit has populated the tracks lists. This is more
@@ -299,6 +307,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       unawaited(_loadIntroSkipper());
       if (mounted) _tryEnterFullscreenAfterOpen();
     } catch (e) {
+      _playerReadyForCastMirror = false;
       if (!mounted) return;
       setState(() => _openError = e);
     }
@@ -670,6 +679,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // Pause / unpause events + 10-second progress timer.
     _playingSub = _player.stream.playing.listen((playing) {
       _progressTimer?.cancel();
+      if (_remoteCastMirrorActive) {
+        if (mounted) _syncIntroSkipperOverlay(_lastPosition);
+        return;
+      }
       final ticks = _lastPosition.inMilliseconds * _ticksPerMs;
       scrobbler.progress(
         positionTicks: ticks,
@@ -685,7 +698,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           );
         });
       }
-      if (!_applyingSyncPlayCommand) {
+      if (!_applyingSyncPlayCommand && !_remoteCastMirrorActive) {
         unawaited(_publishSyncPlayPlaying(playing));
       }
       if (mounted) _syncIntroSkipperOverlay(_lastPosition);
@@ -694,6 +707,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // When the file finishes, fire a final stop with full position so
     // Jellyfin marks it played.
     _completedSub = _player.stream.completed.listen((completed) {
+      if (_remoteCastMirrorActive) return;
       if (completed) {
         _cancelAutoplay();
         scrobbler.stop(
@@ -718,16 +732,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _positionSub = _player.stream.position.listen((p) {
       final previous = _lastPosition;
       _lastPosition = p;
-      if (!_applyingSyncPlayCommand) {
+      if (!_applyingSyncPlayCommand && !_remoteCastMirrorActive) {
         unawaited(_maybePublishSyncPlaySeek(previous, p));
       }
-      _maybeShowNextUp();
+      if (!_remoteCastMirrorActive) _maybeShowNextUp();
       if (mounted) _syncIntroSkipperOverlay(p);
     });
   }
 
   bool get _syncPlayActive =>
       ref.read(syncPlayControllerProvider).activeGroup != null;
+
+  bool get _remoteCastMirrorActive =>
+      _applyingRemoteCastState || _volumeBeforeCastMirror != null;
 
   Future<void> _publishSyncPlayPlaying(bool playing) async {
     if (!_syncPlayActive) return;
@@ -778,6 +795,80 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       return;
     }
     await controller.ready(position: _lastPosition, isPlaying: isPlaying);
+  }
+
+  void _handleActiveRemoteSessionChange(
+    AsyncValue<RemoteSession?>? previous,
+    AsyncValue<RemoteSession?> next,
+  ) {
+    final session = next.value;
+    if (session == null || !session.isPlayingSomething) {
+      unawaited(_stopRemoteCastMirror());
+      return;
+    }
+
+    final remoteItemId = session.nowPlayingItemId;
+    if (remoteItemId == null || remoteItemId.isEmpty) {
+      unawaited(_stopRemoteCastMirror());
+      return;
+    }
+
+    if (remoteItemId != widget.itemId) {
+      final position = session.estimatedPosition() ?? Duration.zero;
+      context.go(
+        Uri(
+          path: '/play/$remoteItemId',
+          queryParameters: {
+            'resumeTicks': '${position.inMilliseconds * _ticksPerMs}',
+          },
+        ).toString(),
+      );
+      return;
+    }
+
+    unawaited(_mirrorRemoteCastSession(session));
+  }
+
+  Future<void> _mirrorRemoteCastSession(RemoteSession session) async {
+    if (!_playerReadyForCastMirror || !mounted) return;
+    _applyingRemoteCastState = true;
+    try {
+      _volumeBeforeCastMirror ??= _player.state.volume;
+      if (_player.state.volume > 0) {
+        await _player.setVolume(0);
+      }
+
+      final remotePosition = session.estimatedPosition();
+      if (remotePosition != null) {
+        final drift = (_lastPosition - remotePosition).abs();
+        if (drift > const Duration(milliseconds: 900)) {
+          await _player.seek(remotePosition);
+        }
+      }
+
+      if (session.isPaused) {
+        if (_player.state.playing) await _player.pause();
+      } else {
+        if (!_player.state.playing) await _player.play();
+      }
+    } finally {
+      _applyingRemoteCastState = false;
+    }
+  }
+
+  Future<void> _stopRemoteCastMirror() async {
+    final restoreVolume = _volumeBeforeCastMirror;
+    if (restoreVolume == null) return;
+    _volumeBeforeCastMirror = null;
+    _applyingRemoteCastState = true;
+    try {
+      if (_player.state.playing) {
+        await _player.pause();
+      }
+      await _player.setVolume(restoreVolume);
+    } finally {
+      _applyingRemoteCastState = false;
+    }
   }
 
   void _maybeShowNextUp() {
@@ -846,7 +937,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _completedSub?.cancel();
     _durationSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
-    _scrobbler?.stop(positionTicks: _lastPosition.inMilliseconds * _ticksPerMs);
+    if (!_remoteCastMirrorActive) {
+      _scrobbler?.stop(
+        positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
+      );
+    }
     // Release the server-side transcoder if we were transcoding. Fire-and-
     // forget — `_player.dispose` doesn't wait for it, but we don't need to
     // either; the server times out idle encodings anyway.
@@ -959,6 +1054,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   onPlayNow: _playNextEpisode,
                 ),
               ),
+            Consumer(
+              builder: (context, ref, _) {
+                final remote = ref.watch(activeRemoteSessionProvider).value;
+                if (remote == null || !remote.isPlayingSomething) {
+                  return const SizedBox.shrink();
+                }
+                return Positioned(
+                  left: pad.left + 16,
+                  bottom: pad.bottom + 96,
+                  child: _RemoteCastStatus(
+                    session: remote,
+                    onTap: () => _showCastSheet(context),
+                  ),
+                );
+              },
+            ),
           ],
         );
       },
@@ -970,6 +1081,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     ref.listen<SyncPlayState>(
       syncPlayControllerProvider,
       _handleSyncPlayStateChange,
+    );
+    ref.listen<AsyncValue<RemoteSession?>>(
+      activeRemoteSessionProvider,
+      _handleActiveRemoteSessionChange,
     );
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
@@ -1244,6 +1359,141 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       isPlaying: _player.state.playing,
     );
   }
+}
+
+class _RemoteCastStatus extends StatelessWidget {
+  const _RemoteCastStatus({required this.session, required this.onTap});
+
+  final RemoteSession session;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = session.duration ?? Duration.zero;
+    final position = session.estimatedPosition() ?? Duration.zero;
+    final progress = duration > Duration.zero
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.36),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: 260,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.cast_connected_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          session.deviceName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        session.isPaused
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    session.nowPlayingTitle ?? 'Now playing',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  if (duration > Duration.zero) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        color: AppColors.primary,
+                        backgroundColor: Colors.white.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Text(
+                          _formatRemoteCastTimestamp(position),
+                          style: const TextStyle(
+                            color: AppColors.textTertiary,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _formatRemoteCastTimestamp(duration),
+                          style: const TextStyle(
+                            color: AppColors.textTertiary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatRemoteCastTimestamp(Duration value) {
+  if (value.isNegative) value = Duration.zero;
+  final hours = value.inHours;
+  final minutes = value.inMinutes.remainder(60);
+  final seconds = value.inSeconds.remainder(60);
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class _PlaybackSettingsOverlay extends ConsumerStatefulWidget {
