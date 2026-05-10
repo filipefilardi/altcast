@@ -84,62 +84,73 @@ class _PersonHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
-    final photoUrl = repo.personImageUrl(
-      person.id,
-      person.imageTag,
-      width: 300,
-    );
     final infoRows = _personalInfoRows(person);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+        final photoSize = isDesktop ? 156.0 : 96.0;
+        final photoUrl = repo.personImageUrl(
+          person.id,
+          person.imageTag,
+          width: isDesktop ? 460 : 300,
+        );
+
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 96,
-                height: 96,
-                child: ColoredBox(
-                  color: AppColors.surfaceElevated,
-                  child: LocalOrNetworkImage(
-                    source: photoUrl,
-                    errorBuilder: (_) => const Icon(
-                      Icons.person_outline,
-                      color: AppColors.textSecondary,
-                      size: 34,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(isDesktop ? 16 : 12),
+                  child: SizedBox.square(
+                    dimension: photoSize,
+                    child: ColoredBox(
+                      color: AppColors.surfaceElevated,
+                      child: LocalOrNetworkImage(
+                        source: photoUrl,
+                        errorBuilder: (_) => Icon(
+                          Icons.person_outline,
+                          color: AppColors.textSecondary,
+                          size: isDesktop ? 48 : 34,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    person.name,
-                    style: Theme.of(context).textTheme.titleLarge,
+                SizedBox(width: isDesktop ? 20 : 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        person.name,
+                        style: isDesktop
+                            ? Theme.of(context).textTheme.headlineMedium
+                            : Theme.of(context).textTheme.titleLarge,
+                      ),
+                      if (infoRows.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        ...infoRows,
+                      ],
+                    ],
                   ),
-                  if (infoRows.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    ...infoRows,
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
+            if (person.overview != null && person.overview!.isNotEmpty) ...[
+              SizedBox(height: isDesktop ? 20 : 14),
+              ExpandableText(
+                text: person.overview!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: isDesktop ? 14 : null,
+                  height: 1.5,
+                ),
+              ),
+            ],
           ],
-        ),
-        if (person.overview != null && person.overview!.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          ExpandableText(
-            text: person.overview!,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ],
+        );
+      },
     );
   }
 
@@ -194,9 +205,9 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
         value,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AppColors.textSecondary,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
       ),
     );
   }
@@ -215,21 +226,26 @@ class _WorksGrid extends StatelessWidget {
         style: TextStyle(color: AppColors.textSecondary),
       );
     }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.55,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) => PosterCard(
-        item: items[i],
-        width: double.infinity,
-        onTap: () => openItemDetail(context, items[i]),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxExtent = constraints.maxWidth >= 900 ? 190.0 : 168.0;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: maxExtent,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.55,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) => PosterCard(
+            item: items[i],
+            width: double.infinity,
+            onTap: () => openItemDetail(context, items[i]),
+          ),
+        );
+      },
     );
   }
 }
@@ -239,25 +255,35 @@ class _PersonHeaderSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Skeleton.group(
-      child: Row(
-        children: [
-          Skeleton.box(width: 96, height: 96, radius: 12),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Skeleton.line(width: 180),
-                SizedBox(height: 8),
-                Skeleton.line(width: 130),
-                SizedBox(height: 8),
-                Skeleton.line(width: 120),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+        final photoSize = isDesktop ? 156.0 : 96.0;
+        return Skeleton.group(
+          child: Row(
+            children: [
+              Skeleton.box(
+                width: photoSize,
+                height: photoSize,
+                radius: isDesktop ? 16 : 12,
+              ),
+              SizedBox(width: isDesktop ? 20 : 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Skeleton.line(width: 180),
+                    const SizedBox(height: 8),
+                    Skeleton.line(width: 130),
+                    const SizedBox(height: 8),
+                    Skeleton.line(width: 120),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -267,20 +293,25 @@ class _WorksSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Skeleton.group(
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.55,
-        ),
-        itemCount: 9,
-        itemBuilder: (_, _) =>
-            Skeleton.box(width: double.infinity, height: 180),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxExtent = constraints.maxWidth >= 900 ? 190.0 : 168.0;
+        return Skeleton.group(
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: maxExtent,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.55,
+            ),
+            itemCount: 9,
+            itemBuilder: (_, _) =>
+                Skeleton.box(width: double.infinity, height: double.infinity),
+          ),
+        );
+      },
     );
   }
 }

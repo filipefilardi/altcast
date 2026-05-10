@@ -77,23 +77,34 @@ final searchFiltersProvider =
 /// search tab drops the request.
 final searchResultsProvider = FutureProvider.autoDispose<List<BrowseItem>>((
   ref,
-) {
+) async {
   final query = ref.watch(searchQueryProvider);
   final filters = ref.watch(searchFiltersProvider);
-  if (query.trim().isEmpty) return Future.value(const <BrowseItem>[]);
-  final itemTypes = [
+  if (query.trim().isEmpty) return const <BrowseItem>[];
+  final mediaTypes = [
     if (filters.includeMovies) 'Movie',
     if (filters.includeShows) 'Series',
-    if (filters.includePeople) 'Person',
   ].join(',');
-  if (itemTypes.isEmpty) return Future.value(const <BrowseItem>[]);
-  return ref
-      .watch(jellyfinRepositoryProvider)
-      .searchAdvanced(
+  if (mediaTypes.isEmpty && !filters.includePeople) {
+    return const <BrowseItem>[];
+  }
+
+  final repo = ref.watch(jellyfinRepositoryProvider);
+  final results = await Future.wait([
+    if (mediaTypes.isNotEmpty)
+      repo.searchAdvanced(
         query,
         genre: filters.genre,
         year: filters.year,
         unwatchedOnly: filters.unwatchedOnly,
-        itemTypes: itemTypes,
-      );
+        itemTypes: mediaTypes,
+      )
+    else
+      Future.value(const <BrowseItem>[]),
+    if (filters.includePeople)
+      repo.searchPeople(query)
+    else
+      Future.value(const <BrowseItem>[]),
+  ]);
+  return [...results[0], ...results[1]];
 });

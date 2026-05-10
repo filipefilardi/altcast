@@ -148,6 +148,26 @@ class JellyfinRepository {
         .toList();
   }
 
+  Future<List<BrowseItem>> searchPeople(String query, {int limit = 30}) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Persons',
+      queryParameters: {
+        'UserId': s.userId,
+        'searchTerm': trimmed,
+        'Limit': limit,
+        'Fields': 'PrimaryImageAspectRatio',
+        'EnableImages': true,
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+  }
+
   Future<LibraryPage> browseMovies({
     int startIndex = 0,
     int limit = 30,
