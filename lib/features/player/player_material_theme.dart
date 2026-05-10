@@ -25,6 +25,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
   required void Function(BuildContext origin) onOpenSyncPlay,
+  required VoidCallback onRotateOrientation,
   required void Function(double value) onVolumeChanged,
   required String title,
 }) {
@@ -126,6 +127,13 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
               onPressed: () => onOpenCast(ctx),
             );
           },
+        ),
+      ),
+      Builder(
+        builder: (ctx) => AltCastChromeIconButton(
+          icon: Icons.screen_rotation_rounded,
+          tooltip: 'Rotate',
+          onPressed: onRotateOrientation,
         ),
       ),
       Builder(

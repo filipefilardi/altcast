@@ -23,41 +23,52 @@ class DownloadsScreen extends ConsumerWidget {
       ),
       body: !state.bootstrapped
           ? const Center(child: CircularProgressIndicator())
-          : state.items.isEmpty && state.progress.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: EmptyState(
-                    icon: Icons.download_outlined,
-                    title: 'Nothing downloaded yet',
-                    message:
-                        'Tap the download icon on a movie or episode to keep it offline.',
+          : state.items.isEmpty &&
+                state.progress.isEmpty &&
+                state.failures.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: EmptyState(
+                icon: Icons.download_outlined,
+                title: 'Nothing downloaded yet',
+                message:
+                    'Tap the download icon on a movie or episode to keep it offline.',
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              children: [
+                if (state.progress.isNotEmpty) ...[
+                  Text(
+                    'Downloading'.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
-                )
-              : ListView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  children: [
-                    if (state.progress.isNotEmpty) ...[
-                      Text(
-                        'Downloading'.toUpperCase(),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final entry in state.progress.values)
-                        _InProgressRow(progress: entry),
-                      const SizedBox(height: 24),
-                    ],
-                    if (state.items.isNotEmpty) ...[
-                      Text(
-                        'Available offline'.toUpperCase(),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final item in state.items.values)
-                        _DownloadedRow(item: item),
-                    ],
-                  ],
-                ),
+                  const SizedBox(height: 8),
+                  for (final entry in state.progress.values)
+                    _InProgressRow(progress: entry),
+                  const SizedBox(height: 24),
+                ],
+                if (state.failures.isNotEmpty) ...[
+                  Text(
+                    'Needs attention'.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final failure in state.failures.values)
+                    _FailedRow(failure: failure),
+                  const SizedBox(height: 24),
+                ],
+                if (state.items.isNotEmpty) ...[
+                  Text(
+                    'Available offline'.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final item in state.items.values)
+                    _DownloadedRow(item: item),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -134,8 +145,10 @@ class _DownloadedRow extends ConsumerWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  color: AppColors.textSecondary),
+              icon: const Icon(
+                Icons.delete_outline,
+                color: AppColors.textSecondary,
+              ),
               tooltip: 'Remove download',
               onPressed: () =>
                   ref.read(downloadManagerProvider.notifier).delete(item.id),
@@ -147,8 +160,7 @@ class _DownloadedRow extends ConsumerWidget {
   }
 
   String _primaryLabel(DownloadedItem item) {
-    if (item.kind == DownloadedItemKind.episode &&
-        item.seriesName != null) {
+    if (item.kind == DownloadedItemKind.episode && item.seriesName != null) {
       return '${item.seriesName} — ${item.name}';
     }
     return item.name;
@@ -162,6 +174,91 @@ class _DownloadedRow extends ConsumerWidget {
       if (item.runTime != null) formatLongDuration(item.runTime!),
     ];
     return parts.isEmpty ? null : parts.join(' • ');
+  }
+}
+
+class _FailedRow extends ConsumerWidget {
+  const _FailedRow({required this.failure});
+  final DownloadFailure failure;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 78,
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.error_outline,
+              color: AppColors.error,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _label(failure),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _secondary(failure),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            tooltip: 'Retry download',
+            onPressed: () => ref
+                .read(downloadManagerProvider.notifier)
+                .retry(failure.itemId),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: AppColors.textSecondary),
+            tooltip: 'Dismiss',
+            onPressed: () => ref
+                .read(downloadManagerProvider.notifier)
+                .dismissFailure(failure.itemId),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _label(DownloadFailure f) {
+    if (f.kind == DownloadedItemKind.episode && f.seriesName != null) {
+      return '${f.seriesName} — ${f.name}';
+    }
+    return f.name;
+  }
+
+  String _secondary(DownloadFailure f) {
+    if (f.episodeLabel != null) return '${f.episodeLabel} • ${f.message}';
+    return f.message;
   }
 }
 

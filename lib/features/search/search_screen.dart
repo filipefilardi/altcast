@@ -140,104 +140,107 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         'Search filters',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<LibrarySort>(
-                      initialValue: sort,
-                      decoration: const InputDecoration(labelText: 'Sort'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: LibrarySort.recentlyAdded,
-                          child: Text('Most relevant/recent'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.nameAsc,
-                          child: Text('Name A-Z'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.nameDesc,
-                          child: Text('Name Z-A'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.yearDesc,
-                          child: Text('Year (newest first)'),
-                        ),
-                      ],
-                      onChanged: (v) => setModalState(() => sort = v ?? sort),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      initialValue: genre ?? '',
-                      decoration: const InputDecoration(labelText: 'Genre'),
-                      onChanged: (v) =>
-                          genre = v.trim().isEmpty ? null : v.trim(),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: yearController,
-                      decoration: const InputDecoration(labelText: 'Year'),
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      onChanged: (v) => year = int.tryParse(v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Unwatched only'),
-                      value: unwatched,
-                      onChanged: (v) => setModalState(() => unwatched = v),
-                    ),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Movies'),
-                      value: movies,
-                      onChanged: (v) => setModalState(() => movies = v ?? true),
-                    ),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('TV Shows'),
-                      value: shows,
-                      onChanged: (v) => setModalState(() => shows = v ?? true),
-                    ),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('People'),
-                      value: people,
-                      onChanged: (v) => setModalState(() => people = v ?? true),
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            ref.read(searchFiltersProvider.notifier).clear();
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Clear'),
-                        ),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: () {
-                            ref
-                                .read(searchFiltersProvider.notifier)
-                                .set(
-                                  SearchFilterState(
-                                    genre: genre,
-                                    year: year,
-                                    unwatchedOnly: unwatched,
-                                    includeMovies: movies,
-                                    includeShows: shows,
-                                    includePeople: people,
-                                    sort: sort,
-                                  ),
-                                );
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Apply'),
-                        ),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<LibrarySort>(
+                        initialValue: sort,
+                        decoration: const InputDecoration(labelText: 'Sort'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: LibrarySort.recentlyAdded,
+                            child: Text('Most relevant/recent'),
+                          ),
+                          DropdownMenuItem(
+                            value: LibrarySort.nameAsc,
+                            child: Text('Name A-Z'),
+                          ),
+                          DropdownMenuItem(
+                            value: LibrarySort.nameDesc,
+                            child: Text('Name Z-A'),
+                          ),
+                          DropdownMenuItem(
+                            value: LibrarySort.yearDesc,
+                            child: Text('Year (newest first)'),
+                          ),
+                        ],
+                        onChanged: (v) => setModalState(() => sort = v ?? sort),
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        initialValue: genre ?? '',
+                        decoration: const InputDecoration(labelText: 'Genre'),
+                        onChanged: (v) =>
+                            genre = v.trim().isEmpty ? null : v.trim(),
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: yearController,
+                        decoration: const InputDecoration(labelText: 'Year'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: (v) => year = int.tryParse(v),
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Unwatched only'),
+                        value: unwatched,
+                        onChanged: (v) => setModalState(() => unwatched = v),
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Movies'),
+                        value: movies,
+                        onChanged: (v) =>
+                            setModalState(() => movies = v ?? true),
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('TV Shows'),
+                        value: shows,
+                        onChanged: (v) =>
+                            setModalState(() => shows = v ?? true),
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('People'),
+                        value: people,
+                        onChanged: (v) =>
+                            setModalState(() => people = v ?? true),
+                      ),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              ref.read(searchFiltersProvider.notifier).clear();
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Clear'),
+                          ),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: () {
+                              ref
+                                  .read(searchFiltersProvider.notifier)
+                                  .set(
+                                    SearchFilterState(
+                                      genre: genre,
+                                      year: year,
+                                      unwatchedOnly: unwatched,
+                                      includeMovies: movies,
+                                      includeShows: shows,
+                                      includePeople: people,
+                                      sort: sort,
+                                    ),
+                                  );
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Apply'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -344,19 +347,19 @@ class _Body extends StatelessWidget {
 }
 
 List<String> _searchFilterLabels(SearchFilterState filters) => [
-      if (filters.genre != null) filters.genre!,
-      if (filters.year != null) '${filters.year}',
-      if (filters.unwatchedOnly) 'Unwatched',
-      if (!filters.includeMovies) 'No Movies',
-      if (!filters.includeShows) 'No Shows',
-      if (!filters.includePeople) 'No People',
-      switch (filters.sort) {
-        LibrarySort.nameAsc => 'A-Z',
-        LibrarySort.nameDesc => 'Z-A',
-        LibrarySort.yearDesc => 'Year',
-        LibrarySort.recentlyAdded => 'Recent',
-      },
-    ];
+  if (filters.genre != null) filters.genre!,
+  if (filters.year != null) '${filters.year}',
+  if (filters.unwatchedOnly) 'Unwatched',
+  if (!filters.includeMovies) 'No Movies',
+  if (!filters.includeShows) 'No Shows',
+  if (!filters.includePeople) 'No People',
+  switch (filters.sort) {
+    LibrarySort.nameAsc => 'A-Z',
+    LibrarySort.nameDesc => 'Z-A',
+    LibrarySort.yearDesc => 'Year',
+    LibrarySort.recentlyAdded => 'Recent',
+  },
+];
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label, required this.count});
@@ -393,8 +396,8 @@ class _PosterGrid extends StatelessWidget {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 168,
         mainAxisSpacing: 16,
         crossAxisSpacing: 12,
         childAspectRatio: 0.55,
@@ -426,8 +429,8 @@ class _SearchSkeleton extends StatelessWidget {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 168,
               mainAxisSpacing: 16,
               crossAxisSpacing: 12,
               childAspectRatio: 0.55,
@@ -521,4 +524,3 @@ class _PersonTile extends ConsumerWidget {
     );
   }
 }
-

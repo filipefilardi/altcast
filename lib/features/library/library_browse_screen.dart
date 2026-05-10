@@ -197,8 +197,8 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 168,
             mainAxisSpacing: 16,
             crossAxisSpacing: 12,
             childAspectRatio: 0.55,

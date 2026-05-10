@@ -58,11 +58,13 @@ class LibraryScreen extends ConsumerWidget {
   String _downloadsSubtitle(DownloadsState s) {
     if (!s.bootstrapped) return 'Loading…';
     final pending = s.progress.length;
+    final failed = s.failures.length;
     final done = s.items.length;
-    if (done == 0 && pending == 0) return 'Nothing offline yet';
+    if (done == 0 && pending == 0 && failed == 0) return 'Nothing offline yet';
     final parts = [
       if (done > 0) '$done available offline',
       if (pending > 0) '$pending downloading',
+      if (failed > 0) '$failed failed',
     ];
     return parts.join(' • ');
   }

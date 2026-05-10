@@ -15,26 +15,32 @@ enum DownloadLocation {
 class DownloadPreferences {
   const DownloadPreferences({
     this.autoDownloadNextEpisode = false,
+    this.wifiOnlyDownloads = true,
     this.downloadLocation = DownloadLocation.internal,
   });
 
   final bool autoDownloadNextEpisode;
+  final bool wifiOnlyDownloads;
   final DownloadLocation downloadLocation;
 
   DownloadPreferences copyWith({
     bool? autoDownloadNextEpisode,
+    bool? wifiOnlyDownloads,
     DownloadLocation? downloadLocation,
   }) {
     return DownloadPreferences(
-      autoDownloadNextEpisode: autoDownloadNextEpisode ?? this.autoDownloadNextEpisode,
+      autoDownloadNextEpisode:
+          autoDownloadNextEpisode ?? this.autoDownloadNextEpisode,
+      wifiOnlyDownloads: wifiOnlyDownloads ?? this.wifiOnlyDownloads,
       downloadLocation: downloadLocation ?? this.downloadLocation,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'autoDownloadNextEpisode': autoDownloadNextEpisode,
-        'downloadLocation': downloadLocation.name,
-      };
+    'autoDownloadNextEpisode': autoDownloadNextEpisode,
+    'wifiOnlyDownloads': wifiOnlyDownloads,
+    'downloadLocation': downloadLocation.name,
+  };
 
   factory DownloadPreferences.fromJson(Map<String, dynamic> json) {
     final locationName = json['downloadLocation'] as String?;
@@ -43,7 +49,9 @@ class DownloadPreferences {
       orElse: () => DownloadLocation.internal,
     );
     return DownloadPreferences(
-      autoDownloadNextEpisode: json['autoDownloadNextEpisode'] as bool? ?? false,
+      autoDownloadNextEpisode:
+          json['autoDownloadNextEpisode'] as bool? ?? false,
+      wifiOnlyDownloads: json['wifiOnlyDownloads'] as bool? ?? true,
       downloadLocation: location,
     );
   }
@@ -51,8 +59,8 @@ class DownloadPreferences {
 
 final downloadPreferencesProvider =
     NotifierProvider<DownloadPreferencesNotifier, DownloadPreferences>(
-  DownloadPreferencesNotifier.new,
-);
+      DownloadPreferencesNotifier.new,
+    );
 
 class DownloadPreferencesNotifier extends Notifier<DownloadPreferences> {
   @override
@@ -72,6 +80,11 @@ class DownloadPreferencesNotifier extends Notifier<DownloadPreferences> {
 
   Future<void> setAutoDownloadNextEpisode(bool enabled) async {
     state = state.copyWith(autoDownloadNextEpisode: enabled);
+    await _persist();
+  }
+
+  Future<void> setWifiOnlyDownloads(bool enabled) async {
+    state = state.copyWith(wifiOnlyDownloads: enabled);
     await _persist();
   }
 
