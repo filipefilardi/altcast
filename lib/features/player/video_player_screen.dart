@@ -1128,7 +1128,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         right: pad.right + 12,
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth: size.width < 360 ? size.width - 24 : 236,
+                            maxWidth: size.width < 380 ? size.width - 24 : 280,
                           ),
                           child: _PlaybackSettingsOverlay(
                             initialRate: _playbackRate,
@@ -1673,44 +1673,64 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
                 ),
               ),
               Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: AppColors.primary,
-                    inactiveTrackColor: Colors.white.withValues(alpha: 0.24),
-                    thumbColor: AppColors.primary,
-                    overlayColor: AppColors.primary.withValues(alpha: 0.16),
-                    valueIndicatorColor: AppColors.surfaceElevated,
-                    valueIndicatorTextStyle: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      IgnorePointer(
-                        child: SizedBox(
-                          width: _zeroMarkerWidth,
-                          height: _zeroMarkerHeight,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (details) {
+                        _setOffsetFromDx(details.localPosition.dx, constraints);
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        _setOffsetFromDx(details.localPosition.dx, constraints);
+                      },
+                      onTapDown: (details) {
+                        _setOffsetFromDx(details.localPosition.dx, constraints);
+                      },
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: Colors.white.withValues(
+                            alpha: 0.24,
+                          ),
+                          thumbColor: AppColors.primary,
+                          overlayColor: AppColors.primary.withValues(
+                            alpha: 0.16,
+                          ),
+                          valueIndicatorColor: AppColors.surfaceElevated,
+                          valueIndicatorTextStyle: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            IgnorePointer(
+                              child: SizedBox(
+                                width: _zeroMarkerWidth,
+                                height: _zeroMarkerHeight,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Slider(
+                              min: _minOffsetSeconds,
+                              max: _maxOffsetSeconds,
+                              divisions: 240,
+                              label: _offsetLabel(_subtitleOffset),
+                              value: _subtitleOffset.inMilliseconds / 1000.0,
+                              onChanged: _setOffsetSeconds,
+                            ),
+                          ],
+                        ),
                       ),
-                      Slider(
-                        min: _minOffsetSeconds,
-                        max: _maxOffsetSeconds,
-                        divisions: 240,
-                        label: _offsetLabel(_subtitleOffset),
-                        value: _subtitleOffset.inMilliseconds / 1000.0,
-                        onChanged: _setOffsetSeconds,
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               IconButton(
@@ -1730,6 +1750,15 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
   void _setOffsetSeconds(double value) {
     final offset = Duration(milliseconds: (value * 1000).round());
     _setOffset(offset);
+  }
+
+  void _setOffsetFromDx(double dx, BoxConstraints constraints) {
+    final width = constraints.maxWidth;
+    if (width <= 0) return;
+    final t = (dx / width).clamp(0.0, 1.0);
+    final seconds =
+        _minOffsetSeconds + ((_maxOffsetSeconds - _minOffsetSeconds) * t);
+    _setOffsetSeconds(seconds);
   }
 
   Future<void> _setOffset(Duration value) async {
