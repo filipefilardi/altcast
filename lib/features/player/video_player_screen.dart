@@ -160,6 +160,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _applyingRemoteCastState = false;
   bool _playerReadyForCastMirror = false;
   double? _volumeBeforeCastMirror;
+  DateTime? _lastRemoteCastSeekAt;
   int _lastSyncQueueSerial = 0;
   int _lastSyncCommandSerial = 0;
   String? _lastSyncCommandKey;
@@ -841,7 +842,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final remotePosition = session.estimatedPosition();
       if (remotePosition != null) {
         final drift = (_lastPosition - remotePosition).abs();
-        if (drift > const Duration(milliseconds: 900)) {
+        final now = DateTime.now();
+        final lastSeekAt = _lastRemoteCastSeekAt;
+        final minSeekInterval = session.isPaused
+            ? const Duration(milliseconds: 350)
+            : const Duration(seconds: 3);
+        final seekThreshold = session.isPaused
+            ? const Duration(milliseconds: 450)
+            : const Duration(seconds: 3);
+        final canSeek =
+            lastSeekAt == null || now.difference(lastSeekAt) >= minSeekInterval;
+        if (drift > seekThreshold && canSeek) {
+          _lastRemoteCastSeekAt = now;
           await _player.seek(remotePosition);
         }
       }
@@ -860,6 +872,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final restoreVolume = _volumeBeforeCastMirror;
     if (restoreVolume == null) return;
     _volumeBeforeCastMirror = null;
+    _lastRemoteCastSeekAt = null;
     _applyingRemoteCastState = true;
     try {
       if (_player.state.playing) {
@@ -1054,22 +1067,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   onPlayNow: _playNextEpisode,
                 ),
               ),
-            Consumer(
-              builder: (context, ref, _) {
-                final remote = ref.watch(activeRemoteSessionProvider).value;
-                if (remote == null || !remote.isPlayingSomething) {
-                  return const SizedBox.shrink();
-                }
-                return Positioned(
-                  left: pad.left + 16,
-                  bottom: pad.bottom + 96,
-                  child: _RemoteCastStatus(
-                    session: remote,
-                    onTap: () => _showCastSheet(context),
-                  ),
-                );
-              },
-            ),
           ],
         );
       },
@@ -1359,141 +1356,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       isPlaying: _player.state.playing,
     );
   }
-}
-
-class _RemoteCastStatus extends StatelessWidget {
-  const _RemoteCastStatus({required this.session, required this.onTap});
-
-  final RemoteSession session;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final duration = session.duration ?? Duration.zero;
-    final position = session.estimatedPosition() ?? Duration.zero;
-    final progress = duration > Duration.zero
-        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.58),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.36),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: SizedBox(
-            width: 260,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.cast_connected_rounded,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          session.deviceName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        session.isPaused
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    session.nowPlayingTitle ?? 'Now playing',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  if (duration > Duration.zero) ...[
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 3,
-                        color: AppColors.primary,
-                        backgroundColor: Colors.white.withValues(alpha: 0.16),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Text(
-                          _formatRemoteCastTimestamp(position),
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _formatRemoteCastTimestamp(duration),
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-String _formatRemoteCastTimestamp(Duration value) {
-  if (value.isNegative) value = Duration.zero;
-  final hours = value.inHours;
-  final minutes = value.inMinutes.remainder(60);
-  final seconds = value.inSeconds.remainder(60);
-  if (hours > 0) {
-    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class _PlaybackSettingsOverlay extends ConsumerStatefulWidget {

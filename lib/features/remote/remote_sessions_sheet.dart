@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -57,42 +59,47 @@ class _RemoteSessionsSheet extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
               child: Row(
                 children: [
-                  Icon(Icons.cast, color: AppColors.primary),
-                  SizedBox(width: 12),
-                  Text(
-                    'Play on…',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  const _SheetIcon(icon: Icons.cast_connected_rounded),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          itemId == null ? 'Cast controls' : 'Play on',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Nearby Jellyfin sessions',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
             if (activeRemoteId != null)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                leading: const Icon(
-                  Icons.phone_iphone_rounded,
-                  color: AppColors.primary,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: _ReturnToDeviceTile(
+                  onTap: () => _switchToLocal(context, ref, activeRemoteId),
                 ),
-                title: const Text(
-                  'This device',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Stop remote playback',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                onTap: () => _switchToLocal(context, ref, activeRemoteId),
               ),
             Flexible(
               child: sessionsAsync.when(
@@ -110,9 +117,9 @@ class _RemoteSessionsSheet extends ConsumerWidget {
                   }
                   return ListView.separated(
                     shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     itemCount: sessions.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (_, i) => _SessionRow(
                       session: sessions[i],
                       itemId: itemId,
@@ -135,6 +142,63 @@ class _RemoteSessionsSheet extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetIcon extends StatelessWidget {
+  const _SheetIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 40,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: AppColors.primary, size: 21),
+      ),
+    );
+  }
+}
+
+class _ReturnToDeviceTile extends StatelessWidget {
+  const _ReturnToDeviceTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'This device',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -174,57 +238,67 @@ class _SessionRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final canCast = itemId != null;
     final isActive = ref.watch(activeRemoteSessionIdProvider) == session.id;
-    return InkWell(
-      onTap: canCast ? () => _cast(context, ref) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_iconForClient(session.client), color: AppColors.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        session.deviceName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (session.client.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+    return Material(
+      color: isActive
+          ? AppColors.primary.withValues(alpha: 0.10)
+          : AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: canCast ? () => _cast(context, ref) : null,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _DeviceAvatar(icon: _iconForClient(session.client)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          session.client,
+                          session.deviceName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (session.client.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            session.client,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                if (isActive)
-                  const Icon(Icons.check_rounded, color: AppColors.primary)
-                else if (canCast)
-                  const Icon(Icons.cast, color: AppColors.textTertiary),
+                  if (isActive)
+                    const Icon(Icons.check_rounded, color: AppColors.primary)
+                  else if (canCast)
+                    const Icon(
+                      Icons.cast_rounded,
+                      color: AppColors.textTertiary,
+                    ),
+                ],
+              ),
+              if (session.isPlayingSomething) ...[
+                const SizedBox(height: 12),
+                _NowPlayingControls(session: session),
               ],
-            ),
-            if (session.isPlayingSomething) ...[
-              const SizedBox(height: 12),
-              _NowPlayingControls(session: session),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -281,6 +355,26 @@ class _SessionRow extends ConsumerWidget {
   }
 }
 
+class _DeviceAvatar extends StatelessWidget {
+  const _DeviceAvatar({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 38,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceHighlight,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: AppColors.primary, size: 20),
+      ),
+    );
+  }
+}
+
 /// Inline mini-control rendered under a session row when that session is
 /// playing something. Title + scrubber + transport controls.
 ///
@@ -301,6 +395,14 @@ class _NowPlayingControls extends ConsumerStatefulWidget {
 class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
   /// Position the slider should render. `null` → mirror the polled value.
   double? _scrubOverride;
+  double? _volumeOverride;
+  Timer? _volumeDebounce;
+
+  @override
+  void dispose() {
+    _volumeDebounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -313,12 +415,15 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
     final value =
         _scrubOverride ??
         (hasDuration ? (liveMicroseconds * 10) / totalTicks : 0.0);
+    final volumeValue =
+        _volumeOverride ?? session.volumeLevel?.clamp(0, 100).toDouble();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.background.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -345,6 +450,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                   color: AppColors.primary,
                 ),
                 tooltip: session.isPaused ? 'Play' : 'Pause',
+                visualDensity: VisualDensity.compact,
                 onPressed: () => repo.playPause(session.id),
               ),
               IconButton(
@@ -353,6 +459,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                   color: AppColors.textSecondary,
                 ),
                 tooltip: 'Stop',
+                visualDensity: VisualDensity.compact,
                 onPressed: () async {
                   await repo.stop(session.id);
                   if (isActive) {
@@ -374,6 +481,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                     color: AppColors.textSecondary,
                   ),
                   tooltip: session.isMuted ? 'Unmute' : 'Mute',
+                  visualDensity: VisualDensity.compact,
                   onPressed: () =>
                       repo.setMute(session.id, muted: !session.isMuted),
                 ),
@@ -391,8 +499,9 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                     child: Slider(
                       min: 0,
                       max: 100,
-                      value: session.volumeLevel!.clamp(0, 100).toDouble(),
-                      onChanged: (v) => repo.setVolume(session.id, v.round()),
+                      value: volumeValue ?? 0,
+                      onChanged: (v) => _setVolumePreview(repo, session.id, v),
+                      onChangeEnd: (v) => _commitVolume(repo, session.id, v),
                     ),
                   ),
                 ),
@@ -456,5 +565,28 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
         ],
       ),
     );
+  }
+
+  void _setVolumePreview(
+    RemoteSessionsRepository repo,
+    String sessionId,
+    double value,
+  ) {
+    setState(() => _volumeOverride = value);
+    _volumeDebounce?.cancel();
+    _volumeDebounce = Timer(const Duration(milliseconds: 120), () {
+      repo.setVolume(sessionId, value.round());
+    });
+  }
+
+  Future<void> _commitVolume(
+    RemoteSessionsRepository repo,
+    String sessionId,
+    double value,
+  ) async {
+    _volumeDebounce?.cancel();
+    await repo.setVolume(sessionId, value.round());
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _volumeOverride = null);
   }
 }
