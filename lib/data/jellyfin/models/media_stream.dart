@@ -67,10 +67,7 @@ MediaStreamKind _kindFromType(String? type) {
 
 /// Tracks-only summary of an item — what the pre-play picker shows.
 class ItemMediaStreams {
-  const ItemMediaStreams({
-    required this.audio,
-    required this.subtitle,
-  });
+  const ItemMediaStreams({required this.audio, required this.subtitle});
 
   final List<MediaStream> audio;
   final List<MediaStream> subtitle;
@@ -82,9 +79,17 @@ class ItemMediaStreams {
   /// the kind at all. Useful for the picker's initial value.
   MediaStream? defaultAudio() {
     if (audio.isEmpty) return null;
-    return audio.firstWhere(
-      (s) => s.isDefault,
-      orElse: () => audio.first,
-    );
+    return audio.firstWhere((s) => s.isDefault, orElse: () => audio.first);
+  }
+
+  /// Server-selected subtitle stream when Jellyfin marks one. If there is only
+  /// one subtitle, expose it so a single-option detail picker can still show
+  /// the language instead of a generic auto label.
+  MediaStream? defaultSubtitle() {
+    if (subtitle.isEmpty) return null;
+    for (final stream in subtitle) {
+      if (stream.isDefault) return stream;
+    }
+    return subtitle.length == 1 ? subtitle.first : null;
   }
 }
