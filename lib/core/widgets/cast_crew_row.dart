@@ -11,11 +11,7 @@ import 'local_or_network_image.dart';
 /// Caps at [maxShown] to keep first paint cheap; callers should provide a
 /// "See all" affordance at the screen level if they want full coverage.
 class CastCrewRow extends ConsumerWidget {
-  const CastCrewRow({
-    super.key,
-    required this.people,
-    this.maxShown = 14,
-  });
+  const CastCrewRow({super.key, required this.people, this.maxShown = 14});
 
   final List<PersonCredit> people;
   final int maxShown;
@@ -24,67 +20,81 @@ class CastCrewRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
     final shown = people.take(maxShown).toList(growable: false);
-    return SizedBox(
-      height: 114,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: shown.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, i) {
-          final person = shown[i];
-          final imageUrl = repo.personImageUrl(person.id, person.primaryImageTag);
-          return InkWell(
-            onTap: person.id == null || person.id!.isEmpty
-                ? null
-                : () => context.push('/person/${person.id}'),
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 86,
-              child: Column(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: const BoxDecoration(
-                      color: AppColors.surfaceElevated,
-                      shape: BoxShape.circle,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: LocalOrNetworkImage(
-                      source: imageUrl,
-                      errorBuilder: (_) => const Icon(
-                        Icons.person_outline,
-                        color: AppColors.textSecondary,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+        final avatarSize = isDesktop ? 82.0 : 60.0;
+        final itemWidth = isDesktop ? 112.0 : 86.0;
+        final height = isDesktop ? 142.0 : 114.0;
+
+        return SizedBox(
+          height: height,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: shown.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, i) {
+              final person = shown[i];
+              final imageUrl = repo.personImageUrl(
+                person.id,
+                person.primaryImageTag,
+                width: isDesktop ? 220 : 160,
+              );
+              return InkWell(
+                onTap: person.id == null || person.id!.isEmpty
+                    ? null
+                    : () => context.push('/person/${person.id}'),
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: itemWidth,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: const BoxDecoration(
+                          color: AppColors.surfaceElevated,
+                          shape: BoxShape.circle,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: LocalOrNetworkImage(
+                          source: imageUrl,
+                          errorBuilder: (_) => Icon(
+                            Icons.person_outline,
+                            color: AppColors.textSecondary,
+                            size: isDesktop ? 34 : 24,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isDesktop ? 13 : 12,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        person.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    person.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    person.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

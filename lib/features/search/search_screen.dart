@@ -85,7 +85,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               autofocus: query.isEmpty,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Movies & shows',
+                hintText: 'Movies, shows & cast',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _controller.text.isEmpty
                     ? null
@@ -270,7 +270,7 @@ class _Body extends StatelessWidget {
         child: EmptyState(
           icon: Icons.search,
           title: 'Find something to watch',
-          message: 'Type a movie or show name above.',
+          message: 'Type a movie, show, or cast member above.',
         ),
       );
     }
