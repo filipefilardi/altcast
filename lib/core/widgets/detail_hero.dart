@@ -22,11 +22,22 @@ class DetailHero extends StatelessWidget {
   /// rating, etc.).
   final Widget? metaRow;
 
-  static double heightForWidth(double width) {
-    final isDesktop = width >= 900;
-    if (!isDesktop) return width * 9 / 16;
+  static bool useComposedLayout(double width, Orientation orientation) {
+    return width >= 900 ||
+        (orientation == Orientation.landscape && width >= 640);
+  }
 
+  static double heightForWidth(double width, Orientation orientation) {
+    final isComposed = useComposedLayout(width, orientation);
+    if (!isComposed) return width * 9 / 16;
+
+    final isDesktop = width >= 900;
     final target = width * 0.44;
+    if (!isDesktop) {
+      if (target < 300) return 300;
+      if (target > 420) return 420;
+      return target;
+    }
     if (target < 520) return 520;
     if (target > 760) return 760;
     return target;
@@ -37,8 +48,9 @@ class DetailHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final isDesktop = width >= 900;
-        final height = DetailHero.heightForWidth(width);
+        final orientation = MediaQuery.orientationOf(context);
+        final isComposed = DetailHero.useComposedLayout(width, orientation);
+        final height = DetailHero.heightForWidth(width, orientation);
 
         return SizedBox(
           height: height,
@@ -65,15 +77,15 @@ class DetailHero extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: isDesktop
+                    stops: isComposed
                         ? const [0.0, 0.42, 0.78, 1.0]
                         : const [0.15, 0.55, 0.82, 1.0],
                     colors: [
                       AppColors.background.withValues(
-                        alpha: isDesktop ? 0.08 : 0.0,
+                        alpha: isComposed ? 0.08 : 0.0,
                       ),
                       AppColors.background.withValues(
-                        alpha: isDesktop ? 0.2 : 0.34,
+                        alpha: isComposed ? 0.2 : 0.34,
                       ),
                       AppColors.background.withValues(alpha: 0.8),
                       AppColors.background,
@@ -86,12 +98,12 @@ class DetailHero extends StatelessWidget {
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    center: isDesktop
+                    center: isComposed
                         ? const Alignment(0, 0.56)
                         : const Alignment(0, 1.15),
-                    radius: isDesktop ? 0.78 : 1.08,
+                    radius: isComposed ? 0.78 : 1.08,
                     colors: [
-                      Colors.black.withValues(alpha: isDesktop ? 0.38 : 0.46),
+                      Colors.black.withValues(alpha: isComposed ? 0.38 : 0.46),
                       Colors.black.withValues(alpha: 0.0),
                     ],
                     stops: const [0.0, 1.0],
@@ -102,7 +114,7 @@ class DetailHero extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: -2,
-                height: isDesktop ? 164 : 64,
+                height: isComposed ? 164 : 64,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -122,7 +134,7 @@ class DetailHero extends StatelessWidget {
                 title: title,
                 subtitle: subtitle,
                 metaRow: metaRow,
-                isDesktop: isDesktop,
+                isComposed: isComposed,
               ),
             ],
           ),
@@ -137,28 +149,28 @@ class _HeroCopy extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.metaRow,
-    required this.isDesktop,
+    required this.isComposed,
   });
 
   final String title;
   final String? subtitle;
   final Widget? metaRow;
-  final bool isDesktop;
+  final bool isComposed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    final align = isDesktop ? Alignment.bottomCenter : Alignment.bottomLeft;
+    final align = isComposed ? Alignment.bottomCenter : Alignment.bottomLeft;
     final padding = EdgeInsets.fromLTRB(
-      isDesktop ? 48 : 20,
+      isComposed ? 48 : 20,
       0,
-      isDesktop ? 48 : 20,
-      isDesktop ? 88 : 16,
+      isComposed ? 48 : 20,
+      isComposed ? 72 : 16,
     );
-    final crossAxisAlignment = isDesktop
+    final crossAxisAlignment = isComposed
         ? CrossAxisAlignment.center
         : CrossAxisAlignment.start;
-    final textAlign = isDesktop ? TextAlign.center : TextAlign.start;
+    final textAlign = isComposed ? TextAlign.center : TextAlign.start;
 
     return Align(
       alignment: align,
@@ -166,7 +178,7 @@ class _HeroCopy extends StatelessWidget {
         padding: padding,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: isDesktop ? 760 : double.infinity,
+            maxWidth: isComposed ? 760 : double.infinity,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -177,7 +189,7 @@ class _HeroCopy extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: textAlign,
-                style: isDesktop
+                style: isComposed
                     ? theme.displayMedium?.copyWith(
                         color: AppColors.textPrimary,
                         shadows: const [
@@ -199,14 +211,14 @@ class _HeroCopy extends StatelessWidget {
                   textAlign: textAlign,
                   style: theme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
-                    fontSize: isDesktop ? 15 : null,
+                    fontSize: isComposed ? 15 : null,
                   ),
                 ),
               ],
               if (metaRow != null) ...[
                 const SizedBox(height: 12),
                 Align(
-                  alignment: isDesktop
+                  alignment: isComposed
                       ? Alignment.center
                       : Alignment.centerLeft,
                   child: metaRow!,

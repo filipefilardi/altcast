@@ -297,7 +297,10 @@ class _EpisodeSkeleton extends StatelessWidget {
             builder: (context, constraints) {
               return Skeleton.box(
                 width: double.infinity,
-                height: DetailHero.heightForWidth(constraints.maxWidth),
+                height: DetailHero.heightForWidth(
+                  constraints.maxWidth,
+                  MediaQuery.orientationOf(context),
+                ),
                 radius: 0,
               );
             },
