@@ -78,12 +78,12 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       Builder(
         builder: (ctx) => Consumer(
           builder: (_, ref, _) {
-            final active = ref.watch(activeRemoteSessionIdProvider) != null;
+            final active = ref.watch(syncPlayControllerProvider).isActive;
             return AltCastChromeIconButton(
-              icon: Icons.cast_rounded,
-              tooltip: 'Cast',
+              icon: Icons.groups_rounded,
+              tooltip: 'SyncPlay',
               color: active ? AppColors.primary : null,
-              onPressed: () => onOpenCast(ctx),
+              onPressed: () => onOpenSyncPlay(ctx),
             );
           },
         ),
@@ -91,12 +91,12 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       Builder(
         builder: (ctx) => Consumer(
           builder: (_, ref, _) {
-            final active = ref.watch(syncPlayControllerProvider).isActive;
+            final active = ref.watch(activeRemoteSessionIdProvider) != null;
             return AltCastChromeIconButton(
-              icon: Icons.groups_rounded,
-              tooltip: 'SyncPlay',
+              icon: Icons.cast_rounded,
+              tooltip: 'Cast',
               color: active ? AppColors.primary : null,
-              onPressed: () => onOpenSyncPlay(ctx),
+              onPressed: () => onOpenCast(ctx),
             );
           },
         ),
