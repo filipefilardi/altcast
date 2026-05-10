@@ -36,6 +36,7 @@ class ExternalSubtitle {
   const ExternalSubtitle({
     required this.id,
     required this.url,
+    this.streamIndex,
     this.title,
     this.language,
     this.codec,
@@ -44,6 +45,7 @@ class ExternalSubtitle {
   /// Stable identifier (we use the absolute URL — unique per source).
   final String id;
   final String url;
+  final int? streamIndex;
 
   /// Server-provided display title (e.g. "English (SDH)"). Often null.
   final String? title;

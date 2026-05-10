@@ -13,13 +13,14 @@ import '../../../data/local/playback_preferences.dart';
 /// Conventions:
 ///  - `audioLang == null` → server/player default (no override).
 ///  - `subKind == _SubKind.off` → explicitly disable subtitles.
-///  - `subKind == _SubKind.byLang` → match the first sub track with this
-///    language (case-insensitive). Works for embedded and external alike.
+///  - `subKind == _SubKind.byLang` → match a sub track with this language.
+///    When available, `subStreamIndex` pins that to the exact Jellyfin stream.
 class TrackPreference {
   const TrackPreference({
     this.audioLang,
     this.subKind = SubPreferenceKind.serverDefault,
     this.subLang,
+    this.subStreamIndex,
   });
 
   /// Seeds a per-item preference from the user's global playback defaults,
@@ -43,6 +44,7 @@ class TrackPreference {
   final String? audioLang;
   final SubPreferenceKind subKind;
   final String? subLang;
+  final int? subStreamIndex;
 
   /// Encode into the `?audioLang=...&subLang=...` query string the player
   /// reads. Empty pieces are omitted.
@@ -59,6 +61,9 @@ class TrackPreference {
       case SubPreferenceKind.byLang:
         if (subLang != null && subLang!.isNotEmpty) {
           q['subLang'] = subLang!;
+        }
+        if (subStreamIndex != null) {
+          q['subIndex'] = '$subStreamIndex';
         }
     }
     return q;
@@ -202,6 +207,36 @@ class TrackPreferenceRow extends ConsumerWidget {
     }
   }
 
+  MediaStream? _selectedAudioStream(ItemMediaStreams streams) {
+    final lang = preference.audioLang;
+    if (lang == null || lang.isEmpty) return null;
+    return streams.audio.firstWhere(
+      (s) => (s.language ?? '').toLowerCase() == lang.toLowerCase(),
+      orElse: () => streams.audio.first,
+    );
+  }
+
+  MediaStream? _selectedSubtitleStream(ItemMediaStreams streams) {
+    if (preference.subKind != SubPreferenceKind.byLang) return null;
+    final index = preference.subStreamIndex;
+    if (index != null) {
+      for (final stream in streams.subtitle) {
+        if (stream.index == index) return stream;
+      }
+    }
+    final lang = preference.subLang;
+    if (lang == null || lang.isEmpty) return null;
+    return streams.subtitle.firstWhere(
+      (s) => (s.language ?? '').toLowerCase() == lang.toLowerCase(),
+      orElse: () => streams.subtitle.first,
+    );
+  }
+
+  String _serverDefaultSubtitleLabel(ItemMediaStreams streams) {
+    final label = _streamLabel(streams.defaultSubtitle(), fallback: 'Auto');
+    return label == 'Auto' ? 'Server default' : 'Server default ($label)';
+  }
+
   String _streamLabel(MediaStream? s, {required String fallback}) {
     if (s == null) return fallback;
     final mapped = languageDisplay(s.language);
@@ -221,6 +256,7 @@ class TrackPreferenceRow extends ConsumerWidget {
     ItemMediaStreams streams,
   ) async {
     final hint = originalLanguageHint?.trim();
+    final selectedAudio = _selectedAudioStream(streams);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -249,6 +285,7 @@ class TrackPreferenceRow extends ConsumerWidget {
                   audioLang: null,
                   subKind: preference.subKind,
                   subLang: preference.subLang,
+                  subStreamIndex: preference.subStreamIndex,
                 ),
               );
               Navigator.of(sheetCtx).pop();
@@ -266,6 +303,7 @@ class TrackPreferenceRow extends ConsumerWidget {
                     audioLang: hint,
                     subKind: preference.subKind,
                     subLang: preference.subLang,
+                    subStreamIndex: preference.subStreamIndex,
                   ),
                 );
                 Navigator.of(sheetCtx).pop();
@@ -274,16 +312,14 @@ class TrackPreferenceRow extends ConsumerWidget {
           for (final s in streams.audio)
             _PickerRow(
               label: _audioRowLabel(s),
-              selected:
-                  preference.audioLang != null &&
-                  preference.audioLang!.toLowerCase() ==
-                      (s.language ?? '').toLowerCase(),
+              selected: selectedAudio != null && selectedAudio.index == s.index,
               onTap: () {
                 onChanged(
                   TrackPreference(
                     audioLang: s.language,
                     subKind: preference.subKind,
                     subLang: preference.subLang,
+                    subStreamIndex: preference.subStreamIndex,
                   ),
                 );
                 Navigator.of(sheetCtx).pop();
@@ -295,6 +331,7 @@ class TrackPreferenceRow extends ConsumerWidget {
   }
 
   Future<void> _pickSub(BuildContext context, ItemMediaStreams streams) async {
+    final selectedSub = _selectedSubtitleStream(streams);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -303,8 +340,21 @@ class TrackPreferenceRow extends ConsumerWidget {
         title: 'Subtitles',
         rows: [
           _PickerRow(
+            label: _serverDefaultSubtitleLabel(streams),
+            selected: preference.subKind == SubPreferenceKind.serverDefault,
+            onTap: () {
+              onChanged(
+                TrackPreference(
+                  audioLang: preference.audioLang,
+                  subKind: SubPreferenceKind.serverDefault,
+                ),
+              );
+              Navigator.of(sheetCtx).pop();
+            },
+          ),
+          _PickerRow(
             label: 'Off',
-            selected: preference.subKind != SubPreferenceKind.byLang,
+            selected: preference.subKind == SubPreferenceKind.off,
             onTap: () {
               onChanged(
                 TrackPreference(
@@ -318,17 +368,14 @@ class TrackPreferenceRow extends ConsumerWidget {
           for (final s in streams.subtitle)
             _PickerRow(
               label: _subRowLabel(s),
-              selected:
-                  preference.subKind == SubPreferenceKind.byLang &&
-                  preference.subLang != null &&
-                  preference.subLang!.toLowerCase() ==
-                      (s.language ?? '').toLowerCase(),
+              selected: selectedSub != null && selectedSub.index == s.index,
               onTap: () {
                 onChanged(
                   TrackPreference(
                     audioLang: preference.audioLang,
                     subKind: SubPreferenceKind.byLang,
                     subLang: s.language,
+                    subStreamIndex: s.index,
                   ),
                 );
                 Navigator.of(sheetCtx).pop();
