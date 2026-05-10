@@ -98,6 +98,26 @@ class DetailHero extends StatelessWidget {
                   ),
                 ),
               ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: -2,
+                height: isDesktop ? 164 : 64,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.background.withValues(alpha: 0.0),
+                        AppColors.background,
+                        AppColors.background,
+                      ],
+                      stops: const [0.0, 0.88, 1.0],
+                    ),
+                  ),
+                ),
+              ),
               _HeroCopy(
                 title: title,
                 subtitle: subtitle,
