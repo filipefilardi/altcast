@@ -334,9 +334,9 @@ class _Body extends StatelessWidget {
           ],
         );
       },
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: _SearchSkeleton(),
+      loading: () => ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        children: const [_SearchSkeleton()],
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),

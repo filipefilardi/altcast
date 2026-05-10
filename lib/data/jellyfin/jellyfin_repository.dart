@@ -148,6 +148,35 @@ class JellyfinRepository {
         .toList();
   }
 
+  Future<List<BrowseItem>> searchCandidates({
+    int limit = 500,
+    String itemTypes = 'Movie,Series',
+    String? genre,
+    int? year,
+    bool unwatchedOnly = false,
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': itemTypes,
+        'Recursive': true,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+        if (genre != null && genre.trim().isNotEmpty) 'Genres': genre.trim(),
+        if (year != null) 'Years': '$year',
+        if (unwatchedOnly) 'Filters': 'IsUnplayed',
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+  }
+
   Future<List<BrowseItem>> searchPeople(String query, {int limit = 30}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
@@ -160,6 +189,25 @@ class JellyfinRepository {
         'Limit': limit,
         'Fields': 'PrimaryImageAspectRatio',
         'EnableImages': true,
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<BrowseItem>> peopleCandidates({int limit = 800}) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Persons',
+      queryParameters: {
+        'UserId': s.userId,
+        'Limit': limit,
+        'Fields': 'PrimaryImageAspectRatio',
+        'EnableImages': true,
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
       },
     );
     return ((res.data?['Items'] as List?) ?? const [])
