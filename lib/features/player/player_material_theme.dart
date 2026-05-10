@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/material.dart';
@@ -10,6 +11,8 @@ import 'package:media_kit_video/media_kit_video_controls/src/controls/methods/vi
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../remote/remote_providers.dart';
+import '../syncplay/syncplay_controller.dart';
 
 /// Material mobile controls: −10s / +30s, close + CC (tracks sheet) in the top
 /// bar (visible in media_kit fullscreen), **brightness on the left** and
@@ -20,9 +23,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenTracks,
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
-  required bool isCastActive,
   required void Function(BuildContext origin) onOpenSyncPlay,
-  required bool isSyncPlayActive,
   required String title,
 }) {
   final screenBrightness = ScreenBrightness();
@@ -75,19 +76,29 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       const SizedBox(width: 8),
       Expanded(child: AltCastPlayerTitle(title: title)),
       Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.cast_rounded,
-          tooltip: 'Cast',
-          color: isCastActive ? AppColors.primary : null,
-          onPressed: () => onOpenCast(ctx),
+        builder: (ctx) => Consumer(
+          builder: (_, ref, _) {
+            final active = ref.watch(activeRemoteSessionIdProvider) != null;
+            return AltCastChromeIconButton(
+              icon: Icons.cast_rounded,
+              tooltip: 'Cast',
+              color: active ? AppColors.primary : null,
+              onPressed: () => onOpenCast(ctx),
+            );
+          },
         ),
       ),
       Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.groups_rounded,
-          tooltip: 'SyncPlay',
-          color: isSyncPlayActive ? AppColors.primary : null,
-          onPressed: () => onOpenSyncPlay(ctx),
+        builder: (ctx) => Consumer(
+          builder: (_, ref, _) {
+            final active = ref.watch(syncPlayControllerProvider).isActive;
+            return AltCastChromeIconButton(
+              icon: Icons.groups_rounded,
+              tooltip: 'SyncPlay',
+              color: active ? AppColors.primary : null,
+              onPressed: () => onOpenSyncPlay(ctx),
+            );
+          },
         ),
       ),
       Builder(
