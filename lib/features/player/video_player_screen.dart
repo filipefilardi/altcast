@@ -21,6 +21,7 @@ import '../../data/jellyfin/models/episode.dart';
 import '../../data/local/playback_preferences.dart';
 import '../remote/remote_sessions_sheet.dart';
 import '../syncplay/syncplay_controller.dart';
+import '../syncplay/syncplay_sheet.dart';
 import 'player_material_theme.dart';
 import 'scrobbler.dart';
 import 'widgets/next_up_card.dart';
@@ -970,12 +971,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       syncPlayControllerProvider,
       _handleSyncPlayStateChange,
     );
+    final syncPlayActive = ref.watch(syncPlayControllerProvider).isActive;
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
       onClosePlayer: _closePlayer,
       onOpenTracks: _showTracksSheet,
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
+      onOpenSyncPlay: _showSyncPlaySheet,
+      isSyncPlayActive: syncPlayActive,
       title: _playerTitle,
     );
 
@@ -1225,6 +1229,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       context,
       itemId: widget.itemId,
       startPositionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
+    );
+  }
+
+  void _showSyncPlaySheet(BuildContext context) {
+    _hideControlOverlay();
+    showSyncPlaySheet(
+      context,
+      itemId: widget.itemId,
+      startPosition: _lastPosition,
+      isPlaying: _player.state.playing,
     );
   }
 }
