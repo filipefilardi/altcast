@@ -527,13 +527,14 @@ class _SeriesSkeleton extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Skeleton.group(
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Skeleton.box(
-              width: double.infinity,
-              height: double.infinity,
-              radius: 0,
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Skeleton.box(
+                width: double.infinity,
+                height: DetailHero.heightForWidth(constraints.maxWidth),
+                radius: 0,
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
