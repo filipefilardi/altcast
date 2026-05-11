@@ -33,7 +33,7 @@ class TrackPreference {
     return TrackPreference(
       audioLang: prefs.resolvedAudioLanguage(itemOriginalLanguage),
       subKind: switch (prefs.defaultSubtitleMode) {
-        DefaultSubtitleMode.auto => SubPreferenceKind.serverDefault,
+        DefaultSubtitleMode.auto => SubPreferenceKind.off,
         DefaultSubtitleMode.off => SubPreferenceKind.off,
         DefaultSubtitleMode.byLanguage => SubPreferenceKind.byLang,
       },
