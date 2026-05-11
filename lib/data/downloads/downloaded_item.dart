@@ -23,6 +23,10 @@ class DownloadedItem {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
+    this.introStartTicks,
+    this.introEndTicks,
+    this.creditsStartTicks,
+    this.creditsEndTicks,
     this.externalSubtitles = const [],
   });
 
@@ -49,6 +53,10 @@ class DownloadedItem {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+  final int? introStartTicks;
+  final int? introEndTicks;
+  final int? creditsStartTicks;
+  final int? creditsEndTicks;
   final List<DownloadedExternalSubtitle> externalSubtitles;
 
   Duration? get runTime =>
@@ -75,6 +83,10 @@ class DownloadedItem {
     if (seriesName != null) 'seriesName': seriesName,
     if (seasonNumber != null) 'seasonNumber': seasonNumber,
     if (episodeNumber != null) 'episodeNumber': episodeNumber,
+    if (introStartTicks != null) 'introStartTicks': introStartTicks,
+    if (introEndTicks != null) 'introEndTicks': introEndTicks,
+    if (creditsStartTicks != null) 'creditsStartTicks': creditsStartTicks,
+    if (creditsEndTicks != null) 'creditsEndTicks': creditsEndTicks,
     if (externalSubtitles.isNotEmpty)
       'externalSubtitles': externalSubtitles.map((s) => s.toJson()).toList(),
   };
@@ -93,6 +105,10 @@ class DownloadedItem {
       seriesName: json['seriesName'] as String?,
       seasonNumber: json['seasonNumber'] as int?,
       episodeNumber: json['episodeNumber'] as int?,
+      introStartTicks: json['introStartTicks'] as int?,
+      introEndTicks: json['introEndTicks'] as int?,
+      creditsStartTicks: json['creditsStartTicks'] as int?,
+      creditsEndTicks: json['creditsEndTicks'] as int?,
       externalSubtitles: ((json['externalSubtitles'] as List?) ?? const [])
           .cast<Map<String, dynamic>>()
           .map(DownloadedExternalSubtitle.fromJson)
