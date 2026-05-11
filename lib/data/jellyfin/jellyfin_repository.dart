@@ -75,20 +75,91 @@ class JellyfinRepository {
   /// episodes), ordered most-recently-played first.
   Future<List<BrowseItem>> continueWatching({int limit = 12}) async {
     final s = _session;
-    final res = await _api.dio.get<Map<String, dynamic>>(
-      '/Users/${s.userId}/Items/Resume',
-      queryParameters: {
-        'MediaTypes': 'Video',
-        'Limit': limit,
-        'Fields':
-            'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage',
-        'EnableImages': true,
-      },
-    );
-    return ((res.data?['Items'] as List?) ?? const [])
+    final fields = 'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage';
+    final responses = await Future.wait([
+      _api.dio.get<Map<String, dynamic>>(
+        '/Users/${s.userId}/Items/Resume',
+        queryParameters: {
+          'MediaTypes': 'Video',
+          'Limit': limit,
+          'Fields': fields,
+          'EnableImages': true,
+        },
+      ),
+      _api.dio.get<Map<String, dynamic>>(
+        '/Shows/NextUp',
+        queryParameters: {
+          'UserId': s.userId,
+          'Limit': limit,
+          'Fields': fields,
+          'EnableImages': true,
+        },
+      ),
+    ]);
+    final resumeRes = responses[0];
+    final nextUpRes = responses[1];
+
+    final resumeItems = ((resumeRes.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(BrowseItem.fromJson)
-        .toList();
+        .toList(growable: true);
+    final nextUpItems = ((nextUpRes.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList(growable: false);
+    if (nextUpItems.isEmpty) return resumeItems.take(limit).toList();
+
+    final existingKeys = resumeItems
+        .map(_continueWatchingIdentityKey)
+        .whereType<String>()
+        .toSet();
+    final uniqueNextUp = <BrowseItem>[];
+    for (final item in nextUpItems) {
+      final key = _continueWatchingIdentityKey(item);
+      if (key == null || existingKeys.contains(key)) continue;
+      uniqueNextUp.add(item);
+      existingKeys.add(key);
+    }
+    if (uniqueNextUp.isEmpty) return resumeItems.take(limit).toList();
+
+    if (resumeItems.length < limit) {
+      final room = limit - resumeItems.length;
+      resumeItems.addAll(uniqueNextUp.take(room));
+      return resumeItems;
+    }
+
+    final reservedSlots = _nextUpReservedSlots(limit, uniqueNextUp.length);
+    final baseCount = (limit - reservedSlots).clamp(0, limit);
+    return [
+      ...resumeItems.take(baseCount),
+      ...uniqueNextUp.take(reservedSlots),
+    ];
+  }
+
+  int _nextUpReservedSlots(int limit, int availableNextUp) {
+    if (limit <= 0 || availableNextUp <= 0) return 0;
+    final preferred = (limit / 3).floor().clamp(1, 4);
+    return preferred > availableNextUp ? availableNextUp : preferred;
+  }
+
+  String? _continueWatchingIdentityKey(BrowseItem item) {
+    switch (item.kind) {
+      case MediaKind.episode:
+        final seriesId = item.seriesId;
+        if (seriesId != null && seriesId.isNotEmpty) {
+          return 'series:$seriesId';
+        }
+        return 'episode:${item.id}';
+      case MediaKind.series:
+        return 'series:${item.id}';
+      case MediaKind.movie:
+        return 'movie:${item.id}';
+      case MediaKind.season:
+        return 'season:${item.id}';
+      case MediaKind.person:
+      case MediaKind.collection:
+        return null;
+    }
   }
 
   Future<List<BrowseItem>> recentlyAddedMovies({int limit = 16}) async {
