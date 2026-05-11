@@ -23,6 +23,7 @@ class DownloadedItem {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
+    this.externalSubtitles = const [],
   });
 
   /// The Jellyfin item id this download corresponds to.
@@ -48,6 +49,7 @@ class DownloadedItem {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+  final List<DownloadedExternalSubtitle> externalSubtitles;
 
   Duration? get runTime =>
       runTimeTicks == null ? null : Duration(microseconds: runTimeTicks! ~/ 10);
@@ -73,6 +75,8 @@ class DownloadedItem {
     if (seriesName != null) 'seriesName': seriesName,
     if (seasonNumber != null) 'seasonNumber': seasonNumber,
     if (episodeNumber != null) 'episodeNumber': episodeNumber,
+    if (externalSubtitles.isNotEmpty)
+      'externalSubtitles': externalSubtitles.map((s) => s.toJson()).toList(),
   };
 
   factory DownloadedItem.fromJson(Map<String, dynamic> json) {
@@ -89,6 +93,48 @@ class DownloadedItem {
       seriesName: json['seriesName'] as String?,
       seasonNumber: json['seasonNumber'] as int?,
       episodeNumber: json['episodeNumber'] as int?,
+      externalSubtitles: ((json['externalSubtitles'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(DownloadedExternalSubtitle.fromJson)
+          .toList(growable: false),
+    );
+  }
+}
+
+class DownloadedExternalSubtitle {
+  const DownloadedExternalSubtitle({
+    required this.id,
+    required this.filePath,
+    this.streamIndex,
+    this.title,
+    this.language,
+    this.codec,
+  });
+
+  final String id;
+  final String filePath;
+  final int? streamIndex;
+  final String? title;
+  final String? language;
+  final String? codec;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'filePath': filePath,
+    if (streamIndex != null) 'streamIndex': streamIndex,
+    if (title != null) 'title': title,
+    if (language != null) 'language': language,
+    if (codec != null) 'codec': codec,
+  };
+
+  factory DownloadedExternalSubtitle.fromJson(Map<String, dynamic> json) {
+    return DownloadedExternalSubtitle(
+      id: json['id'] as String,
+      filePath: json['filePath'] as String,
+      streamIndex: json['streamIndex'] as int?,
+      title: json['title'] as String?,
+      language: json['language'] as String?,
+      codec: json['codec'] as String?,
     );
   }
 }

@@ -288,12 +288,24 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final quality = ref.read(playbackPreferencesProvider).streamingQuality;
       // Prefer the local file if this item was downloaded — saves a server
       // round-trip and lets playback work fully offline.
-      final localPath = downloads.localPath(widget.itemId);
+      final localItem = downloads.items[widget.itemId];
+      final localPath = localItem?.filePath;
       final StreamSource source;
       if (localPath != null) {
         source = StreamSource(
           url: Uri.file(localPath).toString(),
           isTranscoding: false,
+          externalSubtitles: [
+            for (final sub in localItem?.externalSubtitles ?? const [])
+              ExternalSubtitle(
+                id: sub.id,
+                url: Uri.file(sub.filePath).toString(),
+                streamIndex: sub.streamIndex,
+                title: sub.title,
+                language: sub.language,
+                codec: sub.codec,
+              ),
+          ],
         );
       } else {
         source = await repo.getStreamSource(widget.itemId, quality: quality);
