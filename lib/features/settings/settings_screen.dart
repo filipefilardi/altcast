@@ -195,20 +195,6 @@ class _PlaybackGroup extends ConsumerWidget {
           onTap: () => _showStreamingQualitySheet(context),
         ),
         SwitchListTile(
-          secondary: const Icon(Icons.skip_next_outlined),
-          title: const Text('Auto-skip intros & credits'),
-          subtitle: const Text(
-            'When on, jumps past detected segments after a few seconds. '
-            'Skip buttons still show when Intro Skipper has timings even if this is off.',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          value: prefs.autoSkipIntroCredits,
-          onChanged: (v) => ref
-              .read(playbackPreferencesProvider.notifier)
-              .setAutoSkipIntroCredits(v),
-          activeThumbColor: AppColors.primary,
-        ),
-        SwitchListTile(
           secondary: const Icon(Icons.play_circle_outline),
           title: const Text('Autoplay next episode'),
           subtitle: const Text(
