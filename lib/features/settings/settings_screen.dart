@@ -955,6 +955,15 @@ class _SubtitleAppearanceSheetState
                 },
                 child: const Text('Reset'),
               ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: () => _openFullscreenPreview(
+                  context,
+                  fontScale: _fontScale,
+                  bottomInset: _bottomInset,
+                ),
+                child: const Text('Full-screen preview'),
+              ),
               const Spacer(),
               FilledButton(
                 onPressed: () async {
@@ -1038,6 +1047,92 @@ class _SubtitlePreviewCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+Future<void> _openFullscreenPreview(
+  BuildContext context, {
+  required double fontScale,
+  required double bottomInset,
+}) {
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black,
+    builder: (_) => _SubtitleFullscreenPreview(
+      fontScale: fontScale,
+      bottomInset: bottomInset,
+    ),
+  );
+}
+
+class _SubtitleFullscreenPreview extends StatelessWidget {
+  const _SubtitleFullscreenPreview({
+    required this.fontScale,
+    required this.bottomInset,
+  });
+
+  final double fontScale;
+  final double bottomInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final shortestSide = mq.size.shortestSide;
+    final isTabletClass = shortestSide >= 600;
+    final baseFont = isTabletClass ? 32.0 : 24.0;
+    final fontSize = (baseFont * fontScale).clamp(16.0, 56.0);
+    final baseBottom = (isTabletClass ? 96.0 : 44.0) + mq.padding.bottom;
+    final bottomPad = (baseBottom + bottomInset).clamp(16.0, 220.0);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF1F1F1F), Color(0xFF090909)],
+              ),
+            ),
+          ),
+          Positioned(
+            top: mq.padding.top + 12,
+            right: 12,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close, color: Colors.white),
+              tooltip: 'Close preview',
+            ),
+          ),
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: bottomPad,
+            child: Text(
+              'This is how subtitles will appear during playback.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: fontSize,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+                backgroundColor: Colors.black26,
+                shadows: const [
+                  Shadow(
+                    offset: Offset(0, 1),
+                    blurRadius: 2,
+                    color: Colors.black,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
