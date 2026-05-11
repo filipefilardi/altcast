@@ -1,3 +1,5 @@
+import '../jellyfin/models/trickplay.dart';
+
 enum DownloadedItemKind { movie, episode }
 
 DownloadedItemKind _kindFromName(String? raw) {
@@ -28,6 +30,7 @@ class DownloadedItem {
     this.creditsStartTicks,
     this.creditsEndTicks,
     this.externalSubtitles = const [],
+    this.offlineTrickplay,
   });
 
   /// The Jellyfin item id this download corresponds to.
@@ -58,6 +61,7 @@ class DownloadedItem {
   final int? creditsStartTicks;
   final int? creditsEndTicks;
   final List<DownloadedExternalSubtitle> externalSubtitles;
+  final OfflineTrickplayData? offlineTrickplay;
 
   Duration? get runTime =>
       runTimeTicks == null ? null : Duration(microseconds: runTimeTicks! ~/ 10);
@@ -89,6 +93,7 @@ class DownloadedItem {
     if (creditsEndTicks != null) 'creditsEndTicks': creditsEndTicks,
     if (externalSubtitles.isNotEmpty)
       'externalSubtitles': externalSubtitles.map((s) => s.toJson()).toList(),
+    if (offlineTrickplay != null) 'offlineTrickplay': offlineTrickplay!.toJson(),
   };
 
   factory DownloadedItem.fromJson(Map<String, dynamic> json) {
@@ -113,6 +118,11 @@ class DownloadedItem {
           .cast<Map<String, dynamic>>()
           .map(DownloadedExternalSubtitle.fromJson)
           .toList(growable: false),
+      offlineTrickplay: json['offlineTrickplay'] is Map
+          ? OfflineTrickplayData.fromJson(
+              Map<String, dynamic>.from(json['offlineTrickplay'] as Map),
+            )
+          : null,
     );
   }
 }

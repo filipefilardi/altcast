@@ -14,6 +14,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
+import '../../data/downloads/download_manager.dart';
 import '../../data/jellyfin/remote_sessions_repository.dart';
 import '../../data/jellyfin/models/stream_source.dart';
 import '../remote/remote_providers.dart';
@@ -497,7 +498,21 @@ class _AltCastTrickplaySeekGroupState
     if (key == _lastManifestKey) return;
     _lastManifestKey = key;
     try {
-      final session = await ref
+      TrickplaySession? session;
+      final localUrl = source?.url ?? '';
+      final isLocal = localUrl.startsWith('file://');
+      if (isLocal) {
+        final localItem = ref.read(downloadManagerProvider).items[widget.itemId];
+        final offline = localItem?.offlineTrickplay;
+        if (offline != null && offline.tileFilesByIndex.isNotEmpty) {
+          session = TrickplaySession.offline(
+            itemId: widget.itemId,
+            manifest: offline.manifest,
+            tileFilesByIndex: offline.tileFilesByIndex,
+          );
+        }
+      }
+      session ??= await ref
           .read(jellyfinRepositoryProvider)
           .getTrickplaySession(
             widget.itemId,
