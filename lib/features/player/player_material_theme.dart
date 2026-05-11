@@ -827,13 +827,21 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
     );
     final shortestSide = MediaQuery.sizeOf(context).shortestSide;
     final isTabletOrDesktop = shortestSide >= 600;
-    final frameWidth = isTabletOrDesktop ? 300.0 : 164.0;
     final safeThumbWidth = frame.thumbWidth <= 0 ? 320 : frame.thumbWidth;
     final safeThumbHeight = frame.thumbHeight <= 0 ? 180 : frame.thumbHeight;
-    final rawFrameHeight = safeThumbHeight * (frameWidth / safeThumbWidth);
-    final frameHeight = isTabletOrDesktop
-        ? rawFrameHeight.clamp(160.0, 220.0)
-        : rawFrameHeight.clamp(92.0, 132.0);
+    final thumbAspect = safeThumbWidth / safeThumbHeight;
+    final preferredWidth = isTabletOrDesktop ? 300.0 : 164.0;
+    final minHeight = isTabletOrDesktop ? 160.0 : 92.0;
+    final maxHeight = isTabletOrDesktop ? 220.0 : 132.0;
+    var frameWidth = preferredWidth;
+    var frameHeight = frameWidth / thumbAspect;
+    if (frameHeight > maxHeight) {
+      frameHeight = maxHeight;
+      frameWidth = frameHeight * thumbAspect;
+    } else if (frameHeight < minHeight) {
+      frameHeight = minHeight;
+      frameWidth = frameHeight * thumbAspect;
+    }
     final tileColumns = session.manifest.tileWidth;
     final tileRows = session.manifest.tileHeight;
     final tileImageWidth = frameWidth * tileColumns;
