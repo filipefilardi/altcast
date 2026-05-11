@@ -601,6 +601,56 @@ class JellyfinRepository {
     }
   }
 
+  /// Removes an item from Jellyfin's resume/continue-watching queue by
+  /// clearing its stored playback position for the current user.
+  Future<void> removeFromQueue(String itemId) async {
+    final s = _session;
+    await _api.dio.post<void>(
+      '/Users/${s.userId}/Items/$itemId/UserData',
+      data: const {'PlaybackPositionTicks': 0},
+    );
+  }
+
+  /// Removes a whole series from queue-related surfaces by clearing resume
+  /// progress for every episode and forcing Jellyfin to recompute Next Up by
+  /// toggling the series played-state (played -> unplayed).
+  Future<void> removeSeriesFromQueue(String seriesId) async {
+    final s = _session;
+    const pageSize = 200;
+    var startIndex = 0;
+    while (true) {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/Shows/$seriesId/Episodes',
+        queryParameters: {
+          'UserId': s.userId,
+          'StartIndex': startIndex,
+          'Limit': pageSize,
+          'Fields': 'UserData',
+        },
+      );
+      final items = ((res.data?['Items'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(BrowseItem.fromJson)
+          .toList(growable: false);
+      if (items.isEmpty) break;
+
+      for (final episode in items) {
+        final ud = episode.userData;
+        if (ud == null || ud.playbackPositionTicks <= 0) continue;
+        await removeFromQueue(episode.id);
+      }
+
+      if (items.length < pageSize) break;
+      startIndex += items.length;
+    }
+
+    // Jellyfin-side workaround used by clients/users to force a series to
+    // drop from Next Up while preserving "unplayed" end-state.
+    final seriesPlayedPath = '/Users/${s.userId}/PlayedItems/$seriesId';
+    await _api.dio.post<void>(seriesPlayedPath);
+    await _api.dio.delete<void>(seriesPlayedPath);
+  }
+
   Future<List<BrowseItem>> getSimilarItems(
     String itemId, {
     int limit = 16,

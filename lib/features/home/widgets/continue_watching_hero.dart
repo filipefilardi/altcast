@@ -10,6 +10,7 @@ import '../../../core/widgets/local_or_network_image.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../data/jellyfin/jellyfin_repository.dart';
 import '../../../data/jellyfin/models/browse_item.dart';
+import '../home_providers.dart';
 
 /// Home “Keep watching” block: section label, loading / error / content, and
 /// trailing spacing (24 px) for the next shelf.
@@ -271,6 +272,11 @@ class _ContinueWatchingCard extends ConsumerWidget {
                       ],
                     ),
                   ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: _QueueMenuButton(item: item),
                 ),
                 Positioned(
                   left: 12,
@@ -552,11 +558,117 @@ class _HeroSlide extends ConsumerWidget {
               ],
             ),
           ),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: _QueueMenuButton(item: item),
+          ),
         ],
       ),
     );
   }
 }
+
+class _QueueMenuButton extends ConsumerWidget {
+  const _QueueMenuButton({required this.item});
+
+  final BrowseItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<_QueueMenuAction>(
+      tooltip: 'Queue actions',
+      onSelected: (action) async {
+        switch (action) {
+          case _QueueMenuAction.removeFromQueue:
+            try {
+              await ref
+                  .read(jellyfinRepositoryProvider)
+                  .removeFromQueue(item.id);
+              ref.invalidate(continueWatchingProvider);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Removed "${item.name}" from queue.'),
+                ),
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    "Couldn't remove this item from queue. Please try again.",
+                  ),
+                ),
+              );
+            }
+          case _QueueMenuAction.removeSeriesFromQueue:
+            final seriesId = item.kind == MediaKind.series
+                ? item.id
+                : item.seriesId;
+            if (seriesId == null || seriesId.trim().isEmpty) return;
+            try {
+              await ref
+                  .read(jellyfinRepositoryProvider)
+                  .removeSeriesFromQueue(seriesId);
+              ref.invalidate(continueWatchingProvider);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Removed series "${item.seriesName ?? item.name}" from queue.',
+                  ),
+                ),
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    "Couldn't remove this series from queue. Please try again.",
+                  ),
+                ),
+              );
+            }
+        }
+      },
+      color: AppColors.surfaceElevated,
+      itemBuilder: (context) {
+        final canRemoveSeries =
+            item.kind == MediaKind.series ||
+            (item.kind == MediaKind.episode &&
+                item.seriesId != null &&
+                item.seriesId!.trim().isNotEmpty);
+        return [
+          const PopupMenuItem<_QueueMenuAction>(
+            value: _QueueMenuAction.removeFromQueue,
+            child: Text('Remove from queue'),
+          ),
+          if (canRemoveSeries)
+            const PopupMenuItem<_QueueMenuAction>(
+              value: _QueueMenuAction.removeSeriesFromQueue,
+              child: Text('Remove series from queue'),
+            ),
+        ];
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.background.withValues(alpha: 0.68),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.textTertiary.withValues(alpha: 0.3)),
+        ),
+        padding: const EdgeInsets.all(6),
+        child: const Icon(
+          Icons.more_vert_rounded,
+          size: 18,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+}
+
+enum _QueueMenuAction { removeFromQueue, removeSeriesFromQueue }
 
 class _ResumePill extends StatelessWidget {
   const _ResumePill();
