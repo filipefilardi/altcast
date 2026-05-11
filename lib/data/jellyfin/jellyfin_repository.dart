@@ -759,11 +759,17 @@ class JellyfinRepository {
   /// `Static=true`, used as a last-resort fallback when [getStreamSource]
   /// fails. Prefer [getStreamSource] — it lets the server decide whether to
   /// direct-stream or transcode.
-  String streamUrl(String itemId, {String? mediaSourceId}) {
+  String streamUrl(
+    String itemId, {
+    String? mediaSourceId,
+    int? maxBitrate,
+    bool staticStream = true,
+  }) {
     final s = _session;
     final ms = mediaSourceId != null ? '&MediaSourceId=$mediaSourceId' : '';
+    final bitrate = maxBitrate != null ? '&MaxStreamingBitrate=$maxBitrate' : '';
     return '${s.serverUrl}/Videos/$itemId/stream'
-        '?Static=true$ms&api_key=${s.accessToken}';
+        '?Static=$staticStream$ms$bitrate&api_key=${s.accessToken}';
   }
 
   /// Negotiate playback with the server: ask Jellyfin to pick between

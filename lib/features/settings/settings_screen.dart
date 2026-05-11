@@ -122,6 +122,19 @@ class _DownloadGroup extends ConsumerWidget {
           onChanged: notifier.setAutoDownloadNextEpisode,
           activeThumbColor: AppColors.primary,
         ),
+        ListTile(
+          leading: const Icon(Icons.hd_outlined),
+          title: const Text('Offline video quality'),
+          subtitle: Text(
+            prefs.offlineVideoQuality.label,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.expand_more,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showOfflineQualityPicker(context, ref),
+        ),
         if (Platform.isAndroid)
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
@@ -164,6 +177,38 @@ class _DownloadGroup extends ConsumerWidget {
                 ref
                     .read(downloadPreferencesProvider.notifier)
                     .setDownloadLocation(loc);
+                Navigator.pop(context);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showOfflineQualityPicker(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: OfflineVideoQuality.values.map((quality) {
+            final selected =
+                ref.watch(downloadPreferencesProvider).offlineVideoQuality ==
+                quality;
+            return ListTile(
+              leading: Icon(
+                Icons.movie_filter_outlined,
+                color: selected ? AppColors.primary : null,
+              ),
+              title: Text(quality.label),
+              trailing: selected
+                  ? const Icon(Icons.check, color: AppColors.primary)
+                  : null,
+              onTap: () {
+                ref
+                    .read(downloadPreferencesProvider.notifier)
+                    .setOfflineVideoQuality(quality);
                 Navigator.pop(context);
               },
             );
