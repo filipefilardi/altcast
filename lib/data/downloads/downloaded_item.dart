@@ -147,6 +147,8 @@ class DownloadProgress {
     required this.itemId,
     required this.name,
     required this.fraction,
+    this.downloadedBytes,
+    this.totalBytes,
     this.kind = DownloadedItemKind.movie,
     this.imageTag,
     this.seriesId,
@@ -160,6 +162,8 @@ class DownloadProgress {
 
   /// 0..1; values < 0 mean "indeterminate".
   final double fraction;
+  final int? downloadedBytes;
+  final int? totalBytes;
 
   final DownloadedItemKind kind;
   final String? imageTag;
@@ -180,6 +184,25 @@ class DownloadProgress {
     itemId: itemId,
     name: name,
     fraction: f,
+    downloadedBytes: downloadedBytes,
+    totalBytes: totalBytes,
+    kind: kind,
+    imageTag: imageTag,
+    seriesId: seriesId,
+    seriesName: seriesName,
+    seasonNumber: seasonNumber,
+    episodeNumber: episodeNumber,
+  );
+
+  DownloadProgress copyWithBytes({
+    required int downloaded,
+    required int? total,
+  }) => DownloadProgress(
+    itemId: itemId,
+    name: name,
+    fraction: total != null && total > 0 ? downloaded / total : fraction,
+    downloadedBytes: downloaded,
+    totalBytes: total,
     kind: kind,
     imageTag: imageTag,
     seriesId: seriesId,

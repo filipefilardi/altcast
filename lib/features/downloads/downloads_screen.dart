@@ -38,6 +38,8 @@ class DownloadsScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               children: [
+                _QueueSummary(state: state),
+                const SizedBox(height: 16),
                 if (state.progress.isNotEmpty) ...[
                   Text(
                     'Downloading'.toUpperCase(),
@@ -268,6 +270,8 @@ class _InProgressRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final downloads = ref.watch(downloadManagerProvider);
+    final paused = downloads.isPaused(progress.itemId);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -284,7 +288,9 @@ class _InProgressRow extends ConsumerWidget {
               width: 22,
               height: 22,
               child: CircularProgressIndicator(
-                value: progress.fraction > 0 ? progress.fraction : null,
+                value: paused
+                    ? null
+                    : (progress.fraction > 0 ? progress.fraction : null),
                 strokeWidth: 2,
                 color: AppColors.primary,
                 backgroundColor: AppColors.divider,
@@ -318,11 +324,20 @@ class _InProgressRow extends ConsumerWidget {
             ),
           ),
           IconButton(
+            icon: Icon(
+              paused ? Icons.play_arrow : Icons.pause,
+              color: AppColors.textSecondary,
+            ),
+            tooltip: paused ? 'Resume' : 'Pause',
+            onPressed: () => paused
+                ? ref.read(downloadManagerProvider.notifier).resume(progress.itemId)
+                : ref.read(downloadManagerProvider.notifier).pause(progress.itemId),
+          ),
+          IconButton(
             icon: const Icon(Icons.close, color: AppColors.textSecondary),
             tooltip: 'Cancel',
-            onPressed: () => ref
-                .read(downloadManagerProvider.notifier)
-                .cancel(progress.itemId),
+            onPressed: () =>
+                ref.read(downloadManagerProvider.notifier).cancel(progress.itemId),
           ),
         ],
       ),
@@ -337,8 +352,42 @@ class _InProgressRow extends ConsumerWidget {
   }
 
   String _secondary(DownloadProgress p) {
-    final pct = '${(p.fraction * 100).toStringAsFixed(0)}%';
-    if (p.episodeLabel != null) return '${p.episodeLabel} • $pct';
-    return pct;
+    final bytes = p.totalBytes != null && p.downloadedBytes != null
+        ? '${formatBytes(p.downloadedBytes!)} / ${formatBytes(p.totalBytes!)}'
+        : (p.downloadedBytes != null ? formatBytes(p.downloadedBytes!) : null);
+    final pct = p.fraction > 0 ? '${(p.fraction * 100).toStringAsFixed(0)}%' : 'Queued';
+    final line = bytes != null ? '$pct • $bytes' : pct;
+    if (p.episodeLabel != null) return '${p.episodeLabel} • $line';
+    return line;
+  }
+}
+
+class _QueueSummary extends StatelessWidget {
+  const _QueueSummary({required this.state});
+
+  final DownloadsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final paused = state.pausedIds.length;
+    final downloading = state.progress.length - paused;
+    final available = state.items.length;
+    final failed = state.failures.length;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        [
+          if (available > 0) '$available offline',
+          if (downloading > 0) '$downloading active',
+          if (paused > 0) '$paused paused',
+          if (failed > 0) '$failed failed',
+        ].join(' • '),
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      ),
+    );
   }
 }

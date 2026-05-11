@@ -45,6 +45,7 @@ class _DownloadButton extends ConsumerWidget {
     }
     if (progress != null) {
       final pct = progress.fraction;
+      final paused = state.isPaused(itemId);
       return Stack(
         alignment: Alignment.center,
         children: [
@@ -52,7 +53,7 @@ class _DownloadButton extends ConsumerWidget {
             width: iconSize - 2,
             height: iconSize - 2,
             child: CircularProgressIndicator(
-              value: pct > 0 ? pct : null,
+              value: paused ? null : (pct > 0 ? pct : null),
               strokeWidth: 2,
               color: AppColors.primary,
               backgroundColor: AppColors.divider,
@@ -60,11 +61,12 @@ class _DownloadButton extends ConsumerWidget {
           ),
           IconButton(
             iconSize: iconSize - 6,
-            icon: const Icon(Icons.close),
-            tooltip: 'Cancel download',
+            icon: Icon(paused ? Icons.play_arrow : Icons.pause),
+            tooltip: paused ? 'Resume download' : 'Pause download',
             color: AppColors.textSecondary,
-            onPressed: () =>
-                ref.read(downloadManagerProvider.notifier).cancel(itemId),
+            onPressed: () => paused
+                ? ref.read(downloadManagerProvider.notifier).resume(itemId)
+                : ref.read(downloadManagerProvider.notifier).pause(itemId),
           ),
         ],
       );
