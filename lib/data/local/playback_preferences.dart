@@ -23,9 +23,9 @@ class PlaybackPreferences {
     this.autoplayNextTvEpisode = true,
     this.autoplayCountdownSeconds = 8,
     this.androidSoftwareVideoDecode = true,
-    this.defaultAudioMode = DefaultAudioMode.auto,
-    this.defaultAudioLanguage,
-    this.defaultSubtitleMode = DefaultSubtitleMode.auto,
+    this.defaultAudioMode = DefaultAudioMode.fixedLanguage,
+    this.defaultAudioLanguage = 'en',
+    this.defaultSubtitleMode = DefaultSubtitleMode.off,
     this.defaultSubtitleLanguage,
     this.subtitleFontScale = 1.0,
     this.subtitleBottomInset = 0.0,
@@ -67,7 +67,8 @@ class PlaybackPreferences {
   String? resolvedAudioLanguage(String? itemOriginalLanguage) {
     switch (defaultAudioMode) {
       case DefaultAudioMode.auto:
-        return null;
+        final code = defaultAudioLanguage?.trim();
+        return (code == null || code.isEmpty) ? null : code;
       case DefaultAudioMode.fixedLanguage:
         final code = defaultAudioLanguage?.trim();
         return (code == null || code.isEmpty) ? null : code;
@@ -135,28 +136,37 @@ class PlaybackPreferences {
       orElse: () => StreamingQuality.auto,
     );
     final subtitleModeName = json['defaultSubtitleMode'] as String?;
-    final subtitleMode = DefaultSubtitleMode.values.firstWhere(
+    final parsedSubtitleMode = DefaultSubtitleMode.values.firstWhere(
       (m) => m.name == subtitleModeName,
-      orElse: () => DefaultSubtitleMode.auto,
+      orElse: () => DefaultSubtitleMode.off,
     );
     final legacyLang = json['defaultAudioLanguage'] as String?;
     final modeName = json['defaultAudioMode'] as String?;
-    final audioMode = DefaultAudioMode.values.firstWhere(
+    final parsedAudioMode = DefaultAudioMode.values.firstWhere(
       (m) => m.name == modeName,
       orElse: () {
         if (legacyLang != null && legacyLang.trim().isNotEmpty) {
           return DefaultAudioMode.fixedLanguage;
         }
-        return DefaultAudioMode.auto;
+        return DefaultAudioMode.fixedLanguage;
       },
     );
     final trimmedLegacy = legacyLang?.trim();
-    final langForFixed =
-        audioMode == DefaultAudioMode.fixedLanguage &&
-            trimmedLegacy != null &&
-            trimmedLegacy.isNotEmpty
+    final effectiveAudioLang =
+        (trimmedLegacy != null && trimmedLegacy.isNotEmpty)
         ? trimmedLegacy
-        : null;
+        : 'en';
+    final effectiveAudioMode =
+        parsedAudioMode == DefaultAudioMode.originalLanguage
+        ? DefaultAudioMode.originalLanguage
+        : DefaultAudioMode.fixedLanguage;
+    final subtitleLang = (json['defaultSubtitleLanguage'] as String?)?.trim();
+    final effectiveSubtitleMode =
+        parsedSubtitleMode == DefaultSubtitleMode.byLanguage &&
+            subtitleLang != null &&
+            subtitleLang.isNotEmpty
+        ? DefaultSubtitleMode.byLanguage
+        : DefaultSubtitleMode.off;
     return PlaybackPreferences(
       streamingQuality: quality,
       autoSkipIntroCredits: json['autoSkipIntroCredits'] as bool? ?? true,
@@ -166,10 +176,13 @@ class PlaybackPreferences {
       ),
       androidSoftwareVideoDecode:
           json['androidSoftwareVideoDecode'] as bool? ?? true,
-      defaultAudioMode: audioMode,
-      defaultAudioLanguage: langForFixed,
-      defaultSubtitleMode: subtitleMode,
-      defaultSubtitleLanguage: json['defaultSubtitleLanguage'] as String?,
+      defaultAudioMode: effectiveAudioMode,
+      defaultAudioLanguage: effectiveAudioLang,
+      defaultSubtitleMode: effectiveSubtitleMode,
+      defaultSubtitleLanguage:
+          effectiveSubtitleMode == DefaultSubtitleMode.byLanguage
+          ? subtitleLang
+          : null,
       subtitleFontScale: _normalizeSubtitleFontScale(
         (json['subtitleFontScale'] as num?)?.toDouble(),
       ),
@@ -293,18 +306,11 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
   }
 
   Future<void> setDefaultAudioAuto() async {
-    state = state.copyWith(
-      defaultAudioMode: DefaultAudioMode.auto,
-      clearDefaultAudioLanguage: true,
-    );
-    await _persist();
+    return setDefaultAudioFixedLanguage(state.defaultAudioLanguage ?? 'en');
   }
 
   Future<void> setDefaultAudioOriginalLanguage() async {
-    state = state.copyWith(
-      defaultAudioMode: DefaultAudioMode.originalLanguage,
-      clearDefaultAudioLanguage: true,
-    );
+    state = state.copyWith(defaultAudioMode: DefaultAudioMode.originalLanguage);
     await _persist();
   }
 
@@ -317,11 +323,7 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
   }
 
   Future<void> setDefaultSubtitleAuto() async {
-    state = state.copyWith(
-      defaultSubtitleMode: DefaultSubtitleMode.auto,
-      clearDefaultSubtitleLanguage: true,
-    );
-    await _persist();
+    return setDefaultSubtitleOff();
   }
 
   Future<void> setDefaultSubtitleOff() async {

@@ -676,6 +676,9 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
+        final audioCodes = _orderedLanguageCodes(
+          selected: prefs.defaultAudioLanguage,
+        );
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -689,7 +692,7 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Uses TMDB “original language” from Jellyfin when available.',
+                  'Choose original audio per title, or force one language.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -698,21 +701,10 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
               ),
               _defaultTrackOption(
                 context: context,
-                selected: prefs.defaultAudioMode == DefaultAudioMode.auto,
-                label: 'Auto (server default)',
-                onTap: () async {
-                  await ref
-                      .read(playbackPreferencesProvider.notifier)
-                      .setDefaultAudioAuto();
-                  if (context.mounted) Navigator.of(context).pop();
-                },
-              ),
-              _defaultTrackOption(
-                context: context,
                 selected:
                     prefs.defaultAudioMode == DefaultAudioMode.originalLanguage,
-                label: 'Original language (metadata)',
-                subtitle: 'When unknown for a title, behaves like Auto.',
+                label: 'Original audio',
+                subtitle: 'Uses each title\'s metadata when available.',
                 onTap: () async {
                   await ref
                       .read(playbackPreferencesProvider.notifier)
@@ -722,11 +714,11 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
               ),
               const SizedBox(height: 8),
               Text(
-                'Always use language',
+                'Choose language',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 8),
-              for (final code in _commonLanguageCodes)
+              for (final code in audioCodes)
                 _defaultTrackOption(
                   context: context,
                   selected:
@@ -756,6 +748,9 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
+        final subtitleCodes = _orderedLanguageCodes(
+          selected: prefs.defaultSubtitleLanguage,
+        );
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -768,17 +763,6 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
               const SizedBox(height: 8),
               _defaultTrackOption(
                 context: context,
-                selected: prefs.defaultSubtitleMode == DefaultSubtitleMode.auto,
-                label: 'Auto',
-                onTap: () async {
-                  await ref
-                      .read(playbackPreferencesProvider.notifier)
-                      .setDefaultSubtitleAuto();
-                  if (context.mounted) Navigator.of(context).pop();
-                },
-              ),
-              _defaultTrackOption(
-                context: context,
                 selected: prefs.defaultSubtitleMode == DefaultSubtitleMode.off,
                 label: 'Off',
                 onTap: () async {
@@ -789,7 +773,7 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
                 },
               ),
               const SizedBox(height: 4),
-              for (final code in _commonLanguageCodes)
+              for (final code in subtitleCodes)
                 _defaultTrackOption(
                   context: context,
                   selected:
@@ -815,26 +799,40 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
 String _audioDefaultLabel(PlaybackPreferences prefs) {
   switch (prefs.defaultAudioMode) {
     case DefaultAudioMode.auto:
-      return 'Auto (server default)';
+      return _languageOrPlaceholder(prefs.defaultAudioLanguage);
     case DefaultAudioMode.originalLanguage:
-      return 'Original language (from metadata)';
+      return 'Original audio';
     case DefaultAudioMode.fixedLanguage:
-      final code = prefs.defaultAudioLanguage;
-      return languageDisplay(code) ??
-          (code == null || code.isEmpty ? '—' : code);
+      return _languageOrPlaceholder(prefs.defaultAudioLanguage);
   }
 }
 
 String _subtitleDefaultLabel(DefaultSubtitleMode mode, String? code) {
   switch (mode) {
     case DefaultSubtitleMode.auto:
-      return 'Auto';
+      return 'Off';
     case DefaultSubtitleMode.off:
       return 'Off';
     case DefaultSubtitleMode.byLanguage:
-      return languageDisplay(code) ??
-          (code == null || code.isEmpty ? 'Auto' : code);
+      return _languageOrPlaceholder(code);
   }
+}
+
+String _languageOrPlaceholder(String? code) {
+  if (code == null || code.isEmpty) return 'Select language';
+  return languageDisplay(code) ?? code;
+}
+
+List<String> _orderedLanguageCodes({String? selected}) {
+  final code = selected?.trim().toLowerCase();
+  if (code == null || code.isEmpty || !_commonLanguageCodes.contains(code)) {
+    return _commonLanguageCodes;
+  }
+  return [
+    code,
+    for (final c in _commonLanguageCodes)
+      if (c != code) c,
+  ];
 }
 
 String _subtitleAppearanceSummary({
