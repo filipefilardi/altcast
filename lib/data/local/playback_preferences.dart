@@ -184,7 +184,16 @@ class PlaybackPreferences {
 /// short so the picker stays compact and the chosen number maps to a clean
 /// progress arc on the Next Up card.
 const autoplayCountdownPresets = <int>[5, 8, 10, 15, 30];
-const subtitleFontScalePresets = <double>[0.9, 1.0, 1.1, 1.2, 1.35, 1.5];
+const subtitleFontScalePresets = <double>[
+  0.7,
+  0.8,
+  0.9,
+  1.0,
+  1.1,
+  1.2,
+  1.35,
+  1.5,
+];
 const subtitleBottomInsetPresets = <double>[-20, 0, 20, 40, 60, 80];
 
 int _normalizeAutoplayCountdown(int? value) {
