@@ -55,6 +55,8 @@ class SettingsScreen extends ConsumerWidget {
           const _DownloadGroup(),
           const SizedBox(height: 24),
           const _PlaybackGroup(),
+          const SizedBox(height: 24),
+          const _AudioSubtitleGroup(),
           const SizedBox(height: 28),
           const _SignOutTile(),
           const SizedBox(height: 28),
@@ -236,6 +238,20 @@ class _PlaybackGroup extends ConsumerWidget {
                 .setAndroidSoftwareVideoDecode(v),
             activeThumbColor: AppColors.primary,
           ),
+      ],
+    );
+  }
+}
+
+class _AudioSubtitleGroup extends ConsumerWidget {
+  const _AudioSubtitleGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(playbackPreferencesProvider);
+    return _SettingsGroup(
+      label: 'Audio & Subtitles',
+      children: [
         ListTile(
           leading: const Icon(Icons.volume_up_outlined),
           title: const Text('Default audio'),
@@ -266,70 +282,23 @@ class _PlaybackGroup extends ConsumerWidget {
           onTap: () => _showDefaultSubtitleSheet(context),
         ),
         ListTile(
-          leading: const Icon(Icons.format_size_outlined),
-          title: const Text('Subtitle size'),
+          leading: const Icon(Icons.tune_outlined),
+          title: const Text('Subtitle appearance'),
           subtitle: Text(
-            _subtitleSizeLabel(prefs.subtitleFontScale),
+            _subtitleAppearanceSummary(
+              scale: prefs.subtitleFontScale,
+              inset: prefs.subtitleBottomInset,
+            ),
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
             Icons.chevron_right,
             color: AppColors.textSecondary,
           ),
-          onTap: () => _showSubtitleSizeSheet(context),
-        ),
-        ListTile(
-          leading: const Icon(Icons.vertical_align_top_outlined),
-          title: const Text('Subtitle vertical position'),
-          subtitle: Text(
-            _subtitleVerticalLabel(prefs.subtitleBottomInset),
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          trailing: const Icon(
-            Icons.chevron_right,
-            color: AppColors.textSecondary,
-          ),
-          onTap: () => _showSubtitleVerticalSheet(context),
+          onTap: () => _showSubtitleAppearanceSheet(context),
         ),
       ],
     );
-  }
-
-  String _audioDefaultLabel(PlaybackPreferences prefs) {
-    switch (prefs.defaultAudioMode) {
-      case DefaultAudioMode.auto:
-        return 'Auto (server default)';
-      case DefaultAudioMode.originalLanguage:
-        return 'Original language (from metadata)';
-      case DefaultAudioMode.fixedLanguage:
-        final code = prefs.defaultAudioLanguage;
-        return languageDisplay(code) ??
-            (code == null || code.isEmpty ? '—' : code);
-    }
-  }
-
-  String _subtitleDefaultLabel(DefaultSubtitleMode mode, String? code) {
-    switch (mode) {
-      case DefaultSubtitleMode.auto:
-        return 'Auto';
-      case DefaultSubtitleMode.off:
-        return 'Off';
-      case DefaultSubtitleMode.byLanguage:
-        return languageDisplay(code) ??
-            (code == null || code.isEmpty ? 'Auto' : code);
-    }
-  }
-
-  String _subtitleSizeLabel(double scale) {
-    if (scale == 1.0) return 'Default';
-    final pct = ((scale - 1.0) * 100).round();
-    return pct > 0 ? 'Larger (+$pct%)' : 'Smaller ($pct%)';
-  }
-
-  String _subtitleVerticalLabel(double inset) {
-    if (inset == 0) return 'Default';
-    if (inset > 0) return 'Higher (+${inset.round()} px)';
-    return 'Lower (${inset.round()} px)';
   }
 }
 
@@ -610,46 +579,43 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
         final current = ref
             .watch(playbackPreferencesProvider)
             .autoplayCountdownSeconds;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Autoplay countdown',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 4, bottom: 8),
-                  child: Text(
-                    'How long the Next Up card waits before jumping to the next episode.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
+        return _scrollableSheet(
+          context: context,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Autoplay countdown',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 8),
+                child: Text(
+                  'How long the Next Up card waits before jumping to the next episode.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
-                for (final seconds in autoplayCountdownPresets)
-                  ListTile(
-                    title: Text('$seconds seconds'),
-                    contentPadding: EdgeInsets.zero,
-                    trailing: seconds == current
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: AppColors.primary,
-                          )
-                        : null,
-                    onTap: () async {
-                      await ref
-                          .read(playbackPreferencesProvider.notifier)
-                          .setAutoplayCountdownSeconds(seconds);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                  ),
-              ],
-            ),
+              ),
+              for (final seconds in autoplayCountdownPresets)
+                ListTile(
+                  title: Text('$seconds seconds'),
+                  contentPadding: EdgeInsets.zero,
+                  trailing: seconds == current
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                  onTap: () async {
+                    await ref
+                        .read(playbackPreferencesProvider.notifier)
+                        .setAutoplayCountdownSeconds(seconds);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
+            ],
           ),
         );
       },
@@ -664,41 +630,38 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final current = ref.watch(playbackPreferencesProvider).streamingQuality;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Streaming quality',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                for (final q in StreamingQuality.values)
-                  ListTile(
-                    title: Text(q.label),
-                    subtitle: Text(
-                      q.subtitle,
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                    contentPadding: EdgeInsets.zero,
-                    trailing: q == current
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: AppColors.primary,
-                          )
-                        : null,
-                    onTap: () async {
-                      await ref
-                          .read(playbackPreferencesProvider.notifier)
-                          .setStreamingQuality(q);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
+        return _scrollableSheet(
+          context: context,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Streaming quality',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              for (final q in StreamingQuality.values)
+                ListTile(
+                  title: Text(q.label),
+                  subtitle: Text(
+                    q.subtitle,
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
-              ],
-            ),
+                  contentPadding: EdgeInsets.zero,
+                  trailing: q == current
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                  onTap: () async {
+                    await ref
+                        .read(playbackPreferencesProvider.notifier)
+                        .setStreamingQuality(q);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
+            ],
           ),
         );
       },
@@ -849,115 +812,235 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
   );
 }
 
-Future<void> _showSubtitleSizeSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => Consumer(
-      builder: (context, ref, _) {
-        final current = ref
-            .watch(playbackPreferencesProvider)
-            .subtitleFontScale;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Subtitle size',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                for (final value in subtitleFontScalePresets)
-                  ListTile(
-                    title: Text(
-                      value == 1.0 ? 'Default' : '${(value * 100).round()}%',
-                    ),
-                    contentPadding: EdgeInsets.zero,
-                    trailing: value == current
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: AppColors.primary,
-                          )
-                        : null,
-                    onTap: () async {
-                      await ref
-                          .read(playbackPreferencesProvider.notifier)
-                          .setSubtitleFontScale(value);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+String _audioDefaultLabel(PlaybackPreferences prefs) {
+  switch (prefs.defaultAudioMode) {
+    case DefaultAudioMode.auto:
+      return 'Auto (server default)';
+    case DefaultAudioMode.originalLanguage:
+      return 'Original language (from metadata)';
+    case DefaultAudioMode.fixedLanguage:
+      final code = prefs.defaultAudioLanguage;
+      return languageDisplay(code) ??
+          (code == null || code.isEmpty ? '—' : code);
+  }
+}
+
+String _subtitleDefaultLabel(DefaultSubtitleMode mode, String? code) {
+  switch (mode) {
+    case DefaultSubtitleMode.auto:
+      return 'Auto';
+    case DefaultSubtitleMode.off:
+      return 'Off';
+    case DefaultSubtitleMode.byLanguage:
+      return languageDisplay(code) ??
+          (code == null || code.isEmpty ? 'Auto' : code);
+  }
+}
+
+String _subtitleAppearanceSummary({
+  required double scale,
+  required double inset,
+}) {
+  final size = scale == 1.0 ? 'Default size' : '${(scale * 100).round()}% size';
+  final pos = inset == 0
+      ? 'default position'
+      : '${inset.round()}px vertical shift';
+  return '$size · $pos';
+}
+
+Widget _scrollableSheet({
+  required BuildContext context,
+  required Widget child,
+}) {
+  final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
+  return SafeArea(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: child,
+      ),
     ),
   );
 }
 
-Future<void> _showSubtitleVerticalSheet(BuildContext context) {
+Future<void> _showSubtitleAppearanceSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (_) => Consumer(
-      builder: (context, ref, _) {
-        final current = ref
-            .watch(playbackPreferencesProvider)
-            .subtitleBottomInset;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Subtitle vertical position',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 4, bottom: 8),
-                  child: Text(
-                    'Higher means subtitles move farther from the bottom edge.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                for (final value in subtitleBottomInsetPresets)
-                  ListTile(
-                    title: Text(
-                      value == 0
-                          ? 'Default'
-                          : (value > 0
-                                ? 'Higher (+${value.round()} px)'
-                                : 'Lower (${value.round()} px)'),
-                    ),
-                    contentPadding: EdgeInsets.zero,
-                    trailing: value == current
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: AppColors.primary,
-                          )
-                        : null,
-                    onTap: () async {
-                      await ref
-                          .read(playbackPreferencesProvider.notifier)
-                          .setSubtitleBottomInset(value);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    ),
+    isScrollControlled: true,
+    builder: (_) => const _SubtitleAppearanceSheet(),
   );
+}
+
+class _SubtitleAppearanceSheet extends ConsumerStatefulWidget {
+  const _SubtitleAppearanceSheet();
+
+  @override
+  ConsumerState<_SubtitleAppearanceSheet> createState() =>
+      _SubtitleAppearanceSheetState();
+}
+
+class _SubtitleAppearanceSheetState
+    extends ConsumerState<_SubtitleAppearanceSheet> {
+  late double _fontScale;
+  late double _bottomInset;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefs = ref.read(playbackPreferencesProvider);
+    _fontScale = prefs.subtitleFontScale;
+    _bottomInset = prefs.subtitleBottomInset;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _scrollableSheet(
+      context: context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Subtitle appearance',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          _SubtitlePreviewCard(
+            fontScale: _fontScale,
+            bottomInset: _bottomInset,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Size (${(_fontScale * 100).round()}%)',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          Slider(
+            min: subtitleFontScalePresets.first,
+            max: subtitleFontScalePresets.last,
+            divisions:
+                ((subtitleFontScalePresets.last -
+                            subtitleFontScalePresets.first) /
+                        0.05)
+                    .round(),
+            value: _fontScale,
+            label: '${(_fontScale * 100).round()}%',
+            onChanged: (v) => setState(() => _fontScale = v),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Vertical position (${_bottomInset.round()} px)',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          Slider(
+            min: subtitleBottomInsetPresets.first,
+            max: subtitleBottomInsetPresets.last,
+            divisions:
+                (subtitleBottomInsetPresets.last -
+                        subtitleBottomInsetPresets.first)
+                    .round(),
+            value: _bottomInset,
+            label: '${_bottomInset.round()} px',
+            onChanged: (v) => setState(() => _bottomInset = v),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _fontScale = 1.0;
+                    _bottomInset = 0.0;
+                  });
+                },
+                child: const Text('Reset'),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () async {
+                  final notifier = ref.read(
+                    playbackPreferencesProvider.notifier,
+                  );
+                  await notifier.setSubtitleFontScale(_fontScale);
+                  await notifier.setSubtitleBottomInset(_bottomInset);
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubtitlePreviewCard extends StatelessWidget {
+  const _SubtitlePreviewCard({
+    required this.fontScale,
+    required this.bottomInset,
+  });
+
+  final double fontScale;
+  final double bottomInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseFont = 24.0;
+    final fontSize = (baseFont * fontScale).clamp(16.0, 56.0);
+    final bottomPad = (44.0 + bottomInset).clamp(12.0, 180.0);
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF2C2C2C), Color(0xFF151515)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0x88000000)],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: bottomPad,
+              child: Text(
+                'The subtitle preview updates live while you adjust.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                  backgroundColor: Colors.black26,
+                  shadows: const [
+                    Shadow(
+                      offset: Offset(0, 1),
+                      blurRadius: 2,
+                      color: Colors.black,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 Widget _defaultTrackOption({
