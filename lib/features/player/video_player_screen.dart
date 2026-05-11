@@ -12,6 +12,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/language.dart';
 import '../../data/downloads/download_manager.dart';
+import '../../data/downloads/downloaded_item.dart';
 import '../../data/jellyfin/auth_repository.dart';
 import '../../data/jellyfin/jellyfin_repository.dart';
 import '../../data/jellyfin/models/intro_skipper_timestamps.dart';
@@ -227,6 +228,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _loadPlayerTitle() async {
+    final localTitle = _buildOfflinePlayerTitle();
+    if (localTitle != null && localTitle.isNotEmpty && mounted) {
+      setState(() => _playerTitle = localTitle);
+    }
     try {
       final title = await ref
           .read(jellyfinRepositoryProvider)
@@ -234,6 +239,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (!mounted) return;
       setState(() => _playerTitle = title);
     } catch (_) {}
+  }
+
+  String? _buildOfflinePlayerTitle() {
+    final localItem = ref.read(downloadManagerProvider).items[widget.itemId];
+    if (localItem == null) return null;
+
+    if (localItem.kind == DownloadedItemKind.episode) {
+      final seriesName = localItem.seriesName?.trim();
+      final episodeName = localItem.name.trim();
+      final number = localItem.episodeLabel;
+      final titlePart = episodeName.isEmpty ? null : episodeName;
+      final parts = <String>[
+        if (seriesName != null && seriesName.isNotEmpty) seriesName,
+        if (number?.isNotEmpty ?? false) number!,
+        if (titlePart?.isNotEmpty ?? false) titlePart!,
+      ];
+      if (parts.isEmpty) return null;
+      return parts.join(' · ');
+    }
+
+    final name = localItem.name.trim();
+    if (name.isEmpty) return null;
+    final year = localItem.year;
+    return year == null ? name : '$name ($year)';
   }
 
   void _publishOverlays() {
