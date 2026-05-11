@@ -1216,13 +1216,24 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );
+    final playbackPrefs = ref.watch(playbackPreferencesProvider);
     final mediaQuery = MediaQuery.of(context);
     final shortestSide = mediaQuery.size.shortestSide;
     final isTabletClass = shortestSide >= 600;
     final subtitleHorizontalPadding = isTabletClass ? 40.0 : 24.0;
-    final subtitleBottomPadding =
+    final baseBottomPadding =
         (isTabletClass ? 96.0 : 44.0) + mediaQuery.padding.bottom;
-    final subtitleFontSize = isTabletClass ? 32.0 : 24.0;
+    final subtitleBottomPadding =
+        (baseBottomPadding + playbackPrefs.subtitleBottomInset).clamp(
+          16.0,
+          220.0,
+        );
+    final baseSubtitleFontSize = isTabletClass ? 32.0 : 24.0;
+    final subtitleFontSize =
+        (baseSubtitleFontSize * playbackPrefs.subtitleFontScale).clamp(
+          16.0,
+          56.0,
+        );
 
     return Scaffold(
       backgroundColor: Colors.black,

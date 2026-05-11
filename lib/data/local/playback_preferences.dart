@@ -27,6 +27,8 @@ class PlaybackPreferences {
     this.defaultAudioLanguage,
     this.defaultSubtitleMode = DefaultSubtitleMode.auto,
     this.defaultSubtitleLanguage,
+    this.subtitleFontScale = 1.0,
+    this.subtitleBottomInset = 0.0,
   });
 
   final StreamingQuality streamingQuality;
@@ -57,6 +59,8 @@ class PlaybackPreferences {
   final String? defaultAudioLanguage;
   final DefaultSubtitleMode defaultSubtitleMode;
   final String? defaultSubtitleLanguage;
+  final double subtitleFontScale;
+  final double subtitleBottomInset;
 
   /// Effective audio language code for playback prefs, from settings mode plus
   /// optional per-item metadata ([itemOriginalLanguage] from Jellyfin).
@@ -85,6 +89,8 @@ class PlaybackPreferences {
     DefaultSubtitleMode? defaultSubtitleMode,
     String? defaultSubtitleLanguage,
     bool clearDefaultSubtitleLanguage = false,
+    double? subtitleFontScale,
+    double? subtitleBottomInset,
   }) {
     return PlaybackPreferences(
       streamingQuality: streamingQuality ?? this.streamingQuality,
@@ -103,6 +109,8 @@ class PlaybackPreferences {
       defaultSubtitleLanguage: clearDefaultSubtitleLanguage
           ? null
           : (defaultSubtitleLanguage ?? this.defaultSubtitleLanguage),
+      subtitleFontScale: subtitleFontScale ?? this.subtitleFontScale,
+      subtitleBottomInset: subtitleBottomInset ?? this.subtitleBottomInset,
     );
   }
 
@@ -116,6 +124,8 @@ class PlaybackPreferences {
     'defaultAudioLanguage': defaultAudioLanguage,
     'defaultSubtitleMode': defaultSubtitleMode.name,
     'defaultSubtitleLanguage': defaultSubtitleLanguage,
+    'subtitleFontScale': subtitleFontScale,
+    'subtitleBottomInset': subtitleBottomInset,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> json) {
@@ -160,6 +170,12 @@ class PlaybackPreferences {
       defaultAudioLanguage: langForFixed,
       defaultSubtitleMode: subtitleMode,
       defaultSubtitleLanguage: json['defaultSubtitleLanguage'] as String?,
+      subtitleFontScale: _normalizeSubtitleFontScale(
+        (json['subtitleFontScale'] as num?)?.toDouble(),
+      ),
+      subtitleBottomInset: _normalizeSubtitleBottomInset(
+        (json['subtitleBottomInset'] as num?)?.toDouble(),
+      ),
     );
   }
 }
@@ -168,6 +184,8 @@ class PlaybackPreferences {
 /// short so the picker stays compact and the chosen number maps to a clean
 /// progress arc on the Next Up card.
 const autoplayCountdownPresets = <int>[5, 8, 10, 15, 30];
+const subtitleFontScalePresets = <double>[0.9, 1.0, 1.1, 1.2, 1.35, 1.5];
+const subtitleBottomInsetPresets = <double>[-20, 0, 20, 40, 60, 80];
 
 int _normalizeAutoplayCountdown(int? value) {
   if (value == null) return 8;
@@ -176,6 +194,34 @@ int _normalizeAutoplayCountdown(int? value) {
   var best = autoplayCountdownPresets.first;
   var bestDelta = (value - best).abs();
   for (final preset in autoplayCountdownPresets.skip(1)) {
+    final d = (value - preset).abs();
+    if (d < bestDelta) {
+      best = preset;
+      bestDelta = d;
+    }
+  }
+  return best;
+}
+
+double _normalizeSubtitleFontScale(double? value) {
+  if (value == null) return 1.0;
+  var best = subtitleFontScalePresets.first;
+  var bestDelta = (value - best).abs();
+  for (final preset in subtitleFontScalePresets.skip(1)) {
+    final d = (value - preset).abs();
+    if (d < bestDelta) {
+      best = preset;
+      bestDelta = d;
+    }
+  }
+  return best;
+}
+
+double _normalizeSubtitleBottomInset(double? value) {
+  if (value == null) return 0.0;
+  var best = subtitleBottomInsetPresets.first;
+  var bestDelta = (value - best).abs();
+  for (final preset in subtitleBottomInsetPresets.skip(1)) {
     final d = (value - preset).abs();
     if (d < bestDelta) {
       best = preset;
@@ -281,6 +327,20 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
     state = state.copyWith(
       defaultSubtitleMode: DefaultSubtitleMode.byLanguage,
       defaultSubtitleLanguage: languageCode.trim(),
+    );
+    await _persist();
+  }
+
+  Future<void> setSubtitleFontScale(double scale) async {
+    state = state.copyWith(
+      subtitleFontScale: _normalizeSubtitleFontScale(scale),
+    );
+    await _persist();
+  }
+
+  Future<void> setSubtitleBottomInset(double inset) async {
+    state = state.copyWith(
+      subtitleBottomInset: _normalizeSubtitleBottomInset(inset),
     );
     await _persist();
   }

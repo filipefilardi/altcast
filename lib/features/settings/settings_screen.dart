@@ -265,6 +265,32 @@ class _PlaybackGroup extends ConsumerWidget {
           ),
           onTap: () => _showDefaultSubtitleSheet(context),
         ),
+        ListTile(
+          leading: const Icon(Icons.format_size_outlined),
+          title: const Text('Subtitle size'),
+          subtitle: Text(
+            _subtitleSizeLabel(prefs.subtitleFontScale),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showSubtitleSizeSheet(context),
+        ),
+        ListTile(
+          leading: const Icon(Icons.vertical_align_top_outlined),
+          title: const Text('Subtitle vertical position'),
+          subtitle: Text(
+            _subtitleVerticalLabel(prefs.subtitleBottomInset),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showSubtitleVerticalSheet(context),
+        ),
       ],
     );
   }
@@ -292,6 +318,18 @@ class _PlaybackGroup extends ConsumerWidget {
         return languageDisplay(code) ??
             (code == null || code.isEmpty ? 'Auto' : code);
     }
+  }
+
+  String _subtitleSizeLabel(double scale) {
+    if (scale == 1.0) return 'Default';
+    final pct = ((scale - 1.0) * 100).round();
+    return pct > 0 ? 'Larger (+$pct%)' : 'Smaller ($pct%)';
+  }
+
+  String _subtitleVerticalLabel(double inset) {
+    if (inset == 0) return 'Default';
+    if (inset > 0) return 'Higher (+${inset.round()} px)';
+    return 'Lower (${inset.round()} px)';
   }
 }
 
@@ -804,6 +842,117 @@ Future<void> _showDefaultSubtitleSheet(BuildContext context) {
                   },
                 ),
             ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Future<void> _showSubtitleSizeSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final current = ref
+            .watch(playbackPreferencesProvider)
+            .subtitleFontScale;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Subtitle size',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                for (final value in subtitleFontScalePresets)
+                  ListTile(
+                    title: Text(
+                      value == 1.0 ? 'Default' : '${(value * 100).round()}%',
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    trailing: value == current
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppColors.primary,
+                          )
+                        : null,
+                    onTap: () async {
+                      await ref
+                          .read(playbackPreferencesProvider.notifier)
+                          .setSubtitleFontScale(value);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Future<void> _showSubtitleVerticalSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final current = ref
+            .watch(playbackPreferencesProvider)
+            .subtitleBottomInset;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Subtitle vertical position',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 4, bottom: 8),
+                  child: Text(
+                    'Higher means subtitles move farther from the bottom edge.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                for (final value in subtitleBottomInsetPresets)
+                  ListTile(
+                    title: Text(
+                      value == 0
+                          ? 'Default'
+                          : (value > 0
+                                ? 'Higher (+${value.round()} px)'
+                                : 'Lower (${value.round()} px)'),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    trailing: value == current
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppColors.primary,
+                          )
+                        : null,
+                    onTap: () async {
+                      await ref
+                          .read(playbackPreferencesProvider.notifier)
+                          .setSubtitleBottomInset(value);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
