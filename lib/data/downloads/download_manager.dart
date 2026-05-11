@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../jellyfin/jellyfin_repository.dart';
 import '../jellyfin/models/episode.dart';
 import '../jellyfin/models/movie.dart';
+import '../jellyfin/models/stream_source.dart';
 import '../local/download_preferences.dart';
 import 'downloaded_item.dart';
 
@@ -215,6 +216,10 @@ class DownloadManager extends Notifier<DownloadsState> {
     try {
       final f = File(item.filePath);
       if (f.existsSync()) await f.delete();
+      for (final sub in item.externalSubtitles) {
+        final sf = File(sub.filePath);
+        if (sf.existsSync()) await sf.delete();
+      }
     } catch (_) {
       // Ignore — manifest update is the source of truth either way.
     }
@@ -244,6 +249,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   Future<void> _download(_QueueEntry entry) async {
     final repo = ref.read(jellyfinRepositoryProvider);
     final url = repo.streamUrl(entry.itemId);
+    final sidecarSubs = await _resolveExternalSubs(entry.itemId);
     final dir = await _downloadsDir();
     final tempPath = '${dir.path}/${entry.itemId}.partial';
     final finalPath = '${dir.path}/${entry.itemId}.video';
@@ -283,7 +289,15 @@ class DownloadManager extends Notifier<DownloadsState> {
         await tempFile.delete();
       }
 
-      final downloaded = entry.toDownloadedItem(filePath: finalPath);
+      final downloadedSubs = await _downloadExternalSubs(
+        itemId: entry.itemId,
+        subs: sidecarSubs,
+        dir: dir,
+      );
+      final downloaded = entry.toDownloadedItem(
+        filePath: finalPath,
+        externalSubtitles: downloadedSubs,
+      );
       final newItems = {...state.items, downloaded.id: downloaded};
       final newProgress = Map<String, DownloadProgress>.from(state.progress)
         ..remove(entry.itemId);
@@ -313,6 +327,73 @@ class DownloadManager extends Notifier<DownloadsState> {
     } finally {
       _activeCancel = null;
     }
+  }
+
+  Future<List<DownloadedExternalSubtitle>> _downloadExternalSubs({
+    required String itemId,
+    required List<ExternalSubtitle> subs,
+    required Directory dir,
+  }) async {
+    final out = <DownloadedExternalSubtitle>[];
+    for (var i = 0; i < subs.length; i++) {
+      final sub = subs[i];
+      final ext = _subtitleExt(sub);
+      final tempPath = '${dir.path}/$itemId.sub.$i.partial';
+      final finalPath = '${dir.path}/$itemId.sub.$i.$ext';
+      try {
+        await Dio().download(
+          sub.url,
+          tempPath,
+          options: Options(followRedirects: true),
+        );
+        final tempFile = File(tempPath);
+        try {
+          await tempFile.rename(finalPath);
+        } catch (_) {
+          await tempFile.copy(finalPath);
+          await tempFile.delete();
+        }
+        out.add(
+          DownloadedExternalSubtitle(
+            id: sub.id,
+            filePath: finalPath,
+            streamIndex: sub.streamIndex,
+            title: sub.title,
+            language: sub.language,
+            codec: sub.codec,
+          ),
+        );
+      } catch (_) {
+        try {
+          final tf = File(tempPath);
+          if (tf.existsSync()) await tf.delete();
+        } catch (_) {}
+      }
+    }
+    return out;
+  }
+
+  Future<List<ExternalSubtitle>> _resolveExternalSubs(String itemId) async {
+    try {
+      final repo = ref.read(jellyfinRepositoryProvider);
+      final source = await repo.getStreamSource(itemId);
+      return source.externalSubtitles;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String _subtitleExt(ExternalSubtitle sub) {
+    final codec = (sub.codec ?? '').toLowerCase();
+    if (codec.isNotEmpty) return codec;
+    final uri = Uri.tryParse(sub.url);
+    if (uri == null) return 'vtt';
+    final segs = uri.pathSegments;
+    if (segs.isEmpty) return 'vtt';
+    final last = segs.last;
+    final dot = last.lastIndexOf('.');
+    if (dot <= 0 || dot == last.length - 1) return 'vtt';
+    return last.substring(dot + 1).toLowerCase();
   }
 
   Future<void> _guardDownloadNetwork() async {
@@ -488,7 +569,10 @@ class _QueueEntry {
   final int? seasonNumber;
   final int? episodeNumber;
 
-  DownloadedItem toDownloadedItem({required String filePath}) {
+  DownloadedItem toDownloadedItem({
+    required String filePath,
+    List<DownloadedExternalSubtitle> externalSubtitles = const [],
+  }) {
     return DownloadedItem(
       id: itemId,
       name: name,
@@ -502,6 +586,7 @@ class _QueueEntry {
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber,
+      externalSubtitles: externalSubtitles,
     );
   }
 
