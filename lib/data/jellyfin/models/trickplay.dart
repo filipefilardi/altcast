@@ -24,6 +24,48 @@ class TrickplayManifest {
   }
 }
 
+class OfflineTrickplayData {
+  const OfflineTrickplayData({
+    required this.manifest,
+    required this.tileFilesByIndex,
+  });
+
+  final TrickplayManifest manifest;
+  final Map<int, String> tileFilesByIndex;
+
+  Map<String, dynamic> toJson() => {
+    'manifest': {
+      'width': manifest.width,
+      'height': manifest.height,
+      'tileWidth': manifest.tileWidth,
+      'tileHeight': manifest.tileHeight,
+      'thumbnailCount': manifest.thumbnailCount,
+      'intervalMs': manifest.intervalMs,
+    },
+    'tileFilesByIndex': {
+      for (final e in tileFilesByIndex.entries) '${e.key}': e.value,
+    },
+  };
+
+  factory OfflineTrickplayData.fromJson(Map<String, dynamic> json) {
+    final m = Map<String, dynamic>.from(json['manifest'] as Map);
+    final files = Map<String, dynamic>.from(json['tileFilesByIndex'] as Map);
+    return OfflineTrickplayData(
+      manifest: TrickplayManifest(
+        width: m['width'] as int,
+        height: m['height'] as int,
+        tileWidth: m['tileWidth'] as int,
+        tileHeight: m['tileHeight'] as int,
+        thumbnailCount: m['thumbnailCount'] as int,
+        intervalMs: m['intervalMs'] as int,
+      ),
+      tileFilesByIndex: {
+        for (final e in files.entries) int.parse(e.key): e.value as String,
+      },
+    );
+  }
+}
+
 class TrickplayFrame {
   const TrickplayFrame({
     required this.urls,

@@ -12,6 +12,7 @@ import '../jellyfin/models/episode.dart';
 import '../jellyfin/models/intro_skipper_timestamps.dart';
 import '../jellyfin/models/movie.dart';
 import '../jellyfin/models/stream_source.dart';
+import '../jellyfin/models/trickplay.dart';
 import '../local/download_preferences.dart';
 import 'downloaded_item.dart';
 
@@ -268,6 +269,12 @@ class DownloadManager extends Notifier<DownloadsState> {
         final sf = File(sub.filePath);
         if (sf.existsSync()) await sf.delete();
       }
+      if (item.offlineTrickplay != null) {
+        for (final p in item.offlineTrickplay!.tileFilesByIndex.values) {
+          final tf = File(p);
+          if (tf.existsSync()) await tf.delete();
+        }
+      }
     } catch (_) {}
     final newItems = Map<String, DownloadedItem>.from(state.items)
       ..remove(itemId);
@@ -351,11 +358,16 @@ class DownloadManager extends Notifier<DownloadsState> {
         subs: sidecarSubs,
         dir: dir,
       );
+      final offlineTrickplay = await _downloadOfflineTrickplay(
+        itemId: entry.itemId,
+        dir: dir,
+      );
       final skipper = await _resolveIntroSkipperTimestamps(entry.itemId);
       final downloaded = entry.toDownloadedItem(
         filePath: finalPath,
         introSkipper: skipper,
         externalSubtitles: downloadedSubs,
+        offlineTrickplay: offlineTrickplay,
       );
       final newItems = {...state.items, downloaded.id: downloaded};
       final newProgress = Map<String, DownloadProgress>.from(state.progress)
@@ -499,6 +511,58 @@ class DownloadManager extends Notifier<DownloadsState> {
       return source.externalSubtitles;
     } catch (_) {
       return const [];
+    }
+  }
+
+  Future<OfflineTrickplayData?> _downloadOfflineTrickplay({
+    required String itemId,
+    required Directory dir,
+  }) async {
+    try {
+      final repo = ref.read(jellyfinRepositoryProvider);
+      final session = await repo.getTrickplaySession(itemId);
+      if (session == null) return null;
+      final tileCount = session.manifest.tileCount;
+      if (tileCount <= 0) return null;
+
+      final trickDir = Directory('${dir.path}/$itemId.trickplay');
+      if (!trickDir.existsSync()) {
+        await trickDir.create(recursive: true);
+      }
+
+      final downloaded = <int, String>{};
+      final dio = Dio();
+      for (var i = 0; i < tileCount; i++) {
+        final urls = session.tileUrlsForIndex(i);
+        if (urls.isEmpty) continue;
+        List<int>? bytes;
+        for (final url in urls) {
+          try {
+            final res = await dio.get<List<int>>(
+              url,
+              options: Options(responseType: ResponseType.bytes),
+            );
+            final data = res.data;
+            if (data != null && data.isNotEmpty) {
+              bytes = data;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (bytes == null) continue;
+        final path = '${trickDir.path}/$i.jpg';
+        await File(path).writeAsBytes(bytes, flush: true);
+        downloaded[i] = path;
+      }
+      if (downloaded.isEmpty) return null;
+
+      return OfflineTrickplayData(
+        manifest: session.manifest,
+        tileFilesByIndex: downloaded,
+      );
+    } catch (_) {
+      // Trickplay is optional. Video download should still succeed.
+      return null;
     }
   }
 
@@ -749,6 +813,7 @@ class _QueueEntry {
     required String filePath,
     IntroSkipperTimestamps? introSkipper,
     List<DownloadedExternalSubtitle> externalSubtitles = const [],
+    OfflineTrickplayData? offlineTrickplay,
   }) {
     return DownloadedItem(
       id: itemId,
@@ -768,6 +833,7 @@ class _QueueEntry {
       creditsStartTicks: _toTicks(introSkipper?.credits?.start),
       creditsEndTicks: _toTicks(introSkipper?.credits?.end),
       externalSubtitles: externalSubtitles,
+      offlineTrickplay: offlineTrickplay,
     );
   }
 

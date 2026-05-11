@@ -1218,6 +1218,7 @@ class JellyfinRepository {
       serverUrl: s.serverUrl,
       token: s.accessToken,
       playlistTileImages: null,
+      localTileFilesByIndex: null,
     );
   }
 
@@ -1259,6 +1260,7 @@ class JellyfinRepository {
         serverUrl: s.serverUrl,
         token: s.accessToken,
         playlistTileImages: parsed.$2,
+        localTileFilesByIndex: null,
       );
     }
     debugPrint('Trickplay: no playlist manifest for item=$itemId');
@@ -1565,6 +1567,7 @@ class TrickplaySession {
     required this.serverUrl,
     required this.token,
     required this.playlistTileImages,
+    required this.localTileFilesByIndex,
   });
 
   final String itemId;
@@ -1573,7 +1576,24 @@ class TrickplaySession {
   final String serverUrl;
   final String token;
   final List<String>? playlistTileImages;
+  final Map<int, String>? localTileFilesByIndex;
   int? _lastLoggedTileIndex;
+
+  factory TrickplaySession.offline({
+    required String itemId,
+    required TrickplayManifest manifest,
+    required Map<int, String> tileFilesByIndex,
+  }) {
+    return TrickplaySession._(
+      itemId: itemId,
+      mediaSourceId: null,
+      manifest: manifest,
+      serverUrl: '',
+      token: '',
+      playlistTileImages: null,
+      localTileFilesByIndex: tileFilesByIndex,
+    );
+  }
 
   TrickplayFrame frameAt(Duration position) {
     return frameAtWithDuration(position);
@@ -1616,6 +1636,8 @@ class TrickplaySession {
 
     final urls = playlistTileImages != null && playlistTileImages!.isNotEmpty
         ? _playlistTileUrls(tileIndex)
+        : localTileFilesByIndex != null && localTileFilesByIndex!.isNotEmpty
+        ? _localTileUrls(tileIndex)
         : _tileImageUrls(tileIndex);
     if (_trickplayDebugLogs && _lastLoggedTileIndex != tileIndex) {
       _lastLoggedTileIndex = tileIndex;
@@ -1650,6 +1672,33 @@ class TrickplaySession {
       if (!deduped.contains(url)) deduped.add(url);
     }
     return deduped;
+  }
+
+  List<String> tileUrlsForIndex(int tileIndex) {
+    if (playlistTileImages != null && playlistTileImages!.isNotEmpty) {
+      return _playlistTileUrls(tileIndex);
+    }
+    if (localTileFilesByIndex != null && localTileFilesByIndex!.isNotEmpty) {
+      return _localTileUrls(tileIndex);
+    }
+    return _tileImageUrls(tileIndex);
+  }
+
+  List<String> _localTileUrls(int tileIndex) {
+    final map = localTileFilesByIndex!;
+    if (map.isEmpty) return const [];
+    if (map.containsKey(tileIndex)) {
+      return [Uri.file(map[tileIndex]!).toString()];
+    }
+    // Fallback to nearest lower then nearest higher tile to avoid hard-fail
+    // when a few tiles were not downloaded.
+    final keys = map.keys.toList()..sort();
+    int best = keys.first;
+    for (final k in keys) {
+      best = k;
+      if (k >= tileIndex) break;
+    }
+    return [Uri.file(map[best]!).toString()];
   }
 
   List<String> _tileImageUrls(int tileIndex) {
