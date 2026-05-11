@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../jellyfin/jellyfin_repository.dart';
 import '../jellyfin/models/episode.dart';
+import '../jellyfin/models/intro_skipper_timestamps.dart';
 import '../jellyfin/models/movie.dart';
 import '../jellyfin/models/stream_source.dart';
 import '../local/download_preferences.dart';
@@ -350,8 +351,10 @@ class DownloadManager extends Notifier<DownloadsState> {
         subs: sidecarSubs,
         dir: dir,
       );
+      final skipper = await _resolveIntroSkipperTimestamps(entry.itemId);
       final downloaded = entry.toDownloadedItem(
         filePath: finalPath,
+        introSkipper: skipper,
         externalSubtitles: downloadedSubs,
       );
       final newItems = {...state.items, downloaded.id: downloaded};
@@ -496,6 +499,18 @@ class DownloadManager extends Notifier<DownloadsState> {
       return source.externalSubtitles;
     } catch (_) {
       return const [];
+    }
+  }
+
+  Future<IntroSkipperTimestamps?> _resolveIntroSkipperTimestamps(
+    String itemId,
+  ) async {
+    try {
+      return await ref
+          .read(jellyfinRepositoryProvider)
+          .getIntroSkipperTimestamps(itemId);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -732,6 +747,7 @@ class _QueueEntry {
 
   DownloadedItem toDownloadedItem({
     required String filePath,
+    IntroSkipperTimestamps? introSkipper,
     List<DownloadedExternalSubtitle> externalSubtitles = const [],
   }) {
     return DownloadedItem(
@@ -747,8 +763,17 @@ class _QueueEntry {
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber,
+      introStartTicks: _toTicks(introSkipper?.introduction?.start),
+      introEndTicks: _toTicks(introSkipper?.introduction?.end),
+      creditsStartTicks: _toTicks(introSkipper?.credits?.start),
+      creditsEndTicks: _toTicks(introSkipper?.credits?.end),
       externalSubtitles: externalSubtitles,
     );
+  }
+
+  int? _toTicks(Duration? value) {
+    if (value == null) return null;
+    return value.inMicroseconds * 10;
   }
 
   DownloadProgress toProgress(

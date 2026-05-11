@@ -416,6 +416,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _loadIntroSkipper() async {
+    final offline = _offlineIntroSkipper();
+    if (offline != null && offline.hasAny) {
+      _introSkipper = offline;
+      _showSkipIntroChip = false;
+      _showSkipCreditsChip = false;
+      _publishOverlays();
+      if (mounted) {
+        _syncIntroSkipperOverlay(_lastPosition);
+      }
+      return;
+    }
     try {
       final timestamps = await ref
           .read(jellyfinRepositoryProvider)
@@ -429,6 +440,32 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         _syncIntroSkipperOverlay(_lastPosition);
       }
     } catch (_) {}
+  }
+
+  IntroSkipperTimestamps? _offlineIntroSkipper() {
+    final local = ref.read(downloadManagerProvider).items[widget.itemId];
+    if (local == null) return null;
+    final introStart = _ticksToDuration(local.introStartTicks);
+    final introEnd = _ticksToDuration(local.introEndTicks);
+    final creditsStart = _ticksToDuration(local.creditsStartTicks);
+    final creditsEnd = _ticksToDuration(local.creditsEndTicks);
+    return IntroSkipperTimestamps(
+      introduction: introStart != null &&
+              introEnd != null &&
+              introEnd > introStart
+          ? IntroSkipperRange(start: introStart, end: introEnd)
+          : null,
+      credits: creditsStart != null &&
+              creditsEnd != null &&
+              creditsEnd > creditsStart
+          ? IntroSkipperRange(start: creditsStart, end: creditsEnd)
+          : null,
+    );
+  }
+
+  Duration? _ticksToDuration(int? ticks) {
+    if (ticks == null || ticks <= 0) return null;
+    return Duration(microseconds: ticks ~/ 10);
   }
 
   void _cancelIntroSkipperTimers() {
@@ -554,6 +591,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   Future<void> _resolveNextEpisode() async {
+    final offlineNext = _resolveOfflineNextEpisode();
+    if (offlineNext != null) {
+      _nextEpisode = offlineNext;
+      _nextEpisodePosterUrl = null;
+      _publishOverlays();
+      return;
+    }
+
     // Capture the repo upfront — `ref.read` after dispose throws.
     final repo = ref.read(jellyfinRepositoryProvider);
     var seriesId = widget.seriesId;
@@ -596,6 +641,52 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         ? null
         : repo.backdropUrl(next.id, null, fallbackPrimaryTag: next.imageTag);
     _publishOverlays();
+  }
+
+  Episode? _resolveOfflineNextEpisode() {
+    final downloads = ref.read(downloadManagerProvider).items;
+    final current = downloads[widget.itemId];
+    if (current == null || current.kind != DownloadedItemKind.episode) {
+      return null;
+    }
+    final seriesId = current.seriesId;
+    final season = current.seasonNumber;
+    final episode = current.episodeNumber;
+    if (seriesId == null || season == null || episode == null) return null;
+
+    final candidates = downloads.values
+        .where(
+          (item) =>
+              item.kind == DownloadedItemKind.episode &&
+              item.seriesId == seriesId &&
+              item.seasonNumber != null &&
+              item.episodeNumber != null,
+        )
+        .toList(growable: false);
+    candidates.sort((a, b) {
+      final seasonDiff = a.seasonNumber!.compareTo(b.seasonNumber!);
+      if (seasonDiff != 0) return seasonDiff;
+      return a.episodeNumber!.compareTo(b.episodeNumber!);
+    });
+
+    for (final candidate in candidates) {
+      final afterCurrentSeason = candidate.seasonNumber! > season;
+      final sameSeasonNextEpisode =
+          candidate.seasonNumber == season && candidate.episodeNumber! > episode;
+      if (afterCurrentSeason || sameSeasonNextEpisode) {
+        return Episode(
+          id: candidate.id,
+          name: candidate.name,
+          seriesId: candidate.seriesId ?? '',
+          seriesName: candidate.seriesName,
+          parentIndexNumber: candidate.seasonNumber,
+          indexNumber: candidate.episodeNumber,
+          runTime: candidate.runTime,
+          imageTag: candidate.imageTag,
+        );
+      }
+    }
+    return null;
   }
 
   void _setSubVisibility(bool _) {
