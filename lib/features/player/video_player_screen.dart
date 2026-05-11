@@ -188,6 +188,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// pattern so the sheet's "selected" highlight reacts immediately.
   final ValueNotifier<String?> _selectedExternalSubNotifier =
       ValueNotifier<String?>(null);
+  final ValueNotifier<TrickplayOverlayData?> _trickplayOverlayNotifier =
+      ValueNotifier<TrickplayOverlayData?>(null);
 
   StreamSource? get _source => _sourceNotifier.value;
 
@@ -1209,6 +1211,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _player.dispose();
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
+    _trickplayOverlayNotifier.dispose();
     _overlaySnapshots.dispose();
     _controlOverlayNotifier.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
@@ -1309,6 +1312,25 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   onPlayNow: _playNextEpisode,
                 ),
               ),
+            ValueListenableBuilder<TrickplayOverlayData?>(
+              valueListenable: _trickplayOverlayNotifier,
+              builder: (context, trickplay, _) {
+                if (trickplay == null) return const SizedBox.shrink();
+                return Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: pad.bottom + 100,
+                  child: IgnorePointer(
+                    child: AltCastTrickplayPreviewBubble(
+                      session: trickplay.session,
+                      position: trickplay.position,
+                      totalDuration: trickplay.totalDuration,
+                      alignPercent: trickplay.alignPercent,
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         );
       },
@@ -1327,6 +1349,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     );
     final controlsTheme = buildAltCastMaterialVideoControlsTheme(
       player: _player,
+      itemId: widget.itemId,
+      sourceListenable: _sourceNotifier,
+      trickplayOverlayNotifier: _trickplayOverlayNotifier,
       onClosePlayer: _closePlayer,
       onOpenTracks: _showTracksSheet,
       onOpenSettings: _togglePlaybackSettings,

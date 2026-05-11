@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:uuid/uuid.dart';
@@ -14,7 +15,10 @@ import 'models/movie.dart';
 import 'models/person_details.dart';
 import 'models/series.dart';
 import 'models/stream_source.dart';
+import 'models/trickplay.dart';
 import '../local/playback_preferences.dart';
+
+const bool _trickplayDebugLogs = true;
 
 enum LibrarySort { recentlyAdded, nameAsc, nameDesc, yearDesc }
 
@@ -1108,6 +1112,337 @@ class JellyfinRepository {
     return '$raw${sep}api_key=${Uri.encodeQueryComponent(token)}';
   }
 
+  /// Fetches Trickplay metadata map for a video item and returns a lightweight
+  /// session object that can resolve preview frames for scrub positions.
+  ///
+  /// Returns null when the server has no generated Trickplay data for the
+  /// selected item/media source.
+  Future<TrickplaySession?> getTrickplaySession(
+    String itemId, {
+    String? mediaSourceId,
+    int preferredWidth = 320,
+  }) async {
+    final s = _session;
+    if (_trickplayDebugLogs) {
+      debugPrint(
+        'Trickplay lookup item=$itemId mediaSourceId=${mediaSourceId ?? ''}',
+      );
+    }
+    Map<String, dynamic>? data;
+    try {
+      data = await _getTrickplayData(itemId, mediaSourceId: mediaSourceId);
+    } catch (e) {
+      if (_trickplayDebugLogs) {
+        debugPrint('Trickplay map lookup failed, falling back to playlist: $e');
+      }
+      data = null;
+    }
+    if (data == null || data.isEmpty) {
+      return _getTrickplaySessionFromPlaylist(
+        itemId,
+        mediaSourceId: mediaSourceId,
+        preferredWidth: preferredWidth,
+      );
+    }
+
+    final manifests = <TrickplayManifest>[];
+    data.forEach((key, value) {
+      if (value is! Map<String, dynamic>) return;
+      final width =
+          _asInt(value['Width']) ??
+          _asInt(value['width']) ??
+          int.tryParse(key.toString());
+      final height = _asInt(value['Height']) ?? _asInt(value['height']);
+      final tileWidth = _asInt(value['TileWidth']) ?? _asInt(value['tileWidth']);
+      final tileHeight =
+          _asInt(value['TileHeight']) ?? _asInt(value['tileHeight']);
+      final thumbnailCount =
+          _asInt(value['ThumbnailCount']) ?? _asInt(value['thumbnailCount']);
+      final intervalMs = _asInt(value['Interval']) ?? _asInt(value['interval']);
+      if (width == null ||
+          height == null ||
+          tileWidth == null ||
+          tileHeight == null ||
+          thumbnailCount == null ||
+          intervalMs == null) {
+        return;
+      }
+      if (width <= 0 ||
+          height <= 0 ||
+          tileWidth <= 0 ||
+          tileHeight <= 0 ||
+          thumbnailCount <= 0 ||
+          intervalMs <= 0) {
+        return;
+      }
+      manifests.add(
+        TrickplayManifest(
+          width: width,
+          height: height,
+          tileWidth: tileWidth,
+          tileHeight: tileHeight,
+          thumbnailCount: thumbnailCount,
+          intervalMs: intervalMs,
+        ),
+      );
+    });
+
+    if (_trickplayDebugLogs) {
+      debugPrint(
+        'Trickplay map keys=${data.keys.join(",")} parsed=${manifests.length}',
+      );
+    }
+    if (manifests.isEmpty) {
+      return _getTrickplaySessionFromPlaylist(
+        itemId,
+        mediaSourceId: mediaSourceId,
+        preferredWidth: preferredWidth,
+      );
+    }
+    manifests.sort(
+      (a, b) =>
+          (a.width - preferredWidth).abs().compareTo((b.width - preferredWidth).abs()),
+    );
+    final manifest = manifests.first;
+    if (_trickplayDebugLogs) {
+      debugPrint(
+        'Trickplay selected map width=${manifest.width} '
+        'intervalMs=${manifest.intervalMs} layout=${manifest.tileWidth}x${manifest.tileHeight} '
+        'thumbs=${manifest.thumbnailCount}',
+      );
+    }
+    return TrickplaySession._(
+      itemId: itemId,
+      mediaSourceId: mediaSourceId,
+      manifest: manifest,
+      serverUrl: s.serverUrl,
+      token: s.accessToken,
+      playlistTileImages: null,
+    );
+  }
+
+  Future<TrickplaySession?> _getTrickplaySessionFromPlaylist(
+    String itemId, {
+    String? mediaSourceId,
+    int preferredWidth = 320,
+  }) async {
+    final s = _session;
+    final candidateWidths = <int>{
+      preferredWidth,
+      320,
+      240,
+      160,
+      120,
+      640,
+    }.where((w) => w > 0).toList();
+
+    for (final width in candidateWidths) {
+      if (_trickplayDebugLogs) {
+        debugPrint('Trickplay playlist probe width=$width');
+      }
+      final parsed = await _fetchAndParseTrickplayPlaylist(
+        itemId: itemId,
+        width: width,
+        mediaSourceId: mediaSourceId,
+      );
+      if (parsed == null) continue;
+      if (_trickplayDebugLogs) {
+        debugPrint(
+          'Trickplay playlist selected width=${parsed.$1.width} '
+          'images=${parsed.$2.length} intervalMs=${parsed.$1.intervalMs}',
+        );
+      }
+      return TrickplaySession._(
+        itemId: itemId,
+        mediaSourceId: mediaSourceId,
+        manifest: parsed.$1,
+        serverUrl: s.serverUrl,
+        token: s.accessToken,
+        playlistTileImages: parsed.$2,
+      );
+    }
+    debugPrint('Trickplay: no playlist manifest for item=$itemId');
+    return null;
+  }
+
+  Future<(TrickplayManifest, List<String>)?> _fetchAndParseTrickplayPlaylist({
+    required String itemId,
+    required int width,
+    String? mediaSourceId,
+  }) async {
+    Future<String?> fetch({String? msid, bool upperCaseParam = false}) async {
+      final paramName = upperCaseParam ? 'MediaSourceId' : 'mediaSourceId';
+      try {
+        final res = await _api.dio.get<String>(
+          '/Videos/$itemId/Trickplay/$width/tiles.m3u8',
+          queryParameters: {
+            if (msid != null && msid.trim().isNotEmpty) paramName: msid.trim(),
+          },
+        );
+        return res.data;
+      } on DioException catch (e) {
+        if (_trickplayDebugLogs) {
+          debugPrint(
+            'Trickplay playlist request failed status=${e.response?.statusCode} '
+            'width=$width msid=${msid ?? ''} param=$paramName',
+          );
+        }
+        return null;
+      }
+    }
+
+    String? text;
+    text = await fetch(msid: mediaSourceId);
+    if ((text ?? '').trim().isEmpty && mediaSourceId != null) {
+      text = await fetch(msid: mediaSourceId, upperCaseParam: true);
+    }
+    if ((text ?? '').trim().isEmpty && mediaSourceId != null) {
+      text = await fetch();
+    }
+    if (text == null || text.trim().isEmpty) return null;
+
+    final lines = text
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    final tilesLine = lines.where((l) => l.startsWith('#EXT-X-TILES')).firstOrNull;
+    if (tilesLine == null) return null;
+
+    final resolutionMatch = RegExp(
+      r'RESOLUTION=(\d+)x(\d+)',
+      caseSensitive: false,
+    ).firstMatch(tilesLine);
+    final layoutMatch = RegExp(
+      r'LAYOUT=(\d+)x(\d+)',
+      caseSensitive: false,
+    ).firstMatch(tilesLine);
+    final durationMatch = RegExp(
+      r'DURATION=([\d.]+)',
+      caseSensitive: false,
+    ).firstMatch(tilesLine);
+    if (resolutionMatch == null || layoutMatch == null) return null;
+
+    final thumbW = int.tryParse(resolutionMatch.group(1)!);
+    final thumbH = int.tryParse(resolutionMatch.group(2)!);
+    final cols = int.tryParse(layoutMatch.group(1)!);
+    final rows = int.tryParse(layoutMatch.group(2)!);
+    if (thumbW == null || thumbH == null || cols == null || rows == null) {
+      return null;
+    }
+
+    final intervalMs = (() {
+      if (durationMatch == null) return 1000;
+      final value = double.tryParse(durationMatch.group(1)!);
+      if (value == null || value <= 0) return 1000;
+      return value < 100 ? (value * 1000).round() : value.round();
+    })();
+
+    final imageLines = lines
+        .where((line) => !line.startsWith('#'))
+        .where((line) => line.toLowerCase().contains('.jpg'))
+        .toList(growable: false);
+    if (imageLines.isEmpty) {
+      if (_trickplayDebugLogs) {
+        debugPrint('Trickplay playlist parsed but no image lines width=$width');
+      }
+      return null;
+    }
+
+    final base = '${_session.serverUrl}/Videos/$itemId/Trickplay/$width/';
+    final query = StringBuffer('api_key=${Uri.encodeQueryComponent(_session.accessToken)}');
+    if (mediaSourceId != null && mediaSourceId.trim().isNotEmpty) {
+      final encoded = Uri.encodeQueryComponent(mediaSourceId.trim());
+      query.write('&mediaSourceId=$encoded');
+    }
+    final qs = query.toString();
+    final imageUrls = imageLines.map((line) {
+      final normalized = line.startsWith('http') ? line : '$base$line';
+      final lower = normalized.toLowerCase();
+      final hasApiKey = lower.contains('apikey=') || lower.contains('api_key=');
+      final hasMediaSource = lower.contains('mediasourceid=');
+      final needsMediaSource =
+          mediaSourceId != null && mediaSourceId.trim().isNotEmpty;
+      if (hasApiKey && (!needsMediaSource || hasMediaSource)) {
+        return normalized;
+      }
+      final sep = normalized.contains('?') ? '&' : '?';
+      return '$normalized$sep$qs';
+    }).toList(growable: false);
+
+    final thumbsPerTile = cols * rows;
+    final thumbnailCount = imageUrls.length * thumbsPerTile;
+    if (_trickplayDebugLogs) {
+      debugPrint(
+        'Trickplay playlist parsed ${thumbW}x$thumbH layout=${cols}x$rows '
+        'intervalMs=$intervalMs images=${imageUrls.length} first=${imageUrls.first}',
+      );
+    }
+    return (
+      TrickplayManifest(
+        width: thumbW,
+        height: thumbH,
+        tileWidth: cols,
+        tileHeight: rows,
+        thumbnailCount: thumbnailCount,
+        intervalMs: intervalMs,
+      ),
+      imageUrls,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _getTrickplayData(
+    String itemId, {
+    String? mediaSourceId,
+  }) async {
+    Future<Map<String, dynamic>?> request({String? msid}) async {
+      try {
+        final res = await _api.dio.get<Map<String, dynamic>>(
+          '/Videos/$itemId/Trickplay',
+          queryParameters: {
+            if (msid != null && msid.trim().isNotEmpty)
+              'mediaSourceId': msid.trim(),
+          },
+        );
+        return res.data;
+      } on DioException catch (e) {
+        if (_trickplayDebugLogs) {
+          debugPrint(
+            'Trickplay map request failed status=${e.response?.statusCode} '
+            'msid=${msid ?? ''}',
+          );
+        }
+        if (e.response?.statusCode == 404 || e.response?.statusCode == 400) {
+          return null;
+        }
+        rethrow;
+      }
+    }
+
+    final first = await request(msid: mediaSourceId);
+    if (_trickplayDebugLogs) {
+      debugPrint('Trickplay map with mediaSourceId count=${(first ?? const {}).length}');
+    }
+    if ((first ?? const {}).isNotEmpty) return first;
+    if (mediaSourceId != null && mediaSourceId.trim().isNotEmpty) {
+      final fallback = await request();
+      if (_trickplayDebugLogs) {
+        debugPrint(
+          'Trickplay map without mediaSourceId count=${(fallback ?? const {}).length}',
+        );
+      }
+      return fallback;
+    }
+    return first;
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   /// Fetches just the audio + subtitle stream listing for an item — used by
   /// the pre-play picker on detail screens. Read-only; doesn't touch
   /// PlaybackInfo, so no transcoder is spun up as a side effect.
@@ -1219,6 +1554,178 @@ class JellyfinRepository {
         : '';
     return '${s.serverUrl}/Items/$personId/Images/Primary'
         '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
+  }
+}
+
+class TrickplaySession {
+  TrickplaySession._({
+    required this.itemId,
+    required this.mediaSourceId,
+    required this.manifest,
+    required this.serverUrl,
+    required this.token,
+    required this.playlistTileImages,
+  });
+
+  final String itemId;
+  final String? mediaSourceId;
+  final TrickplayManifest manifest;
+  final String serverUrl;
+  final String token;
+  final List<String>? playlistTileImages;
+  int? _lastLoggedTileIndex;
+
+  TrickplayFrame frameAt(Duration position) {
+    return frameAtWithDuration(position);
+  }
+
+  TrickplayFrame frameAtWithDuration(
+    Duration position, {
+    Duration? totalDuration,
+  }) {
+    final intervalMs = manifest.intervalMs;
+    int thumbIndex;
+    if (totalDuration != null &&
+        totalDuration > Duration.zero &&
+        manifest.thumbnailCount > 1) {
+      // Some libraries expose fewer generated thumbnails than the runtime
+      // would suggest from `intervalMs`. Map by scrub percent in that case to
+      // avoid the preview freezing on the last available sprite for long
+      // portions of the media.
+      final runtimeMs = totalDuration.inMilliseconds;
+      final coveredMs = manifest.thumbnailCount * intervalMs;
+      if (runtimeMs > coveredMs && coveredMs > 0) {
+        final percent = position.inMilliseconds / runtimeMs;
+        thumbIndex = (percent * (manifest.thumbnailCount - 1)).round();
+      } else {
+        thumbIndex = intervalMs > 0 ? position.inMilliseconds ~/ intervalMs : 0;
+      }
+    } else {
+      thumbIndex = intervalMs > 0 ? position.inMilliseconds ~/ intervalMs : 0;
+    }
+    if (thumbIndex < 0) thumbIndex = 0;
+    if (thumbIndex >= manifest.thumbnailCount) {
+      thumbIndex = manifest.thumbnailCount - 1;
+    }
+
+    final perTile = manifest.thumbnailsPerTile;
+    final tileIndex = perTile > 0 ? thumbIndex ~/ perTile : 0;
+    final offsetInTile = perTile > 0 ? thumbIndex % perTile : 0;
+    final tileX = offsetInTile % manifest.tileWidth;
+    final tileY = offsetInTile ~/ manifest.tileWidth;
+
+    final urls = playlistTileImages != null && playlistTileImages!.isNotEmpty
+        ? _playlistTileUrls(tileIndex)
+        : _tileImageUrls(tileIndex);
+    if (_trickplayDebugLogs && _lastLoggedTileIndex != tileIndex) {
+      _lastLoggedTileIndex = tileIndex;
+      debugPrint(
+        'Trickplay frame posMs=${position.inMilliseconds} '
+        'thumbIndex=$thumbIndex tileIndex=$tileIndex tile=$tileX,$tileY '
+        'url=${urls.first}',
+      );
+    }
+    return TrickplayFrame(
+      urls: urls,
+      thumbWidth: manifest.width,
+      thumbHeight: manifest.height,
+      tileX: tileX,
+      tileY: tileY,
+    );
+  }
+
+  List<String> _playlistTileUrls(int tileIndex) {
+    final images = playlistTileImages!;
+    final idx = tileIndex.clamp(0, images.length - 1);
+    final current = images[idx];
+    final out = <String>[
+      current,
+      _sanitizeTrickplayUrl(current),
+      _withQueryVariant(current, apiKeyUpper: true, mediaSourceUpper: true),
+      _withQueryVariant(current, apiKeyUpper: false, mediaSourceUpper: true),
+      _withQueryVariant(current, apiKeyUpper: true, mediaSourceUpper: false),
+    ];
+    final deduped = <String>[];
+    for (final url in out) {
+      if (!deduped.contains(url)) deduped.add(url);
+    }
+    return deduped;
+  }
+
+  List<String> _tileImageUrls(int tileIndex) {
+    final baseNoExt = '$serverUrl/Videos/$itemId/Trickplay/${manifest.width}/$tileIndex';
+    final baseJpg = '$baseNoExt.jpg';
+    final query = StringBuffer('api_key=${Uri.encodeQueryComponent(token)}');
+    if (mediaSourceId != null && mediaSourceId!.trim().isNotEmpty) {
+      query.write('&mediaSourceId=${Uri.encodeQueryComponent(mediaSourceId!.trim())}');
+    }
+    final q = query.toString();
+    return [
+      _sanitizeTrickplayUrl('$baseJpg?$q'),
+      _sanitizeTrickplayUrl('$baseNoExt?$q'),
+    ];
+  }
+
+  String _sanitizeTrickplayUrl(String raw) {
+    final uri = Uri.parse(raw);
+    final out = <String, String>{};
+    String? apiKey;
+    String? mediaSource;
+    for (final entry in uri.queryParametersAll.entries) {
+      final key = entry.key;
+      final value = entry.value.isNotEmpty ? entry.value.last : '';
+      if (value.isEmpty) continue;
+      if (key.toLowerCase() == 'apikey' || key.toLowerCase() == 'api_key') {
+        apiKey ??= value;
+        continue;
+      }
+      if (key.toLowerCase() == 'mediasourceid') {
+        mediaSource ??= value;
+        continue;
+      }
+      out.putIfAbsent(key, () => value);
+    }
+    apiKey ??= token;
+    out['api_key'] = apiKey;
+    if (mediaSource != null && mediaSource.isNotEmpty) {
+      out['mediaSourceId'] = mediaSource;
+    } else if (mediaSourceId != null && mediaSourceId!.trim().isNotEmpty) {
+      out['mediaSourceId'] = mediaSourceId!.trim();
+    }
+    return uri.replace(queryParameters: out).toString();
+  }
+
+  String _withQueryVariant(
+    String raw, {
+    required bool apiKeyUpper,
+    required bool mediaSourceUpper,
+  }) {
+    final uri = Uri.parse(raw);
+    final out = <String, String>{};
+    String? apiKey;
+    String? mediaSource;
+    for (final entry in uri.queryParametersAll.entries) {
+      final key = entry.key;
+      final value = entry.value.isNotEmpty ? entry.value.last : '';
+      if (value.isEmpty) continue;
+      final lk = key.toLowerCase();
+      if (lk == 'apikey' || lk == 'api_key') {
+        apiKey ??= value;
+        continue;
+      }
+      if (lk == 'mediasourceid') {
+        mediaSource ??= value;
+        continue;
+      }
+      out.putIfAbsent(key, () => value);
+    }
+    apiKey ??= token;
+    out[apiKeyUpper ? 'ApiKey' : 'api_key'] = apiKey;
+    mediaSource ??= mediaSourceId?.trim();
+    if (mediaSource != null && mediaSource.isNotEmpty) {
+      out[mediaSourceUpper ? 'MediaSourceId' : 'mediaSourceId'] = mediaSource;
+    }
+    return uri.replace(queryParameters: out).toString();
   }
 }
 
