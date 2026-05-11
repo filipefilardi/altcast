@@ -77,6 +77,8 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     ),
     seekBarPositionColor: AppColors.primary,
     seekBarThumbColor: AppColors.primary,
+    seekBarHeight: 5.0,
+    seekBarThumbSize: 14.0,
     buttonBarButtonColor: Colors.white,
     primaryButtonBar: const [
       Spacer(flex: 2),
