@@ -1216,6 +1216,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );
+    final mediaQuery = MediaQuery.of(context);
+    final shortestSide = mediaQuery.size.shortestSide;
+    final isTabletClass = shortestSide >= 600;
+    final subtitleHorizontalPadding = isTabletClass ? 40.0 : 24.0;
+    final subtitleBottomPadding =
+        (isTabletClass ? 96.0 : 44.0) + mediaQuery.padding.bottom;
+    final subtitleFontSize = isTabletClass ? 32.0 : 24.0;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1233,13 +1240,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 controller: _controller,
                 controls: _buildVideoControls,
                 fit: BoxFit.contain,
-                subtitleViewConfiguration: const SubtitleViewConfiguration(
+                subtitleViewConfiguration: SubtitleViewConfiguration(
                   visible: true,
                   textAlign: TextAlign.center,
                   textScaler: TextScaler.noScaling,
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 44),
+                  padding: EdgeInsets.fromLTRB(
+                    subtitleHorizontalPadding,
+                    0,
+                    subtitleHorizontalPadding,
+                    subtitleBottomPadding,
+                  ),
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: subtitleFontSize,
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                     height: 1.2,
