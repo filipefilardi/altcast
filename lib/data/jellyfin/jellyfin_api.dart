@@ -1,29 +1,35 @@
-import 'dart:io' show Platform;
-
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models/jellyfin_session.dart';
 
 const _appName = 'AltCast';
-const _appVersion = '0.0.1';
+const _fallbackDeviceName = 'Flutter';
+const _fallbackAppVersion = '0.0.0';
 
 class JellyfinApi {
-  JellyfinApi({Dio? dio, String? deviceId})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              connectTimeout: const Duration(seconds: 5),
-              receiveTimeout: const Duration(seconds: 10),
-              sendTimeout: const Duration(seconds: 10),
+  JellyfinApi({
+    Dio? dio,
+    String? deviceId,
+    String? deviceName,
+    String? appVersion,
+  })  : _dio =
+            dio ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 5),
+                receiveTimeout: const Duration(seconds: 10),
+                sendTimeout: const Duration(seconds: 10),
+              ),
             ),
-          ),
-      _deviceId = deviceId ?? const Uuid().v4();
+        _deviceId = deviceId ?? const Uuid().v4(),
+        _deviceName = deviceName ?? _fallbackDeviceName,
+        _appVersion = appVersion ?? _fallbackAppVersion;
 
   final Dio _dio;
   final String _deviceId;
+  final String _deviceName;
+  final String _appVersion;
 
   Dio get dio => _dio;
 
@@ -51,25 +57,21 @@ class JellyfinApi {
 
   JellyfinSession? get session => _session;
 
-  String _deviceName() {
-    if (kIsWeb) return 'Web';
-    try {
-      return Platform.localHostname;
-    } catch (_) {
-      return 'Flutter';
-    }
-  }
-
   String _authHeader({String? token}) {
     final parts = <String>[
       'Client="$_appName"',
-      'Device="${_deviceName()}"',
+      'Device="${_sanitize(_deviceName)}"',
       'DeviceId="$_deviceId"',
-      'Version="$_appVersion"',
+      'Version="${_sanitize(_appVersion)}"',
       if (token != null) 'Token="$token"',
     ];
     return 'MediaBrowser ${parts.join(', ')}';
   }
+
+  /// Strip characters that would break the `MediaBrowser` header format
+  /// (quotes and commas), since the value is wrapped in double quotes.
+  static String _sanitize(String value) =>
+      value.replaceAll('"', '').replaceAll(',', '');
 
   String _normalizeBase(String url) {
     var normalized = url.trim();

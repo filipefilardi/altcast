@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'app/app.dart';
+import 'data/jellyfin/auth_repository.dart';
+import 'data/jellyfin/client_metadata.dart';
+import 'data/jellyfin/jellyfin_api.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initializes libmpv (desktop/mobile) and HTML5 video bindings (web).
   // Must run before any [Player] is constructed.
@@ -19,5 +22,16 @@ void main() {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
-  runApp(const ProviderScope(child: AltCastApp()));
+  final metadata = await loadClientMetadata();
+  final api = JellyfinApi(
+    deviceName: metadata.deviceName,
+    appVersion: metadata.appVersion,
+  );
+
+  runApp(
+    ProviderScope(
+      overrides: [jellyfinApiProvider.overrideWithValue(api)],
+      child: const AltCastApp(),
+    ),
+  );
 }
