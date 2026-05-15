@@ -63,7 +63,7 @@ SPEC CHECKSUMS:
   media_kit_libs_macos_video: 85a23e549b5f480e72cae3e5634b5514bc692f65
   media_kit_video: fa6564e3799a0a28bff39442334817088b7ca758
   package_info_plus: f0052d280d17aa382b932f399edf32507174e870
-  screen_brightness_macos: 2a3ee243f8051c340381e8e51bcedced8360f421
+  screen_brightness_macos: 1058c18b5e0570f48f93016487a5ed66d6977fe0
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   wakelock_plus: 917609be14d812ddd9e9528876538b2263aaa03b
 
