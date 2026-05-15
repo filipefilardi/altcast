@@ -12,8 +12,9 @@ name: Release
 # and pick a bump type explicitly.
 #
 # Each platform has a `build-<platform>` job and a `deploy-<platform>` job.
-# Adding a new store target (e.g. F-Droid, Mac App Store) means filling in
-# the corresponding deploy job — no orchestration changes needed.
+# Adding a new platform or store target (e.g. iOS, F-Droid, Mac App Store)
+# means adding the corresponding build/deploy job — no orchestration changes
+# needed.
 on:
   push:
     branches: [main]

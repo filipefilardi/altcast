@@ -19,7 +19,7 @@ By participating in this project, you agree to follow our [Code of Conduct](./CO
 ### Prerequisites
 
 - Flutter SDK (stable) with Dart `^3.8.1`
-- A running Jellyfin server with a music library for manual testing
+- A running Jellyfin server with a movies or TV library for manual testing
 - Platform tooling as needed:
   - Xcode for iOS/macOS
   - Android SDK / Android Studio for Android

@@ -14,7 +14,7 @@ body:
     attributes:
       label: Summary
       description: A short description of the problem.
-      placeholder: When I tap shuffle on a playlist, the queue is not shuffled.
+      placeholder: When I resume an episode, playback restarts from the beginning instead of the saved position.
     validations:
       required: true
 
@@ -25,10 +25,10 @@ body:
       description: |
         Step-by-step instructions to reproduce the bug. Number each step.
       placeholder: |
-        1. Open a playlist with 30+ tracks
-        2. Tap the shuffle button in the action row
-        3. Open the queue from the now-playing screen
-        4. Observe order matches the playlist
+        1. Open a TV series and start an episode
+        2. Watch for a few minutes, then exit the player
+        3. Return to the series detail screen and tap *Resume*
+        4. Observe playback starts from 00:00 instead of the saved position
     validations:
       required: true
 
@@ -36,7 +36,7 @@ body:
     id: expected
     attributes:
       label: Expected behavior
-      placeholder: The queue should be in a randomized order.
+      placeholder: Playback should resume from the last saved position.
     validations:
       required: true
 
@@ -44,7 +44,7 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      placeholder: The queue is in the original playlist order.
+      placeholder: Playback restarts from 00:00.
     validations:
       required: true
 

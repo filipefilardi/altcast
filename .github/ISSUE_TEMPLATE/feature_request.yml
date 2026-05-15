@@ -14,7 +14,7 @@ body:
     attributes:
       label: Problem
       description: What user problem is this feature trying to solve?
-      placeholder: When I'm offline, I can't easily see which albums I've downloaded vs. which are streaming-only.
+      placeholder: When I'm offline, I can't easily see which movies and episodes I've downloaded vs. which are streaming-only.
     validations:
       required: true
 
@@ -23,7 +23,7 @@ body:
     attributes:
       label: Proposed solution
       description: What change would you like to see?
-      placeholder: Add a "downloaded" filter toggle on the library screen.
+      placeholder: Add a "downloaded" filter toggle on the movies and series screens.
     validations:
       required: true
 
