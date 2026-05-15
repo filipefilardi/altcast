@@ -1,0 +1,258 @@
+name: Release
+
+# Runs on every push to main. The version job parses Conventional Commits
+# since the last release to decide the bump type:
+#   - "BREAKING CHANGE" footer or "type!:" prefix   → major
+#   - "feat:"                                       → minor
+#   - "fix:" / "perf:"                              → patch
+#   - everything else (docs, chore, refactor, etc.) → no release
+#
+# To override (e.g. force a minor bump even from a docs-only push, or skip a
+# release that auto-detection would have made), trigger via "Run workflow"
+# and pick a bump type explicitly.
+#
+# Each platform has a `build-<platform>` job and a `deploy-<platform>` job.
+# Adding a new store target (e.g. F-Droid, Mac App Store) means filling in
+# the corresponding deploy job — no orchestration changes needed.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump to apply (auto = detect from commits)'
+        type: choice
+        required: true
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - skip
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  # ─── Version ────────────────────────────────────────────────────────────
+  version:
+    name: Compute version
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.compute.outputs.name }}
+      build: ${{ steps.compute.outputs.build }}
+      tag: ${{ steps.compute.outputs.tag }}
+      should-release: ${{ steps.compute.outputs.should-release }}
+      bump: ${{ steps.compute.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: compute
+        name: Determine bump and next semver
+        env:
+          BUMP_INPUT: ${{ github.event.inputs.bump }}
+        run: |
+          LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ {print; exit}')
+
+          # 1. Pick a bump. Manual input wins; otherwise inspect commits.
+          BUMP="${BUMP_INPUT:-auto}"
+          if [ "$BUMP" = "auto" ] || [ -z "$BUMP" ]; then
+            if [ -z "$LAST_TAG" ]; then
+              BUMP="minor"
+              REASON="(no previous tag, defaulting to minor for first release)"
+            else
+              RANGE="${LAST_TAG}..HEAD"
+              COMMITS=$(git log --format=%B "$RANGE")
+              if echo "$COMMITS" | grep -qE '^[a-zA-Z]+(\([^)]+\))?!:|^BREAKING CHANGE:'; then
+                BUMP="major"
+              elif echo "$COMMITS" | grep -qE '^feat(\([^)]+\))?:'; then
+                BUMP="minor"
+              elif echo "$COMMITS" | grep -qE '^(fix|perf)(\([^)]+\))?:'; then
+                BUMP="patch"
+              else
+                BUMP="skip"
+              fi
+              REASON="(detected from commits in $RANGE)"
+            fi
+          else
+            REASON="(manual override from workflow_dispatch input)"
+          fi
+
+          echo "→ Bump decision: $BUMP $REASON"
+
+          if [ "$BUMP" = "skip" ]; then
+            echo "→ No release will be cut for this run."
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            echo "bump=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 2. Compute the next version.
+          if [ -z "$LAST_TAG" ]; then
+            MAJOR=0; MINOR=1; PATCH=0
+          else
+            MAJOR=$(echo "$LAST_TAG" | sed 's/^v//' | cut -d'.' -f1)
+            MINOR=$(echo "$LAST_TAG" | sed 's/^v//' | cut -d'.' -f2)
+            PATCH=$(echo "$LAST_TAG" | sed 's/^v//' | cut -d'.' -f3)
+          fi
+          case "$BUMP" in
+            major) NAME="$((MAJOR + 1)).0.0" ;;
+            minor) NAME="${MAJOR}.$((MINOR + 1)).0" ;;
+            patch) NAME="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+            *) echo "::error::Unexpected bump value: $BUMP"; exit 1 ;;
+          esac
+
+          BUILD=${{ github.run_number }}
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NAME" >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "should-release=true" >> "$GITHUB_OUTPUT"
+          echo "→ Will release $NAME (build $BUILD) as tag v$NAME [$BUMP bump]"
+
+  # ─── Build ──────────────────────────────────────────────────────────────
+  build-android:
+    name: Build Android (AAB)
+    needs: version
+    if: needs.version.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Decode keystore
+        env:
+          ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$ENCODED_KEYSTORE" | base64 -d > android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          printf 'storePassword=%s\n' "$STORE_PASSWORD" > android/key.properties
+          printf 'keyPassword=%s\n' "$KEY_PASSWORD" >> android/key.properties
+          printf 'keyAlias=upload\n' >> android/key.properties
+          printf 'storeFile=upload-keystore.jks\n' >> android/key.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release AAB
+        run: flutter build appbundle --release --build-name=${{ needs.version.outputs.name }} --build-number=${{ needs.version.outputs.build }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS (unsigned .app)
+    needs: version
+    if: needs.version.outputs.should-release == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      # connectivity_plus 7.1.x references macOS 26 SDK symbols (e.g.
+      # NWPath.isUltraConstrained) and requires Xcode 26+ to compile.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS (release, unsigned)
+        env:
+          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGN_IDENTITY: ""
+          EXPANDED_CODE_SIGN_IDENTITY: ""
+        run: flutter build macos --release --build-name=${{ needs.version.outputs.name }} --build-number=${{ needs.version.outputs.build }}
+
+      - name: Zip .app bundle
+        run: |
+          cd build/macos/Build/Products/Release
+          APP=$(ls -d *.app | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found"
+            exit 1
+          fi
+          zip -r "altsound-macos-${{ needs.version.outputs.name }}.zip" "$APP"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-app
+          path: build/macos/Build/Products/Release/altsound-macos-${{ needs.version.outputs.name }}.zip
+          if-no-files-found: error
+
+  # ─── Publish (single GitHub Release with all artifacts) ─────────────────
+  publish:
+    name: Publish GitHub Release
+    needs: [version, build-android, build-macos]
+    if: needs.version.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}+${{ needs.version.outputs.build }}
+          generate_release_notes: true
+          files: |
+            artifacts/android-aab/app-release.aab
+            artifacts/macos-app/*.zip
+
+  # ─── Deploy ─────────────────────────────────────────────────────────────
+  # Android → Google Play (internal track, draft). Promote to production
+  # manually in the Play Console.
+  deploy-android:
+    name: Deploy to Google Play (internal, draft)
+    needs: [version, publish]
+    if: needs.version.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: android-aab
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.silent_summit.altsound
+          releaseFiles: app-release.aab
+          tracks: internal
+          status: draft
+
+  # macOS deploy slot — currently empty (artifacts ship via GitHub Releases
+  # only). To add Homebrew / Mac App Store distribution, replace this comment
+  # with a job mirroring `deploy-android`: download the macos-app artifact,
+  # call your publisher of choice, gate on `needs: [version, publish]`.
