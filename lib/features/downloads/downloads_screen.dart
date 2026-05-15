@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/format.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/local_or_network_image.dart';
-import '../../data/downloads/download_manager.dart';
-import '../../data/downloads/downloaded_item.dart';
-import '../../data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/empty_state.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
+import 'package:altcast/data/downloads/downloaded_item.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 
 class DownloadsScreen extends ConsumerWidget {
   const DownloadsScreen({super.key});

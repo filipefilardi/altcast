@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../data/jellyfin/auth_repository.dart';
-import '../../data/jellyfin/jellyfin_api.dart';
-import '../../data/jellyfin/models/remote_session.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/remote_session.dart';
 
 final remoteSessionSocketProvider = Provider.autoDispose<RemoteSessionSocket>((
   ref,

@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/format.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/error_state.dart';
-import '../../data/jellyfin/models/remote_session.dart';
-import '../../data/jellyfin/remote_sessions_repository.dart';
-import 'remote_providers.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/empty_state.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/data/jellyfin/models/remote_session.dart';
+import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
+import 'package:altcast/features/remote/remote_providers.dart';
 
 /// Opens the cast picker / mini-control sheet.
 ///

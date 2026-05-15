@@ -7,14 +7,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../jellyfin/jellyfin_repository.dart';
-import '../jellyfin/models/episode.dart';
-import '../jellyfin/models/intro_skipper_timestamps.dart';
-import '../jellyfin/models/movie.dart';
-import '../jellyfin/models/stream_source.dart';
-import '../jellyfin/models/trickplay.dart';
-import '../local/download_preferences.dart';
-import 'downloaded_item.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
+import 'package:altcast/data/jellyfin/models/intro_skipper_timestamps.dart';
+import 'package:altcast/data/jellyfin/models/movie.dart';
+import 'package:altcast/data/jellyfin/models/stream_source.dart';
+import 'package:altcast/data/jellyfin/models/trickplay.dart';
+import 'package:altcast/data/local/download_preferences.dart';
+import 'package:altcast/data/downloads/downloaded_item.dart';
 
 class DownloadsState {
   const DownloadsState({

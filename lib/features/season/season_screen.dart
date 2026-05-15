@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/widgets/error_state.dart';
-import '../series/widgets/episode_tile.dart';
-import 'season_providers.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/features/series/widgets/episode_tile.dart';
+import 'package:altcast/features/season/season_providers.dart';
 
 class SeasonScreen extends ConsumerWidget {
   const SeasonScreen({required this.seasonId, super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../data/jellyfin/models/series.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/data/jellyfin/models/series.dart';
 
 /// Horizontal scrollable chip row of seasons. The currently-selected season's
 /// chip uses the accent color; others use the neutral surface treatment.

@@ -11,14 +11,14 @@ import 'package:media_kit_video/media_kit_video_controls/src/controls/methods/vi
     as video_ctrl;
 import 'package:screen_brightness/screen_brightness.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../data/jellyfin/auth_repository.dart';
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/downloads/download_manager.dart';
-import '../../data/jellyfin/remote_sessions_repository.dart';
-import '../../data/jellyfin/models/stream_source.dart';
-import '../remote/remote_providers.dart';
-import '../syncplay/syncplay_controller.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
+import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
+import 'package:altcast/data/jellyfin/models/stream_source.dart';
+import 'package:altcast/features/remote/remote_providers.dart';
+import 'package:altcast/features/syncplay/syncplay_controller.dart';
 
 const bool _trickplayDebugLogs = true;
 
@@ -658,8 +658,9 @@ class _AltCastTrickplaySeekGroupState
                             unawaited(player.seek(target));
                           },
                           onHoverPreview: (percent) {
-                            if (_isScrubbing || duration <= Duration.zero)
+                            if (_isScrubbing || duration <= Duration.zero) {
                               return;
+                            }
                             if (percent == null) {
                               setState(() => _hoverPercent = null);
                               widget.trickplayOverlayNotifier.value = null;

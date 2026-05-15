@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/navigation.dart';
-import '../../core/widgets/error_state.dart';
-import '../../core/widgets/expandable_text.dart';
-import '../../core/widgets/local_or_network_image.dart';
-import '../../core/widgets/skeleton.dart';
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../../data/jellyfin/models/person_details.dart';
-import '../home/widgets/poster_card.dart';
-import 'person_providers.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/expandable_text.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/core/widgets/skeleton.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/person_details.dart';
+import 'package:altcast/features/home/widgets/poster_card.dart';
+import 'package:altcast/features/person/person_providers.dart';
 
 class PersonScreen extends ConsumerWidget {
   const PersonScreen({required this.personId, super.key});

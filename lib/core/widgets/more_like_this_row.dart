@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/models/browse_item.dart';
-import '../../features/home/widgets/poster_card.dart';
-import '../theme/app_colors.dart';
-import 'skeleton.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/features/home/widgets/poster_card.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/skeleton.dart';
 
 /// Horizontal poster row for "More like this" recommendations. Filters out
 /// the current item so it never recommends itself, and falls back to a

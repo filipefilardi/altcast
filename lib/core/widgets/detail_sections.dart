@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/models/browse_item.dart';
-import '../../data/jellyfin/models/person_credit.dart';
-import '../theme/app_colors.dart';
-import 'cast_crew_row.dart';
-import 'expandable_text.dart';
-import 'more_like_this_row.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/cast_crew_row.dart';
+import 'package:altcast/core/widgets/expandable_text.dart';
+import 'package:altcast/core/widgets/more_like_this_row.dart';
 
 class DetailOverviewSection extends StatelessWidget {
   const DetailOverviewSection({

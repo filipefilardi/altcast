@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'secure_storage.dart';
+import 'package:altcast/data/local/secure_storage.dart';
 
 const _downloadPrefsKey = 'download_preferences_v1';
 

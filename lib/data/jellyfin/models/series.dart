@@ -1,6 +1,6 @@
-import 'browse_item.dart';
-import 'original_language.dart';
-import 'person_credit.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/original_language.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
 
 class Series {
   const Series({

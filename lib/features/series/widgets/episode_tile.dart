@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/format.dart';
-import '../../../core/widgets/local_or_network_image.dart';
-import '../../../data/jellyfin/jellyfin_repository.dart';
-import '../../../data/jellyfin/models/episode.dart';
-import '../../downloads/widgets/download_button.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
+import 'package:altcast/features/downloads/widgets/download_button.dart';
 
 class EpisodeTile extends ConsumerWidget {
   const EpisodeTile({

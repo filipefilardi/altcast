@@ -4,19 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:uuid/uuid.dart';
 
-import 'auth_repository.dart';
-import 'jellyfin_api.dart';
-import 'models/browse_item.dart';
-import 'models/episode.dart';
-import 'models/intro_skipper_timestamps.dart';
-import 'models/jellyfin_session.dart';
-import 'models/media_stream.dart';
-import 'models/movie.dart';
-import 'models/person_details.dart';
-import 'models/series.dart';
-import 'models/stream_source.dart';
-import 'models/trickplay.dart';
-import '../local/playback_preferences.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
+import 'package:altcast/data/jellyfin/models/intro_skipper_timestamps.dart';
+import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
+import 'package:altcast/data/jellyfin/models/media_stream.dart';
+import 'package:altcast/data/jellyfin/models/movie.dart';
+import 'package:altcast/data/jellyfin/models/person_details.dart';
+import 'package:altcast/data/jellyfin/models/series.dart';
+import 'package:altcast/data/jellyfin/models/stream_source.dart';
+import 'package:altcast/data/jellyfin/models/trickplay.dart';
+import 'package:altcast/data/local/playback_preferences.dart';
 
 const bool _trickplayDebugLogs = true;
 

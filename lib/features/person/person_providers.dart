@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../../data/jellyfin/models/person_details.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/person_details.dart';
 
 final personProvider = FutureProvider.autoDispose.family<PersonDetails, String>(
   (ref, id) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-import '../theme/app_gradients.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
 
 /// Primary "Play" / "Resume" CTA. Wide accent-gradient pill with a leading
 /// triangle icon. Matches the brand identity of AltCast's [PlayPill] but is

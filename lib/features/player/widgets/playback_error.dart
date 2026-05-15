@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/dio_error_message.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/dio_error_message.dart';
 
 class PlaybackError extends StatelessWidget {
   const PlaybackError({super.key, required this.error, required this.onClose});

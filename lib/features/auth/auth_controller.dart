@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/utils/dio_error_message.dart';
-import '../../data/jellyfin/auth_repository.dart';
-import '../../data/jellyfin/jellyfin_api.dart';
-import '../../data/jellyfin/models/jellyfin_session.dart';
+import 'package:altcast/core/utils/dio_error_message.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
 
 sealed class AuthState {
   const AuthState();

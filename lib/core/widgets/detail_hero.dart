@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-import 'local_or_network_image.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
 
 /// Full-width backdrop with a bottom-up gradient that fades into the scaffold
 /// background. Used as the header of movie / series detail screens.

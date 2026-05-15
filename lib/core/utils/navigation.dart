@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
 
 /// Pushes the right detail route for a [BrowseItem] based on its
 /// [MediaKind]. Centralised so every list/grid in the app routes the same

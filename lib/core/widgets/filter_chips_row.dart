@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import 'package:altcast/core/theme/app_colors.dart';
 
 /// Read-only horizontal Wrap of compact pill labels — used by Library and
 /// Search to surface the currently-applied filters above the results. Empty

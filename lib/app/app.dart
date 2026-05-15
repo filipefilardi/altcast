@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/theme/app_colors.dart';
-import '../core/theme/app_gradients.dart';
-import '../core/theme/app_theme.dart';
-import '../features/auth/auth_controller.dart';
-import 'router.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/theme/app_theme.dart';
+import 'package:altcast/features/auth/auth_controller.dart';
+import 'package:altcast/app/router.dart';
 
 class AltCastApp extends ConsumerWidget {
   const AltCastApp({super.key});

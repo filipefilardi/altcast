@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/auth_controller.dart';
-import '../features/collection/collection_screen.dart';
-import '../features/auth/login_screen.dart';
-import '../features/downloads/downloads_screen.dart';
-import '../features/episode/episode_screen.dart';
-import '../features/home/home_screen.dart';
-import '../features/library/library_screen.dart';
-import '../features/library/library_browse_screen.dart';
-import '../features/movie/movie_screen.dart';
-import '../features/person/person_screen.dart';
-import '../features/player/video_player_screen.dart';
-import '../features/search/search_screen.dart';
-import '../features/season/season_screen.dart';
-import '../features/series/series_screen.dart';
-import '../features/settings/settings_screen.dart';
-import '../features/shell/app_shell.dart';
+import 'package:altcast/features/auth/auth_controller.dart';
+import 'package:altcast/features/collection/collection_screen.dart';
+import 'package:altcast/features/auth/login_screen.dart';
+import 'package:altcast/features/downloads/downloads_screen.dart';
+import 'package:altcast/features/episode/episode_screen.dart';
+import 'package:altcast/features/home/home_screen.dart';
+import 'package:altcast/features/library/library_screen.dart';
+import 'package:altcast/features/library/library_browse_screen.dart';
+import 'package:altcast/features/movie/movie_screen.dart';
+import 'package:altcast/features/person/person_screen.dart';
+import 'package:altcast/features/player/video_player_screen.dart';
+import 'package:altcast/features/search/search_screen.dart';
+import 'package:altcast/features/season/season_screen.dart';
+import 'package:altcast/features/series/series_screen.dart';
+import 'package:altcast/features/settings/settings_screen.dart';
+import 'package:altcast/features/shell/app_shell.dart';
 
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(this._ref) {

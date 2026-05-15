@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../local/secure_storage.dart';
-import 'jellyfin_api.dart';
-import 'models/jellyfin_session.dart';
+import 'package:altcast/data/local/secure_storage.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
 
 const _sessionKey = 'jellyfin_session_v1';
 

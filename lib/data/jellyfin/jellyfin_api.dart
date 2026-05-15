@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 
-import 'models/jellyfin_session.dart';
+import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
 
 const _appName = 'AltCast';
 const _fallbackDeviceName = 'Flutter';

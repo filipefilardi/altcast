@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'auth_repository.dart';
-import 'jellyfin_api.dart';
-import 'models/syncplay.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/syncplay.dart';
 
 final syncPlayRepositoryProvider = Provider<SyncPlayRepository>((ref) {
   return SyncPlayRepository(ref.watch(jellyfinApiProvider));

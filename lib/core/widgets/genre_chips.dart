@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import 'package:altcast/core/theme/app_colors.dart';
 
 /// Wrap of pill-shaped genre chips. Each chip is tappable so callers can
 /// route into a filtered library view.

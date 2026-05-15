@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_gradients.dart';
-import '../../../core/utils/language.dart';
-import '../../../data/jellyfin/models/stream_source.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/data/jellyfin/models/stream_source.dart';
 
 /// Bottom sheet listing the audio and subtitle tracks the [Player] has
 /// detected. Tapping a row tells media_kit to switch tracks and pops the

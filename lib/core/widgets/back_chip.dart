@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../theme/app_colors.dart';
+import 'package:altcast/core/theme/app_colors.dart';
 
 /// Floating circular back button used on detail screens (movie, series,
 /// episode, season). Sits on top of the edge-to-edge hero artwork via the

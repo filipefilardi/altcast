@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'auth_repository.dart';
-import 'jellyfin_api.dart';
-import 'models/remote_session.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/models/remote_session.dart';
 
 final remoteSessionsRepositoryProvider = Provider<RemoteSessionsRepository>((
   ref,

@@ -3,14 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/utils/dio_error_message.dart';
-import '../../core/utils/navigation.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/error_state.dart';
-import '../../core/widgets/filter_chips_row.dart';
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../home/widgets/poster_card.dart';
+import 'package:altcast/core/utils/dio_error_message.dart';
+import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/empty_state.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/filter_chips_row.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/features/home/widgets/poster_card.dart';
 
 class LibraryBrowseScreen extends ConsumerStatefulWidget {
   const LibraryBrowseScreen({

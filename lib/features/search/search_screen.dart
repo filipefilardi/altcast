@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/navigation.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/error_state.dart';
-import '../../core/widgets/filter_chips_row.dart';
-import '../../core/widgets/local_or_network_image.dart';
-import '../../core/widgets/skeleton.dart';
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../home/widgets/poster_card.dart';
-import 'search_providers.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/empty_state.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/filter_chips_row.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/core/widgets/skeleton.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/features/home/widgets/poster_card.dart';
+import 'package:altcast/features/search/search_providers.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});

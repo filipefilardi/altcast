@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/language.dart';
-import '../../../data/jellyfin/jellyfin_repository.dart';
-import '../../../data/jellyfin/models/media_stream.dart';
-import '../../../data/local/playback_preferences.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/media_stream.dart';
+import 'package:altcast/data/local/playback_preferences.dart';
 
 /// Per-play user preferences captured by [TrackPreferenceRow] and forwarded
 /// to the player as query params on `/play/:id`.

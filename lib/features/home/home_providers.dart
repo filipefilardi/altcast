@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
 
 final continueWatchingProvider = FutureProvider.autoDispose<List<BrowseItem>>((
   ref,

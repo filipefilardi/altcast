@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/models/remote_session.dart';
-import '../../data/jellyfin/remote_sessions_repository.dart';
-import 'remote_session_socket.dart';
+import 'package:altcast/data/jellyfin/models/remote_session.dart';
+import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
+import 'package:altcast/features/remote/remote_session_socket.dart';
 
 /// Mirrors active remote-controllable sessions.
 ///

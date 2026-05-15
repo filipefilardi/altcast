@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../../data/jellyfin/models/episode.dart';
-import '../../data/jellyfin/models/series.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
+import 'package:altcast/data/jellyfin/models/series.dart';
 
 final seriesProvider = FutureProvider.autoDispose.family<Series, String>((
   ref,

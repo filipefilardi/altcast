@@ -1,4 +1,4 @@
-import '../../data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
 
 /// Posts playback events to Jellyfin's `/Sessions/Playing*` endpoints so
 /// resume positions, watched-state, and Continue Watching stay in sync.

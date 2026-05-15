@@ -1,4 +1,4 @@
-import '../jellyfin/models/trickplay.dart';
+import 'package:altcast/data/jellyfin/models/trickplay.dart';
 
 enum DownloadedItemKind { movie, episode }
 

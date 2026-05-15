@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/models/syncplay.dart';
-import '../../data/jellyfin/syncplay_repository.dart';
-import 'syncplay_socket.dart';
+import 'package:altcast/data/jellyfin/models/syncplay.dart';
+import 'package:altcast/data/jellyfin/syncplay_repository.dart';
+import 'package:altcast/features/syncplay/syncplay_socket.dart';
 
 final syncPlayControllerProvider =
     NotifierProvider<SyncPlayController, SyncPlayState>(SyncPlayController.new);

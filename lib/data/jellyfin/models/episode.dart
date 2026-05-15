@@ -1,5 +1,5 @@
-import 'browse_item.dart';
-import 'person_credit.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
 
 class Episode {
   const Episode({

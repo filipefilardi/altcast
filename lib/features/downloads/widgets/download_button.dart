@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../data/downloads/download_manager.dart';
-import '../../../data/jellyfin/jellyfin_repository.dart';
-import '../../../data/jellyfin/models/episode.dart';
-import '../../../data/jellyfin/models/movie.dart';
-import '../../../data/jellyfin/models/series.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
+import 'package:altcast/data/jellyfin/models/movie.dart';
+import 'package:altcast/data/jellyfin/models/series.dart';
 
 /// Generic three-state download control:
 ///  - idle: outlined download icon, taps [onEnqueue].

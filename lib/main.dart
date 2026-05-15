@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
-import 'app/app.dart';
-import 'data/jellyfin/auth_repository.dart';
-import 'data/jellyfin/client_metadata.dart';
-import 'data/jellyfin/jellyfin_api.dart';
+import 'package:altcast/app/app.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/jellyfin/client_metadata.dart';
+import 'package:altcast/data/jellyfin/jellyfin_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

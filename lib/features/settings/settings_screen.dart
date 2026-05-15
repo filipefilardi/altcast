@@ -5,14 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_gradients.dart';
-import '../../core/utils/language.dart';
-import '../../data/downloads/download_manager.dart';
-import '../../data/jellyfin/auth_repository.dart';
-import '../../data/local/download_preferences.dart';
-import '../../data/local/playback_preferences.dart';
-import '../../features/auth/auth_controller.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
+import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/local/download_preferences.dart';
+import 'package:altcast/data/local/playback_preferences.dart';
+import 'package:altcast/features/auth/auth_controller.dart';
 
 final _serverInfoProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((
   ref,

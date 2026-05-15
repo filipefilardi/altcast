@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_colors.dart';
 
 /// Stacked "Skip intro" / "Skip credits" chips shown over the player when
 /// the current playback position falls inside an Intro Skipper segment.

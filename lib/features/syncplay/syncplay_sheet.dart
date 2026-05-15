@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
-import 'syncplay_controller.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/features/syncplay/syncplay_controller.dart';
 
 Future<void> showSyncPlaySheet(
   BuildContext context, {

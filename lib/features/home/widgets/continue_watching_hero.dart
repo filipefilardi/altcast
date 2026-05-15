@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_gradients.dart';
-import '../../../core/utils/format.dart';
-import '../../../core/widgets/error_state.dart';
-import '../../../core/widgets/local_or_network_image.dart';
-import '../../../core/widgets/skeleton.dart';
-import '../../../data/jellyfin/jellyfin_repository.dart';
-import '../../../data/jellyfin/models/browse_item.dart';
-import '../home_providers.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/core/widgets/skeleton.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/features/home/home_providers.dart';
 
 /// Home “Keep watching” block: section label, loading / error / content, and
 /// trailing spacing (24 px) for the next shelf.

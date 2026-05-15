@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_repository.dart';
-import '../../data/jellyfin/models/person_credit.dart';
-import '../theme/app_colors.dart';
-import 'local_or_network_image.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
 
 /// Horizontal scroller of circular cast/crew avatars used on detail screens.
 /// Caps at [maxShown] to keep first paint cheap; callers should provide a

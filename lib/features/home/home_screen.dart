@@ -2,20 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/navigation.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/error_state.dart';
-import '../../core/widgets/skeleton.dart';
-import '../../data/jellyfin/models/browse_item.dart';
-import '../auth/auth_controller.dart';
-import '../remote/remote_providers.dart';
-import '../remote/remote_sessions_sheet.dart';
-import '../syncplay/syncplay_controller.dart';
-import '../syncplay/syncplay_sheet.dart';
-import 'home_providers.dart';
-import 'widgets/continue_watching_hero.dart';
-import 'widgets/poster_card.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/empty_state.dart';
+import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/skeleton.dart';
+import 'package:altcast/data/jellyfin/models/browse_item.dart';
+import 'package:altcast/features/auth/auth_controller.dart';
+import 'package:altcast/features/remote/remote_providers.dart';
+import 'package:altcast/features/remote/remote_sessions_sheet.dart';
+import 'package:altcast/features/syncplay/syncplay_controller.dart';
+import 'package:altcast/features/syncplay/syncplay_sheet.dart';
+import 'package:altcast/features/home/home_providers.dart';
+import 'package:altcast/features/home/widgets/continue_watching_hero.dart';
+import 'package:altcast/features/home/widgets/poster_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});

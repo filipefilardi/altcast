@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_gradients.dart';
-import '../../../core/widgets/local_or_network_image.dart';
-import '../../../data/jellyfin/models/episode.dart';
+import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/widgets/local_or_network_image.dart';
+import 'package:altcast/data/jellyfin/models/episode.dart';
 
 /// Bottom-right card that previews the next episode and offers a play CTA
 /// matching the brand's accent-gradient pill. Shows a live countdown ring
