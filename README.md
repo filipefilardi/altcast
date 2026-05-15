@@ -1,6 +1,9 @@
 # AltCast
 
-Stream your Jellyfin movies and shows with a clean, modern player.
+<p align="center">
+  <img src="assets/graphics/feature_graphic.png" alt="AltCast" width="720">
+</p>
+
 
 ### Description
 
