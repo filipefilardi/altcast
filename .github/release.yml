@@ -1,0 +1,39 @@
+# Categorizes GitHub's auto-generated release notes. PRs are grouped by
+# label. PRs without any of the listed labels fall into "Other changes".
+# Combine with PR-template label suggestions or Dependabot labels for clean
+# changelogs without manual editing.
+changelog:
+  exclude:
+    labels:
+      - "ignore-for-release"
+    authors:
+      - dependabot
+  categories:
+    - title: Features
+      labels:
+        - "enhancement"
+        - "feature"
+    - title: Bug Fixes
+      labels:
+        - "bug"
+        - "bugfix"
+        - "fix"
+    - title: Performance
+      labels:
+        - "performance"
+    - title: Security
+      labels:
+        - "security"
+    - title: Documentation
+      labels:
+        - "documentation"
+        - "docs"
+    - title: Maintenance
+      labels:
+        - "chore"
+        - "refactor"
+        - "ci"
+        - "dependencies"
+    - title: Other changes
+      labels:
+        - "*"
