@@ -1,5 +1,5 @@
 name: altcast
-description: "AltCast — Jellyfin movies & TV shows client."
+description: "A modern, open-source movies and TV shows client for Jellyfin."
 publish_to: 'none'
 version: 1.0.0+1
 
