@@ -27,8 +27,8 @@ By participating in this project, you agree to follow our [Code of Conduct](./CO
 ### Clone and Run
 
 ```bash
-git clone https://github.com/filipefilardi/altsound.git
-cd altsound
+git clone https://github.com/filipefilardi/altcast.git
+cd altcast
 flutter pub get
 flutter run
 ```
@@ -44,7 +44,7 @@ flutter run
 ## Coding Guidelines
 
 - Follow existing architecture and style in `lib/`.
-- Use package imports (`package:altsound/...`) rather than relative imports where applicable.
+- Use package imports (`package:altcast/...`) rather than relative imports where applicable.
 - Keep widgets and controllers small and focused.
 - Avoid unrelated formatting-only changes in functional PRs.
 - Add comments only when logic is non-obvious.

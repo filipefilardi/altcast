@@ -55,5 +55,5 @@ body:
     attributes:
       label: Confirmation
       options:
-        - label: I searched [existing issues](https://github.com/filipefilardi/altsound/issues) and didn't find a duplicate.
+        - label: I searched [existing issues](https://github.com/filipefilardi/altcast/issues) and didn't find a duplicate.
           required: true

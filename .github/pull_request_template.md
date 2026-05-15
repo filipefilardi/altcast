@@ -35,5 +35,5 @@ What did you actually run?
 - [ ] `flutter test` passes (added/updated tests if applicable)
 - [ ] No unrelated formatting or refactoring noise in the diff
 - [ ] No new numeric literals where an `AppSpacing` / `AppRadius` token exists
-- [ ] No new relative imports inside `lib/` (use `package:altsound/...`)
+- [ ] No new relative imports inside `lib/` (use `package:altcast/...`)
 - [ ] Updated docs / README if behavior or commands changed

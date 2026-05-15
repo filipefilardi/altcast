@@ -8,7 +8,7 @@ AltCast is a community project. Security fixes are applied to the latest release
 
 **Do not** open a public GitHub issue for security reports.
 
-Instead, use GitHub's [private vulnerability reporting](https://github.com/filipefilardi/altsound/security/advisories/new) form, or email the maintainer directly. Include:
+Instead, use GitHub's [private vulnerability reporting](https://github.com/filipefilardi/altcast/security/advisories/new) form, or email the maintainer directly. Include:
 
 - A description of the issue and its impact
 - Steps to reproduce (or a proof-of-concept)
