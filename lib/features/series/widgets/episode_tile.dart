@@ -69,8 +69,7 @@ class EpisodeTile extends ConsumerWidget {
                           bottom: 0,
                           child: Container(
                             height: 3,
-                            color:
-                                AppColors.background.withValues(alpha: 0.5),
+                            color: AppColors.background.withValues(alpha: 0.5),
                             child: FractionallySizedBox(
                               alignment: Alignment.centerLeft,
                               widthFactor: progress.toDouble(),
@@ -85,8 +84,9 @@ class EpisodeTile extends ConsumerWidget {
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.background.withValues(alpha: 0.7),
+                              color: AppColors.background.withValues(
+                                alpha: 0.7,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(

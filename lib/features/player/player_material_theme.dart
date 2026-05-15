@@ -193,7 +193,11 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         ),
       ),
     ],
-    bottomButtonBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 28),
+    bottomButtonBarMargin: const EdgeInsets.only(
+      left: 16,
+      right: 16,
+      bottom: 28,
+    ),
     buttonBarHeight: 132,
     seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 28),
   );
@@ -502,7 +506,9 @@ class _AltCastTrickplaySeekGroupState
       final localUrl = source?.url ?? '';
       final isLocal = localUrl.startsWith('file://');
       if (isLocal) {
-        final localItem = ref.read(downloadManagerProvider).items[widget.itemId];
+        final localItem = ref
+            .read(downloadManagerProvider)
+            .items[widget.itemId];
         final offline = localItem?.offlineTrickplay;
         if (offline != null && offline.tileFilesByIndex.isNotEmpty) {
           session = TrickplaySession.offline(
@@ -565,11 +571,7 @@ class _AltCastTrickplaySeekGroupState
       nextPos,
       totalDuration: totalDuration,
     );
-    final urls = <String>[
-      ...current.urls,
-      ...prev.urls,
-      ...next.urls,
-    ];
+    final urls = <String>[...current.urls, ...prev.urls, ...next.urls];
     unawaited(_TrickplayTileCache.prefetch(dio, urls));
   }
 
@@ -611,27 +613,39 @@ class _AltCastTrickplaySeekGroupState
                               _scrubPercent = percent;
                               _hoverPercent = null;
                             });
-                            if (_trickplay != null && duration > Duration.zero) {
-                              _prefetchAround(_trickplay!, duration * percent, duration);
-                              widget.trickplayOverlayNotifier.value = TrickplayOverlayData(
-                                session: _trickplay!,
-                                position: duration * percent,
-                                totalDuration: duration,
-                                alignPercent: percent,
+                            if (_trickplay != null &&
+                                duration > Duration.zero) {
+                              _prefetchAround(
+                                _trickplay!,
+                                duration * percent,
+                                duration,
                               );
+                              widget.trickplayOverlayNotifier.value =
+                                  TrickplayOverlayData(
+                                    session: _trickplay!,
+                                    position: duration * percent,
+                                    totalDuration: duration,
+                                    alignPercent: percent,
+                                  );
                             }
                           },
                           onScrubUpdate: (percent) {
                             if (!_isScrubbing) return;
                             setState(() => _scrubPercent = percent);
-                            if (_trickplay != null && duration > Duration.zero) {
-                              _prefetchAround(_trickplay!, duration * percent, duration);
-                              widget.trickplayOverlayNotifier.value = TrickplayOverlayData(
-                                session: _trickplay!,
-                                position: duration * percent,
-                                totalDuration: duration,
-                                alignPercent: percent,
+                            if (_trickplay != null &&
+                                duration > Duration.zero) {
+                              _prefetchAround(
+                                _trickplay!,
+                                duration * percent,
+                                duration,
                               );
+                              widget.trickplayOverlayNotifier.value =
+                                  TrickplayOverlayData(
+                                    session: _trickplay!,
+                                    position: duration * percent,
+                                    totalDuration: duration,
+                                    alignPercent: percent,
+                                  );
                             }
                           },
                           onScrubEnd: (percent) async {
@@ -644,7 +658,8 @@ class _AltCastTrickplaySeekGroupState
                             unawaited(player.seek(target));
                           },
                           onHoverPreview: (percent) {
-                            if (_isScrubbing || duration <= Duration.zero) return;
+                            if (_isScrubbing || duration <= Duration.zero)
+                              return;
                             if (percent == null) {
                               setState(() => _hoverPercent = null);
                               widget.trickplayOverlayNotifier.value = null;
@@ -974,9 +989,7 @@ class _FallbackNetworkImageState extends ConsumerState<_FallbackNetworkImage> {
           return data;
         }
         if (_trickplayDebugLogs) {
-          debugPrintSynchronously(
-            'Trickplay image empty payload url=$url',
-          );
+          debugPrintSynchronously('Trickplay image empty payload url=$url');
         }
       } catch (e) {
         if (_trickplayDebugLogs) {

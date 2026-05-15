@@ -262,10 +262,8 @@ class _SubtitleSection extends StatelessWidget {
     if (externalTracks.isEmpty) return const [];
 
     final embeddedKeys = <String>{
-      for (final t in embeddedTracks) ..._trackIdentityKeys(
-        title: t.title,
-        language: t.language,
-      ),
+      for (final t in embeddedTracks)
+        ..._trackIdentityKeys(title: t.title, language: t.language),
     };
     final seenExternalKeys = <String>{};
     final out = <ExternalSubtitle>[];
@@ -298,7 +296,10 @@ class _SubtitleSection extends StatelessWidget {
     );
     if (currentKeys.isEmpty) return null;
     for (final sub in externalTracks) {
-      final extKeys = _trackIdentityKeys(title: sub.title, language: sub.language);
+      final extKeys = _trackIdentityKeys(
+        title: sub.title,
+        language: sub.language,
+      );
       if (extKeys.isEmpty) continue;
       if (extKeys.any(currentKeys.contains)) return sub.id;
     }
@@ -332,7 +333,10 @@ class _SubtitleSection extends StatelessWidget {
     return null;
   }
 
-  Set<String> _trackIdentityKeys({required String? title, required String? language}) {
+  Set<String> _trackIdentityKeys({
+    required String? title,
+    required String? language,
+  }) {
     final normalizedLanguage = _normalizeLanguage(language);
     final normalizedTitle = _normalizeTitle(title);
     if (normalizedLanguage == null && normalizedTitle == null) return const {};

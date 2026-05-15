@@ -79,7 +79,8 @@ class JellyfinRepository {
   /// episodes), ordered most-recently-played first.
   Future<List<BrowseItem>> continueWatching({int limit = 12}) async {
     final s = _session;
-    final fields = 'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage';
+    final fields =
+        'Overview,UserData,PrimaryImageAspectRatio,SeriesPrimaryImage';
     final responses = await Future.wait([
       _api.dio.get<Map<String, dynamic>>(
         '/Users/${s.userId}/Items/Resume',
@@ -892,7 +893,9 @@ class JellyfinRepository {
   }) {
     final s = _session;
     final ms = mediaSourceId != null ? '&MediaSourceId=$mediaSourceId' : '';
-    final bitrate = maxBitrate != null ? '&MaxStreamingBitrate=$maxBitrate' : '';
+    final bitrate = maxBitrate != null
+        ? '&MaxStreamingBitrate=$maxBitrate'
+        : '';
     return '${s.serverUrl}/Videos/$itemId/stream'
         '?Static=$staticStream$ms$bitrate&api_key=${s.accessToken}';
   }
@@ -1153,7 +1156,8 @@ class JellyfinRepository {
           _asInt(value['width']) ??
           int.tryParse(key.toString());
       final height = _asInt(value['Height']) ?? _asInt(value['height']);
-      final tileWidth = _asInt(value['TileWidth']) ?? _asInt(value['tileWidth']);
+      final tileWidth =
+          _asInt(value['TileWidth']) ?? _asInt(value['tileWidth']);
       final tileHeight =
           _asInt(value['TileHeight']) ?? _asInt(value['tileHeight']);
       final thumbnailCount =
@@ -1200,8 +1204,9 @@ class JellyfinRepository {
       );
     }
     manifests.sort(
-      (a, b) =>
-          (a.width - preferredWidth).abs().compareTo((b.width - preferredWidth).abs()),
+      (a, b) => (a.width - preferredWidth).abs().compareTo(
+        (b.width - preferredWidth).abs(),
+      ),
     );
     final manifest = manifests.first;
     if (_trickplayDebugLogs) {
@@ -1308,7 +1313,9 @@ class JellyfinRepository {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList(growable: false);
-    final tilesLine = lines.where((l) => l.startsWith('#EXT-X-TILES')).firstOrNull;
+    final tilesLine = lines
+        .where((l) => l.startsWith('#EXT-X-TILES'))
+        .firstOrNull;
     if (tilesLine == null) return null;
 
     final resolutionMatch = RegExp(
@@ -1352,25 +1359,30 @@ class JellyfinRepository {
     }
 
     final base = '${_session.serverUrl}/Videos/$itemId/Trickplay/$width/';
-    final query = StringBuffer('api_key=${Uri.encodeQueryComponent(_session.accessToken)}');
+    final query = StringBuffer(
+      'api_key=${Uri.encodeQueryComponent(_session.accessToken)}',
+    );
     if (mediaSourceId != null && mediaSourceId.trim().isNotEmpty) {
       final encoded = Uri.encodeQueryComponent(mediaSourceId.trim());
       query.write('&mediaSourceId=$encoded');
     }
     final qs = query.toString();
-    final imageUrls = imageLines.map((line) {
-      final normalized = line.startsWith('http') ? line : '$base$line';
-      final lower = normalized.toLowerCase();
-      final hasApiKey = lower.contains('apikey=') || lower.contains('api_key=');
-      final hasMediaSource = lower.contains('mediasourceid=');
-      final needsMediaSource =
-          mediaSourceId != null && mediaSourceId.trim().isNotEmpty;
-      if (hasApiKey && (!needsMediaSource || hasMediaSource)) {
-        return normalized;
-      }
-      final sep = normalized.contains('?') ? '&' : '?';
-      return '$normalized$sep$qs';
-    }).toList(growable: false);
+    final imageUrls = imageLines
+        .map((line) {
+          final normalized = line.startsWith('http') ? line : '$base$line';
+          final lower = normalized.toLowerCase();
+          final hasApiKey =
+              lower.contains('apikey=') || lower.contains('api_key=');
+          final hasMediaSource = lower.contains('mediasourceid=');
+          final needsMediaSource =
+              mediaSourceId != null && mediaSourceId.trim().isNotEmpty;
+          if (hasApiKey && (!needsMediaSource || hasMediaSource)) {
+            return normalized;
+          }
+          final sep = normalized.contains('?') ? '&' : '?';
+          return '$normalized$sep$qs';
+        })
+        .toList(growable: false);
 
     final thumbsPerTile = cols * rows;
     final thumbnailCount = imageUrls.length * thumbsPerTile;
@@ -1423,7 +1435,9 @@ class JellyfinRepository {
 
     final first = await request(msid: mediaSourceId);
     if (_trickplayDebugLogs) {
-      debugPrint('Trickplay map with mediaSourceId count=${(first ?? const {}).length}');
+      debugPrint(
+        'Trickplay map with mediaSourceId count=${(first ?? const {}).length}',
+      );
     }
     if ((first ?? const {}).isNotEmpty) return first;
     if (mediaSourceId != null && mediaSourceId.trim().isNotEmpty) {
@@ -1702,11 +1716,14 @@ class TrickplaySession {
   }
 
   List<String> _tileImageUrls(int tileIndex) {
-    final baseNoExt = '$serverUrl/Videos/$itemId/Trickplay/${manifest.width}/$tileIndex';
+    final baseNoExt =
+        '$serverUrl/Videos/$itemId/Trickplay/${manifest.width}/$tileIndex';
     final baseJpg = '$baseNoExt.jpg';
     final query = StringBuffer('api_key=${Uri.encodeQueryComponent(token)}');
     if (mediaSourceId != null && mediaSourceId!.trim().isNotEmpty) {
-      query.write('&mediaSourceId=${Uri.encodeQueryComponent(mediaSourceId!.trim())}');
+      query.write(
+        '&mediaSourceId=${Uri.encodeQueryComponent(mediaSourceId!.trim())}',
+      );
     }
     final q = query.toString();
     return [

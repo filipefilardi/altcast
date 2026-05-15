@@ -14,12 +14,12 @@ class JellyfinSession {
   final String username;
 
   Map<String, dynamic> toJson() => {
-        'serverUrl': serverUrl,
-        'accessToken': accessToken,
-        'userId': userId,
-        'serverId': serverId,
-        'username': username,
-      };
+    'serverUrl': serverUrl,
+    'accessToken': accessToken,
+    'userId': userId,
+    'serverId': serverId,
+    'username': username,
+  };
 
   factory JellyfinSession.fromJson(Map<String, dynamic> json) {
     return JellyfinSession(

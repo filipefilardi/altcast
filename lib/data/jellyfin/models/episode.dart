@@ -57,7 +57,8 @@ class Episode {
     final tags = json['ImageTags'];
     final people =
         (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    final taglines = (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
+    final taglines =
+        (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
     final firstTagline = taglines.firstWhere(
       (tagline) => tagline.trim().isNotEmpty,
       orElse: () => '',

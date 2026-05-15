@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  /// Dark charcoal stack aligned with AltSound.
+  /// Dark charcoal stack aligned with AltCast.
   static const background = Color(0xFF0B0E12);
   static const surface = Color(0xFF151922);
   static const surfaceElevated = Color(0xFF1B212B);

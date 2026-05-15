@@ -452,12 +452,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final creditsStart = _ticksToDuration(local.creditsStartTicks);
     final creditsEnd = _ticksToDuration(local.creditsEndTicks);
     return IntroSkipperTimestamps(
-      introduction: introStart != null &&
-              introEnd != null &&
-              introEnd > introStart
+      introduction:
+          introStart != null && introEnd != null && introEnd > introStart
           ? IntroSkipperRange(start: introStart, end: introEnd)
           : null,
-      credits: creditsStart != null &&
+      credits:
+          creditsStart != null &&
               creditsEnd != null &&
               creditsEnd > creditsStart
           ? IntroSkipperRange(start: creditsStart, end: creditsEnd)
@@ -674,7 +674,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     for (final candidate in candidates) {
       final afterCurrentSeason = candidate.seasonNumber! > season;
       final sameSeasonNextEpisode =
-          candidate.seasonNumber == season && candidate.episodeNumber! > episode;
+          candidate.seasonNumber == season &&
+          candidate.episodeNumber! > episode;
       if (afterCurrentSeason || sameSeasonNextEpisode) {
         return Episode(
           id: candidate.id,

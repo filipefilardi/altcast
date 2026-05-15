@@ -93,7 +93,8 @@ class DownloadedItem {
     if (creditsEndTicks != null) 'creditsEndTicks': creditsEndTicks,
     if (externalSubtitles.isNotEmpty)
       'externalSubtitles': externalSubtitles.map((s) => s.toJson()).toList(),
-    if (offlineTrickplay != null) 'offlineTrickplay': offlineTrickplay!.toJson(),
+    if (offlineTrickplay != null)
+      'offlineTrickplay': offlineTrickplay!.toJson(),
   };
 
   factory DownloadedItem.fromJson(Map<String, dynamic> json) {

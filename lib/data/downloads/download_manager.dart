@@ -231,7 +231,10 @@ class DownloadManager extends Notifier<DownloadsState> {
     if (_activeItemId == itemId) {
       _activeCancel?.cancel('Paused by user');
     }
-    state = state.copyWith(queueLength: _queue.length, pausedIds: _paused.keys.toSet());
+    state = state.copyWith(
+      queueLength: _queue.length,
+      pausedIds: _paused.keys.toSet(),
+    );
     await _persistQueue();
   }
 
@@ -239,7 +242,10 @@ class DownloadManager extends Notifier<DownloadsState> {
     final entry = _paused.remove(itemId);
     if (entry == null) return;
     _queue.add(entry);
-    state = state.copyWith(queueLength: _queue.length, pausedIds: _paused.keys.toSet());
+    state = state.copyWith(
+      queueLength: _queue.length,
+      pausedIds: _paused.keys.toSet(),
+    );
     await _persistQueue();
     _drain();
   }
@@ -416,17 +422,16 @@ class DownloadManager extends Notifier<DownloadsState> {
     });
   }
 
-  Future<String> _resolveDownloadUrl(JellyfinRepository repo, String itemId) async {
+  Future<String> _resolveDownloadUrl(
+    JellyfinRepository repo,
+    String itemId,
+  ) async {
     final prefs = ref.read(downloadPreferencesProvider);
     final bitrate = prefs.offlineVideoQuality.maxBitrate;
     if (bitrate == null) {
       return repo.streamUrl(itemId, staticStream: true);
     }
-    return repo.streamUrl(
-      itemId,
-      staticStream: false,
-      maxBitrate: bitrate,
-    );
+    return repo.streamUrl(itemId, staticStream: false, maxBitrate: bitrate);
   }
 
   Future<void> _guardFreeSpace({required int minBytes}) async {
@@ -668,7 +673,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     final dir = await _downloadsDir();
     final queueFile = File('${dir.path}/queue.json');
     final data = <Map<String, dynamic>>[
-      for (final q in _queue) _PersistedQueueEntry(entry: q, paused: false).toJson(),
+      for (final q in _queue)
+        _PersistedQueueEntry(entry: q, paused: false).toJson(),
       for (final q in _paused.values)
         _PersistedQueueEntry(entry: q, paused: true).toJson(),
     ];
@@ -697,10 +703,13 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Directory _pickBestExternal(List<Directory> dirs) {
-    final writable = dirs.where((dir) {
-      final path = dir.path;
-      return !path.contains('/emulated/0/') && !path.contains('/data/user/0/');
-    }).toList(growable: false);
+    final writable = dirs
+        .where((dir) {
+          final path = dir.path;
+          return !path.contains('/emulated/0/') &&
+              !path.contains('/data/user/0/');
+        })
+        .toList(growable: false);
     return writable.isNotEmpty ? writable.first : dirs.last;
   }
 }
@@ -887,10 +896,7 @@ class _PersistedQueueEntry {
   final _QueueEntry entry;
   final bool paused;
 
-  Map<String, dynamic> toJson() => {
-    'entry': entry.toJson(),
-    'paused': paused,
-  };
+  Map<String, dynamic> toJson() => {'entry': entry.toJson(), 'paused': paused};
 
   factory _PersistedQueueEntry.fromJson(Map<String, dynamic> json) {
     final entryJson = Map<String, dynamic>.from(json['entry'] as Map);

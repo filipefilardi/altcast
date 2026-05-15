@@ -27,8 +27,9 @@ class AuthRepository {
     final raw = await storage.read(_sessionKey);
     if (raw == null) return null;
     try {
-      final session =
-          JellyfinSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      final session = JellyfinSession.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
       api.bind(session);
       return session;
     } catch (_) {

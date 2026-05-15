@@ -89,8 +89,7 @@ class _SkipChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onPressed,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

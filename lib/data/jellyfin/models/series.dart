@@ -50,8 +50,10 @@ class Series {
   factory Series.fromJson(Map<String, dynamic> json) {
     final tags = json['ImageTags'];
     final backdrops = json['BackdropImageTags'];
-    final people = (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    final taglines = (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
+    final people =
+        (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final taglines =
+        (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
     final firstTagline = taglines.firstWhere(
       (tagline) => tagline.trim().isNotEmpty,
       orElse: () => '',

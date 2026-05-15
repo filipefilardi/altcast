@@ -57,8 +57,10 @@ class ErrorStateView extends StatelessWidget {
                   foregroundColor: AppColors.textPrimary,
                   side: const BorderSide(color: AppColors.divider),
                   shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ],

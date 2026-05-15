@@ -5,7 +5,7 @@ import '../../data/jellyfin/jellyfin_api.dart';
 ///
 /// All posts are best-effort: failures are swallowed because scrobbling
 /// must never crash playback. Tied 1-to-1 with a `VideoPlayerScreen`
-/// instance — there's no global scrobbler today (unlike AltSound, where
+/// instance — there's no global scrobbler today (unlike AltCast, where
 /// audio plays outside the now-playing screen).
 class Scrobbler {
   Scrobbler({

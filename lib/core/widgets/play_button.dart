@@ -4,7 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 
 /// Primary "Play" / "Resume" CTA. Wide accent-gradient pill with a leading
-/// triangle icon. Matches the brand identity of AltSound's [PlayPill] but is
+/// triangle icon. Matches the brand identity of AltCast's [PlayPill] but is
 /// a rectangular wide button suited to detail screens.
 class PlayButton extends StatelessWidget {
   const PlayButton({

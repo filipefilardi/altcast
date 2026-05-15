@@ -330,14 +330,19 @@ class _InProgressRow extends ConsumerWidget {
             ),
             tooltip: paused ? 'Resume' : 'Pause',
             onPressed: () => paused
-                ? ref.read(downloadManagerProvider.notifier).resume(progress.itemId)
-                : ref.read(downloadManagerProvider.notifier).pause(progress.itemId),
+                ? ref
+                      .read(downloadManagerProvider.notifier)
+                      .resume(progress.itemId)
+                : ref
+                      .read(downloadManagerProvider.notifier)
+                      .pause(progress.itemId),
           ),
           IconButton(
             icon: const Icon(Icons.close, color: AppColors.textSecondary),
             tooltip: 'Cancel',
-            onPressed: () =>
-                ref.read(downloadManagerProvider.notifier).cancel(progress.itemId),
+            onPressed: () => ref
+                .read(downloadManagerProvider.notifier)
+                .cancel(progress.itemId),
           ),
         ],
       ),
@@ -355,7 +360,9 @@ class _InProgressRow extends ConsumerWidget {
     final bytes = p.totalBytes != null && p.downloadedBytes != null
         ? '${formatBytes(p.downloadedBytes!)} / ${formatBytes(p.totalBytes!)}'
         : (p.downloadedBytes != null ? formatBytes(p.downloadedBytes!) : null);
-    final pct = p.fraction > 0 ? '${(p.fraction * 100).toStringAsFixed(0)}%' : 'Queued';
+    final pct = p.fraction > 0
+        ? '${(p.fraction * 100).toStringAsFixed(0)}%'
+        : 'Queued';
     final line = bytes != null ? '$pct • $bytes' : pct;
     if (p.episodeLabel != null) return '${p.episodeLabel} • $line';
     return line;

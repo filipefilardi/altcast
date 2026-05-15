@@ -16,20 +16,13 @@ class Skeleton {
     required double width,
     required double height,
     double radius = 12,
-  }) =>
-      _SkeletonBox(width: width, height: height, radius: radius);
+  }) => _SkeletonBox(width: width, height: height, radius: radius);
 
-  static Widget line({
-    double width = double.infinity,
-    double height = 12,
-  }) =>
+  static Widget line({double width = double.infinity, double height = 12}) =>
       _SkeletonBox(width: width, height: height, radius: height / 2);
 
-  static Widget circle({required double size}) => _SkeletonBox(
-        width: size,
-        height: size,
-        radius: size,
-      );
+  static Widget circle({required double size}) =>
+      _SkeletonBox(width: size, height: size, radius: size);
 }
 
 class _SkeletonGroup extends StatefulWidget {
@@ -58,10 +51,7 @@ class _SkeletonGroupState extends State<_SkeletonGroup>
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
-        return _ShimmerScope(
-          progress: _ctrl.value,
-          child: child!,
-        );
+        return _ShimmerScope(progress: _ctrl.value, child: child!);
       },
       child: widget.child,
     );
@@ -89,8 +79,7 @@ class _SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<_ShimmerScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<_ShimmerScope>();
     final t = scope?.progress ?? 0;
     final start = t * 2 - 1;
     return ClipRRect(

@@ -5,11 +5,7 @@ import '../theme/app_colors.dart';
 /// Wrap of pill-shaped genre chips. Each chip is tappable so callers can
 /// route into a filtered library view.
 class GenreChips extends StatelessWidget {
-  const GenreChips({
-    super.key,
-    required this.genres,
-    required this.onTapGenre,
-  });
+  const GenreChips({super.key, required this.genres, required this.onTapGenre});
 
   final List<String> genres;
   final ValueChanged<String> onTapGenre;

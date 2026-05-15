@@ -558,11 +558,7 @@ class _HeroSlide extends ConsumerWidget {
               ],
             ),
           ),
-          Positioned(
-            top: 12,
-            right: 12,
-            child: _QueueMenuButton(item: item),
-          ),
+          Positioned(top: 12, right: 12, child: _QueueMenuButton(item: item)),
         ],
       ),
     );
@@ -588,9 +584,7 @@ class _QueueMenuButton extends ConsumerWidget {
               ref.invalidate(continueWatchingProvider);
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Removed "${item.name}" from queue.'),
-                ),
+                SnackBar(content: Text('Removed "${item.name}" from queue.')),
               );
             } catch (_) {
               if (!context.mounted) return;
@@ -655,7 +649,9 @@ class _QueueMenuButton extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.background.withValues(alpha: 0.68),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.textTertiary.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: AppColors.textTertiary.withValues(alpha: 0.3),
+          ),
         ),
         padding: const EdgeInsets.all(6),
         child: const Icon(

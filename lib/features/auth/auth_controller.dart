@@ -28,8 +28,9 @@ class AuthUnauthenticated extends AuthState {
   final String? error;
 }
 
-final authControllerProvider =
-    NotifierProvider<AuthController, AuthState>(AuthController.new);
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
+);
 
 class AuthController extends Notifier<AuthState> {
   @override
@@ -53,11 +54,9 @@ class AuthController extends Notifier<AuthState> {
   }) async {
     state = const AuthLoading();
     try {
-      final session = await ref.read(authRepositoryProvider).login(
-            serverUrl: serverUrl,
-            username: username,
-            password: password,
-          );
+      final session = await ref
+          .read(authRepositoryProvider)
+          .login(serverUrl: serverUrl, username: username, password: password);
       state = AuthAuthenticated(session);
     } on JellyfinAuthException catch (e) {
       state = AuthUnauthenticated(error: e.message);

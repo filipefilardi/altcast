@@ -44,8 +44,10 @@ class Movie {
     final ticks = json['RunTimeTicks'] as int?;
     final tags = json['ImageTags'];
     final backdrops = json['BackdropImageTags'];
-    final people = (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-    final taglines = (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
+    final people =
+        (json['People'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final taglines =
+        (json['Taglines'] as List?)?.cast<String>() ?? const <String>[];
     final firstTagline = taglines.firstWhere(
       (tagline) => tagline.trim().isNotEmpty,
       orElse: () => '',
@@ -58,9 +60,7 @@ class Movie {
           : (json['Tagline'] as String?),
       overview: json['Overview'] as String?,
       year: json['ProductionYear'] as int?,
-      runTime: ticks != null
-          ? Duration(microseconds: ticks ~/ 10)
-          : null,
+      runTime: ticks != null ? Duration(microseconds: ticks ~/ 10) : null,
       genres: (json['Genres'] as List?)?.cast<String>() ?? const [],
       communityRating: (json['CommunityRating'] as num?)?.toDouble(),
       officialRating: json['OfficialRating'] as String?,

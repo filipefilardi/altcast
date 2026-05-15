@@ -44,9 +44,7 @@ class NextUpCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface.withValues(alpha: 0.94),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.28),
-          ),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.5),
@@ -71,13 +69,12 @@ class NextUpCard extends StatelessWidget {
                 children: [
                   ShaderMask(
                     blendMode: BlendMode.srcIn,
-                    shaderCallback: (b) =>
-                        AppGradients.accent.createShader(b),
+                    shaderCallback: (b) => AppGradients.accent.createShader(b),
                     child: Text(
                       'NEXT UP',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: Colors.white,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelLarge?.copyWith(color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -302,8 +299,7 @@ class _NextUpCancelButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onPressed,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: AppColors.divider),

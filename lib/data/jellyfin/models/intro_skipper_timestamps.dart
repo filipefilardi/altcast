@@ -23,10 +23,7 @@ class IntroSkipperTimestamps {
         json['Introduction'] ?? json['introduction'],
       ),
       credits: IntroSkipperRange.parseSegmentJson(
-        json['Credits'] ??
-            json['credits'] ??
-            json['Outro'] ??
-            json['outro'],
+        json['Credits'] ?? json['credits'] ?? json['Outro'] ?? json['outro'],
       ),
     );
   }
@@ -63,8 +60,7 @@ class IntroSkipperRange {
   final Duration end;
 
   /// True when [position] lies inside `[start, end)`.
-  bool contains(Duration position) =>
-      position >= start && position < end;
+  bool contains(Duration position) => position >= start && position < end;
 
   static IntroSkipperRange? parseSegmentJson(dynamic raw) {
     if (raw is! Map) return null;
