@@ -46,3 +46,11 @@ updates:
       - "android"
     commit-message:
       prefix: "chore(deps)"
+    # AGP 9 and Kotlin 2.3 require ecosystem-wide migration that the Flutter
+    # plugin ecosystem has not completed yet. Stay on the latest 8.x / 2.2.x
+    # until upstream plugins migrate.
+    ignore:
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.android"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
