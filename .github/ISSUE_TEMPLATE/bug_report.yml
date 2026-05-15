@@ -1,0 +1,110 @@
+name: Bug report
+description: Report something that isn't working in AltCast.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please include enough
+        information for us to reproduce the issue locally.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A short description of the problem.
+      placeholder: When I tap shuffle on a playlist, the queue is not shuffled.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Step-by-step instructions to reproduce the bug. Number each step.
+      placeholder: |
+        1. Open a playlist with 30+ tracks
+        2. Tap the shuffle button in the action row
+        3. Open the queue from the now-playing screen
+        4. Observe order matches the playlist
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: The queue should be in a randomized order.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: The queue is in the original playlist order.
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: AltCast version
+      description: Found in Settings → AltCast version footer.
+      placeholder: e.g. 1.2.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - iOS
+        - Android
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: e.g. iOS 17.4, Android 14, macOS 14.5
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: e.g. iPhone 15 Pro, Pixel 8, MacBook Air M2
+
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin server version
+      placeholder: e.g. 10.9.11
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or recordings
+      description: |
+        Drag-and-drop attachments here. Redact any personal information
+        (server URLs, tokens, usernames) before sharing.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched [existing issues](https://github.com/filipefilardi/altsound/issues) and didn't find a duplicate.
+          required: true
+        - label: I have removed any sensitive data (tokens, server URLs) from logs and screenshots.
+          required: true
