@@ -201,12 +201,12 @@ jobs:
             echo "::error::No .app bundle found"
             exit 1
           fi
-          zip -r "altsound-macos-${{ needs.version.outputs.name }}.zip" "$APP"
+          zip -r "altcast-macos-${{ needs.version.outputs.name }}.zip" "$APP"
 
       - uses: actions/upload-artifact@v7
         with:
           name: macos-app
-          path: build/macos/Build/Products/Release/altsound-macos-${{ needs.version.outputs.name }}.zip
+          path: build/macos/Build/Products/Release/altcast-macos-${{ needs.version.outputs.name }}.zip
           if-no-files-found: error
 
   # ─── Publish (single GitHub Release with all artifacts) ─────────────────
@@ -247,7 +247,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.silent_summit.altsound
+          packageName: com.silent_summit.altcast
           releaseFiles: app-release.aab
           tracks: internal
           status: draft
