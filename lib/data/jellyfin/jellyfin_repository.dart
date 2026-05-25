@@ -554,6 +554,9 @@ class JellyfinRepository {
     final items = ((res.data?['Items'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
         .map(Season.fromJson)
+        // Jellyfin may return placeholder/empty seasons. Hide seasons that
+        // explicitly report zero episodes so users don't open blank season tabs.
+        .where((season) => season.episodeCount != 0)
         .toList();
     items.sort(
       (a, b) => (a.indexNumber ?? 1 << 30).compareTo(b.indexNumber ?? 1 << 30),

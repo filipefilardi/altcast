@@ -15,16 +15,17 @@ class DetailActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 12,
-      runSpacing: 4,
-      children: [
-        primary,
-        if (actions.isNotEmpty)
+    if (actions.isEmpty) return primary;
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          primary,
+          const Spacer(),
           Row(mainAxisSize: MainAxisSize.min, children: actions),
-      ],
+        ],
+      ),
     );
   }
 }

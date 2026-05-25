@@ -73,6 +73,7 @@ class _EpisodeBody extends ConsumerWidget {
         const Duration(seconds: 5);
     final seriesName = episode.seriesName?.trim();
     final tagline = episode.tagline?.trim();
+    final safeBottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -179,7 +180,7 @@ class _EpisodeBody extends ConsumerWidget {
                 const SizedBox(height: 8),
                 CastCrewRow(people: episode.artists),
               ],
-              const SizedBox(height: 32),
+              SizedBox(height: 4 + safeBottomInset),
             ],
           ),
         ),
