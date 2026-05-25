@@ -250,6 +250,8 @@ class _ContinueWatchingCard extends ConsumerWidget {
           color: AppColors.surfaceElevated,
           child: InkWell(
             onTap: onOpenDetail,
+            onLongPress: () =>
+                _showQueueActions(context: context, ref: ref, item: item),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -277,11 +279,6 @@ class _ContinueWatchingCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: _QueueMenuButton(item: item),
                 ),
                 Positioned(
                   left: 12,
@@ -468,6 +465,8 @@ class _HeroSlide extends ConsumerWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onOpenDetail,
+                onLongPress: () =>
+                    _showQueueActions(context: context, ref: ref, item: item),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -564,133 +563,114 @@ class _HeroSlide extends ConsumerWidget {
               ),
             ),
           ),
-          Positioned(top: 12, right: 12, child: _QueueMenuButton(item: item)),
         ],
       ),
     );
   }
 }
 
-class _QueueMenuButton extends ConsumerStatefulWidget {
-  const _QueueMenuButton({required this.item});
-
-  final BrowseItem item;
-
-  @override
-  ConsumerState<_QueueMenuButton> createState() => _QueueMenuButtonState();
-}
-
-class _QueueMenuButtonState extends ConsumerState<_QueueMenuButton> {
-  final GlobalKey _anchorKey = GlobalKey();
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      key: _anchorKey,
-      borderRadius: BorderRadius.circular(999),
-      onTap: () => _showQueueActions(context, ref),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.background.withValues(alpha: 0.68),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: AppColors.textTertiary.withValues(alpha: 0.3),
-          ),
+Future<void> _showQueueActions({
+  required BuildContext context,
+  required WidgetRef ref,
+  required BrowseItem item,
+}) {
+  final canRemoveSeries =
+      item.kind == MediaKind.series ||
+      (item.kind == MediaKind.episode &&
+          item.seriesId != null &&
+          item.seriesId!.trim().isNotEmpty);
+  return showGlassPopover<void>(
+    context: context,
+    width: 240,
+    anchorRect: _topRightAnchorRectFor(context),
+    builder: (_) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GlassPopoverItem(
+          icon: Icons.remove_circle_outline_rounded,
+          label: 'Remove from queue',
+          onTap: () => _removeFromQueue(context: context, ref: ref, item: item),
         ),
-        padding: const EdgeInsets.all(6),
-        child: const Icon(
-          Icons.more_vert_rounded,
-          size: 18,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showQueueActions(BuildContext context, WidgetRef ref) {
-    final anchorCtx = _anchorKey.currentContext ?? context;
-    final canRemoveSeries =
-        widget.item.kind == MediaKind.series ||
-        (widget.item.kind == MediaKind.episode &&
-            widget.item.seriesId != null &&
-            widget.item.seriesId!.trim().isNotEmpty);
-    return showGlassPopover<void>(
-      context: anchorCtx,
-      width: 240,
-      builder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+        if (canRemoveSeries)
           GlassPopoverItem(
-            icon: Icons.remove_circle_outline_rounded,
-            label: 'Remove from queue',
-            onTap: () => _removeFromQueue(context, ref),
+            icon: Icons.playlist_remove_rounded,
+            label: 'Remove series from queue',
+            onTap: () =>
+                _removeSeriesFromQueue(context: context, ref: ref, item: item),
           ),
-          if (canRemoveSeries)
-            GlassPopoverItem(
-              icon: Icons.playlist_remove_rounded,
-              label: 'Remove series from queue',
-              onTap: () => _removeSeriesFromQueue(context, ref),
-            ),
-          const SizedBox(height: 4),
-        ],
+        const SizedBox(height: 4),
+      ],
+    ),
+  );
+}
+
+Rect? _topRightAnchorRectFor(BuildContext context) {
+  final ro = context.findRenderObject();
+  if (ro is! RenderBox || !ro.attached) return null;
+  final origin = ro.localToGlobal(Offset.zero);
+  final size = ro.size;
+  const anchorSize = 1.0;
+  const inset = 10.0;
+  return Rect.fromLTWH(
+    origin.dx + size.width - inset - anchorSize,
+    origin.dy + inset,
+    anchorSize,
+    anchorSize,
+  );
+}
+
+Future<void> _removeFromQueue({
+  required BuildContext context,
+  required WidgetRef ref,
+  required BrowseItem item,
+}) async {
+  try {
+    await ref.read(jellyfinRepositoryProvider).removeFromQueue(item.id);
+    ref.invalidate(continueWatchingProvider);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Removed "${item.name}" from queue.')),
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Couldn't remove this item from queue. Please try again.",
+        ),
       ),
     );
   }
+}
 
-  Future<void> _removeFromQueue(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref
-          .read(jellyfinRepositoryProvider)
-          .removeFromQueue(widget.item.id);
-      ref.invalidate(continueWatchingProvider);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Removed "${widget.item.name}" from queue.')),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Couldn't remove this item from queue. Please try again.",
-          ),
+Future<void> _removeSeriesFromQueue({
+  required BuildContext context,
+  required WidgetRef ref,
+  required BrowseItem item,
+}) async {
+  final seriesId = item.kind == MediaKind.series ? item.id : item.seriesId;
+  if (seriesId == null || seriesId.trim().isEmpty) return;
+  try {
+    await ref.read(jellyfinRepositoryProvider).removeSeriesFromQueue(seriesId);
+    ref.invalidate(continueWatchingProvider);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Removed series "${item.seriesName ?? item.name}" from queue.',
         ),
-      );
-    }
-  }
-
-  Future<void> _removeSeriesFromQueue(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final seriesId = widget.item.kind == MediaKind.series
-        ? widget.item.id
-        : widget.item.seriesId;
-    if (seriesId == null || seriesId.trim().isEmpty) return;
-    try {
-      await ref
-          .read(jellyfinRepositoryProvider)
-          .removeSeriesFromQueue(seriesId);
-      ref.invalidate(continueWatchingProvider);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Removed series "${widget.item.seriesName ?? widget.item.name}" from queue.',
-          ),
+      ),
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Couldn't remove this series from queue. Please try again.",
         ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Couldn't remove this series from queue. Please try again.",
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 }
 

@@ -12,8 +12,9 @@ Future<T?> showGlassPopover<T>({
   required WidgetBuilder builder,
   double width = 280,
   double maxHeight = 420,
+  Rect? anchorRect,
 }) {
-  final anchor = _anchorRectFor(context);
+  final anchor = anchorRect ?? _anchorRectFor(context);
   return Navigator.of(context, rootNavigator: true).push<T>(
     _GlassPopoverRoute<T>(
       anchor: anchor,
