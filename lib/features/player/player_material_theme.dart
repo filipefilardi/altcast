@@ -56,8 +56,8 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
 }) {
   final screenBrightness = ScreenBrightness();
   return MaterialVideoControlsThemeData(
-    // Keep bar placement fixed; otherwise media_kit adds fullscreen safe-area
-    // insets after mount, which makes controls appear to "jump" inward.
+    // Avoid double-insetting on mobile (safe-area + internal controls bounds).
+    // Keep this zero and control spacing through bar margins.
     padding: EdgeInsets.zero,
     displaySeekBar: false,
     visibleOnMount: true,

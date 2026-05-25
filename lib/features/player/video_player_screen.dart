@@ -2090,21 +2090,19 @@ class _PlayerUiBackdropOverlay extends StatelessWidget {
             ),
             Align(
               alignment: Alignment.center,
-              child: FractionallySizedBox(
-                widthFactor: 0.78,
-                heightFactor: 0.58,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.center,
-                      radius: 0.72,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.20),
-                        Colors.black.withValues(alpha: 0.08),
-                        Colors.transparent,
-                      ],
-                      stops: [0.0, 0.58, 1.0],
-                    ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  // True vignette: keep center clear and darken only outward.
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.96,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.10),
+                      Colors.black.withValues(alpha: 0.18),
+                    ],
+                    stops: [0.0, 0.62, 0.84, 1.0],
                   ),
                 ),
               ),
