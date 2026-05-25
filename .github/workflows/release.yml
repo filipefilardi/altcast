@@ -217,16 +217,61 @@ jobs:
     if: needs.version.outputs.should-release == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
+
+      - name: Build commit-based release notes
+        env:
+          TAG_NAME: ${{ needs.version.outputs.tag }}
+        run: |
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG_NAME" | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ {print; exit}')
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+            echo "No previous release tag found. Using full history."
+          else
+            RANGE="${PREV_TAG}..HEAD"
+            echo "Generating notes from $RANGE"
+          fi
+
+          {
+            echo "## Changes"
+            echo
+            FEAT_LINES=$(git log --no-merges --format='%s' "$RANGE" | grep -E '^feat(\([^)]+\))?!?: ' || true)
+            FIX_LINES=$(git log --no-merges --format='%s' "$RANGE" | grep -E '^(fix|perf)(\([^)]+\))?!?: ' || true)
+            BREAK_LINES=$(git log --no-merges --format='%B%x00' "$RANGE" | tr '\000' '\n' | grep -E '^BREAKING CHANGE: ' || true)
+            OTHER_LINES=$(git log --no-merges --format='%s' "$RANGE" | grep -Ev '^(feat|fix|perf)(\([^)]+\))?!?: ' || true)
+
+            print_section() {
+              local title="$1"
+              local lines="$2"
+              if [ -n "$lines" ]; then
+                echo "### $title"
+                echo "$lines" | sed '/^$/d' | sed 's/^/- /'
+                echo
+              fi
+            }
+
+            print_section "Features" "$FEAT_LINES"
+            print_section "Fixes" "$FIX_LINES"
+            print_section "Breaking Changes" "$BREAK_LINES"
+            print_section "Other" "$OTHER_LINES"
+          } > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            printf "## Changes\n\n- Internal release updates\n" > RELEASE_NOTES.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           name: ${{ needs.version.outputs.tag }}+${{ needs.version.outputs.build }}
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
           files: |
             artifacts/android-aab/app-release.aab
             artifacts/macos-app/*.zip
