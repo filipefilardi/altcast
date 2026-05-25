@@ -197,10 +197,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     bottomButtonBarMargin: const EdgeInsets.only(
       left: 16,
       right: 16,
-      bottom: 28,
+      bottom: 4,
     ),
-    buttonBarHeight: 132,
-    seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 28),
+    buttonBarHeight: 96,
+    seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
   );
 }
 
@@ -367,9 +367,7 @@ class AltCastPlayPauseButton extends ConsumerWidget {
     final remote = ref.watch(activeRemoteSessionProvider).value;
     if (remote != null && remote.isPlayingSomething) {
       return IconButton(
-        icon: Icon(
-          remote.isPaused ? PiconsFill.play : PiconsFill.pause,
-        ),
+        icon: Icon(remote.isPaused ? PiconsFill.play : PiconsFill.pause),
         iconSize: iconSize ?? 48,
         color: Colors.white,
         tooltip: remote.isPaused ? 'Play' : 'Pause',
