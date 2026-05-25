@@ -56,6 +56,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
 }) {
   final screenBrightness = ScreenBrightness();
   return MaterialVideoControlsThemeData(
+    // Keep bar placement fixed; otherwise media_kit adds fullscreen safe-area
+    // insets after mount, which makes controls appear to "jump" inward.
+    padding: EdgeInsets.zero,
     displaySeekBar: false,
     visibleOnMount: true,
     controlsHoverDuration: const Duration(seconds: 20),
@@ -181,10 +184,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         ),
       ),
     ],
-    topButtonBarMargin: const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 16,
-    ),
+    topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     bottomButtonBar: [
       Expanded(
         child: AltCastTrickplaySeekGroup(
@@ -197,10 +197,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     bottomButtonBarMargin: const EdgeInsets.only(
       left: 16,
       right: 16,
-      bottom: 4,
+      bottom: 8,
     ),
     buttonBarHeight: 96,
-    seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
+    seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
   );
 }
 
