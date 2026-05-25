@@ -272,10 +272,6 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                 ),
               ],
               DetailCastCrewSection(people: series.artists),
-              DetailMoreLikeThisSection(
-                itemsAsync: similarAsync,
-                currentItemId: series.id,
-              ),
               const SizedBox(height: 24),
               Text('EPISODES', style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 12),
@@ -291,6 +287,10 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           seriesName: series.name,
           seriesPosterTag: series.imageTag,
           preference: _preference,
+        ),
+        DetailMoreLikeThisSection(
+          itemsAsync: similarAsync,
+          currentItemId: series.id,
         ),
         const SizedBox(height: 32),
       ],
