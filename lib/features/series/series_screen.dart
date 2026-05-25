@@ -253,9 +253,12 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
           seriesPosterTag: series.imageTag,
           preference: preference,
         ),
-        DetailMoreLikeThisSection(
-          itemsAsync: similarAsync,
-          currentItemId: series.id,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: DetailMoreLikeThisSection(
+            itemsAsync: similarAsync,
+            currentItemId: series.id,
+          ),
         ),
         const SizedBox(height: 32),
       ],
