@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -371,18 +373,26 @@ class _CompactResumeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: AppGradients.accent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const SizedBox(
-        width: 38,
-        height: 38,
-        child: Icon(
-          Icons.play_arrow_rounded,
-          color: AppColors.onAccent,
-          size: 25,
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.28),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.15),
+              width: 1,
+            ),
+          ),
+          child: const Icon(
+            Icons.play_arrow_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
         ),
       ),
     );
@@ -520,7 +530,7 @@ class _HeroSlide extends ConsumerWidget {
                           item,
                           onOpenDetail,
                         ),
-                        child: const _ResumePill(),
+                        child: const _CompactResumeButton(),
                       ),
                     ),
                   ],
@@ -660,39 +670,6 @@ class _QueueMenuButton extends ConsumerWidget {
 }
 
 enum _QueueMenuAction { removeFromQueue, removeSeriesFromQueue }
-
-class _ResumePill extends StatelessWidget {
-  const _ResumePill();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: AppGradients.accent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.play_arrow_rounded, color: AppColors.onAccent, size: 22),
-            SizedBox(width: 4),
-            Text(
-              'RESUME',
-              style: TextStyle(
-                color: AppColors.onAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ContinueWatchingHeroSkeleton extends StatelessWidget {
   const _ContinueWatchingHeroSkeleton();
