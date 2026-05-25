@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -126,7 +127,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                 IconButton(
                   tooltip: 'Filters',
                   onPressed: _showFilters,
-                  icon: const Icon(Icons.tune),
+                  icon: const Icon(PiconsRegular.slidersHorizontal),
                 ),
               ]
             : null,
@@ -176,7 +177,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
-              icon: Icons.video_library_outlined,
+              icon: PiconsRegular.disc,
               title: 'No items found',
               message: _filtersEnabled
                   ? 'Try changing filters.'

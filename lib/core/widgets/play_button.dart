@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
@@ -11,7 +12,7 @@ class PlayButton extends StatelessWidget {
     super.key,
     required this.onPressed,
     this.label = 'Play',
-    this.icon = Icons.play_arrow_rounded,
+    this.icon = PiconsFill.play,
     this.expanded = false,
   });
 

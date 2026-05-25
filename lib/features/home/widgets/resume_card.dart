@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -65,7 +66,7 @@ class ResumeCard extends ConsumerWidget {
                             source: url,
                             errorBuilder: (_) => const Center(
                               child: Icon(
-                                Icons.movie_outlined,
+                                PiconsRegular.disc,
                                 color: AppColors.textTertiary,
                                 size: 28,
                               ),

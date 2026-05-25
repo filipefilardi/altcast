@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -260,7 +261,7 @@ class _ContinueWatchingCard extends ConsumerWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_) => const Center(
                     child: Icon(
-                      Icons.movie_outlined,
+                      PiconsRegular.disc,
                       color: AppColors.textTertiary,
                       size: 32,
                     ),
@@ -386,11 +387,7 @@ class _CompactResumeButton extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: const Icon(
-            Icons.play_arrow_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
+          child: const Icon(PiconsFill.play, color: Colors.white, size: 24),
         ),
       ),
     );
@@ -426,7 +423,7 @@ class _HeroSlide extends ConsumerWidget {
             fit: BoxFit.cover,
             errorBuilder: (_) => const Center(
               child: Icon(
-                Icons.movie_outlined,
+                PiconsRegular.disc,
                 color: AppColors.textTertiary,
                 size: 40,
               ),

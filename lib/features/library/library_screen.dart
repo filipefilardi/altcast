@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,7 +19,7 @@ class LibraryScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Settings',
             onPressed: () => context.push('/settings'),
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(PiconsRegular.gear),
           ),
         ],
       ),
@@ -26,26 +27,26 @@ class LibraryScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         children: [
           _LibraryTile(
-            icon: Icons.download_outlined,
+            icon: PiconsRegular.downloadSimple,
             label: 'Downloads',
             subtitle: _downloadsSubtitle(downloads),
             onTap: () => context.push('/downloads'),
           ),
           // Placeholder for future entries — Movies / Shows / Collections.
           _LibraryTile(
-            icon: Icons.movie_outlined,
+            icon: PiconsRegular.disc,
             label: 'Movies',
             subtitle: 'Browse all movies',
             onTap: () => context.push('/library/movies'),
           ),
           _LibraryTile(
-            icon: Icons.tv_outlined,
+            icon: PiconsRegular.screencast,
             label: 'TV Shows',
             subtitle: 'Browse all shows',
             onTap: () => context.push('/library/shows'),
           ),
           _LibraryTile(
-            icon: Icons.collections_bookmark_outlined,
+            icon: PiconsRegular.queue,
             label: 'Collections',
             subtitle: 'Browse movie collections',
             onTap: () => context.push('/library/collections'),
@@ -127,7 +128,7 @@ class _LibraryTile extends StatelessWidget {
                   ),
                   if (!disabled)
                     const Icon(
-                      Icons.chevron_right,
+                      PiconsRegular.caretRight,
                       color: AppColors.textTertiary,
                     ),
                 ],

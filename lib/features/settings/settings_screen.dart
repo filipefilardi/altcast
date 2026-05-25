@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -94,20 +95,20 @@ class _DownloadGroup extends ConsumerWidget {
       label: 'Library',
       children: [
         ListTile(
-          leading: const Icon(Icons.download_outlined),
+          leading: const Icon(PiconsRegular.downloadSimple),
           title: const Text('Downloads'),
           subtitle: Text(
             SettingsScreen._downloadsSubtitle(downloads),
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.chevron_right,
+            PiconsRegular.caretRight,
             color: AppColors.textSecondary,
           ),
           onTap: () => context.push('/downloads'),
         ),
         SwitchListTile(
-          secondary: const Icon(Icons.wifi_outlined),
+          secondary: const Icon(PiconsRegular.wifiHigh),
           title: const Text('Wi-Fi only downloads'),
           subtitle: const Text('Avoid downloading videos on mobile data.'),
           value: prefs.wifiOnlyDownloads,
@@ -198,7 +199,7 @@ class _DownloadGroup extends ConsumerWidget {
                 quality;
             return ListTile(
               leading: Icon(
-                Icons.movie_filter_outlined,
+                PiconsRegular.sparkle,
                 color: selected ? AppColors.primary : null,
               ),
               title: Text(quality.label),
@@ -236,7 +237,7 @@ class _PlaybackGroup extends ConsumerWidget {
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.chevron_right,
+            PiconsRegular.caretRight,
             color: AppColors.textSecondary,
           ),
           onTap: () => _showStreamingQualitySheet(context),
@@ -263,7 +264,7 @@ class _PlaybackGroup extends ConsumerWidget {
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             trailing: const Icon(
-              Icons.chevron_right,
+              PiconsRegular.caretRight,
               color: AppColors.textSecondary,
             ),
             onTap: () => _showAutoplayCountdownSheet(context),
@@ -305,7 +306,7 @@ class _AudioSubtitleGroup extends ConsumerWidget {
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.chevron_right,
+            PiconsRegular.caretRight,
             color: AppColors.textSecondary,
           ),
           onTap: () => _showDefaultAudioSheet(context),
@@ -321,13 +322,13 @@ class _AudioSubtitleGroup extends ConsumerWidget {
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.chevron_right,
+            PiconsRegular.caretRight,
             color: AppColors.textSecondary,
           ),
           onTap: () => _showDefaultSubtitleSheet(context),
         ),
         ListTile(
-          leading: const Icon(Icons.tune_outlined),
+          leading: const Icon(PiconsRegular.slidersHorizontal),
           title: const Text('Subtitle appearance'),
           subtitle: Text(
             _subtitleAppearanceSummary(
@@ -337,7 +338,7 @@ class _AudioSubtitleGroup extends ConsumerWidget {
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.chevron_right,
+            PiconsRegular.caretRight,
             color: AppColors.textSecondary,
           ),
           onTap: () => _showSubtitleAppearanceSheet(context),
@@ -405,7 +406,10 @@ class _AccountCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              const Icon(
+                PiconsRegular.caretRight,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),
@@ -649,7 +653,7 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
                   contentPadding: EdgeInsets.zero,
                   trailing: seconds == current
                       ? const Icon(
-                          Icons.check_rounded,
+                          PiconsRegular.check,
                           color: AppColors.primary,
                         )
                       : null,
@@ -695,7 +699,7 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
                   contentPadding: EdgeInsets.zero,
                   trailing: q == current
                       ? const Icon(
-                          Icons.check_rounded,
+                          PiconsRegular.check,
                           color: AppColors.primary,
                         )
                       : null,
@@ -1148,7 +1152,7 @@ class _SubtitleFullscreenPreview extends StatelessWidget {
             right: 12,
             child: IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: const Icon(PiconsRegular.x, color: Colors.white),
               tooltip: 'Close preview',
             ),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -87,12 +88,12 @@ class HomeScreen extends ConsumerWidget {
               )
             else if (everythingEmpty)
               EmptyState(
-                icon: Icons.movie_filter_outlined,
+                icon: PiconsRegular.sparkle,
                 title: 'Nothing here yet',
                 message: 'Add some movies or shows to your Jellyfin server.',
                 action: TextButton.icon(
                   onPressed: refresh,
-                  icon: const Icon(Icons.refresh),
+                  icon: const Icon(PiconsRegular.arrowsClockwise),
                   label: const Text('Refresh'),
                 ),
               )
@@ -156,29 +157,29 @@ class _HomeHeader extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _NavIconButton(
-              icon: Icons.search_rounded,
+              icon: PiconsRegular.magnifyingGlass,
               tooltip: 'Search',
               onPressed: () => context.push('/search'),
             ),
             _NavIconButton(
-              icon: Icons.groups_rounded,
+              icon: PiconsRegular.usersThree,
               tooltip: 'SyncPlay',
               isSelected: syncPlayActive,
               onPressed: () => showSyncPlaySheet(context),
             ),
             _NavIconButton(
-              icon: Icons.cast_rounded,
+              icon: PiconsRegular.screencast,
               tooltip: 'Cast',
               isSelected: castActive,
               onPressed: () => showRemoteSessionsSheet(context),
             ),
             _NavIconButton(
-              icon: Icons.download_rounded,
+              icon: PiconsRegular.downloadSimple,
               tooltip: 'Downloads',
               onPressed: () => context.push('/downloads'),
             ),
             _NavIconButton(
-              icon: Icons.settings_outlined,
+              icon: PiconsRegular.gear,
               tooltip: 'Settings',
               onPressed: () => context.push('/settings'),
             ),

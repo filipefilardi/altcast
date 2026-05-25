@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -72,7 +73,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           IconButton(
             tooltip: 'Filters',
             onPressed: _showFilters,
-            icon: const Icon(Icons.tune),
+            icon: const Icon(PiconsRegular.slidersHorizontal),
           ),
         ],
         bottom: PreferredSize(
@@ -86,11 +87,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 hintText: 'Movies, shows & cast',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(PiconsRegular.magnifyingGlass),
                 suffixIcon: _controller.text.isEmpty
                     ? null
                     : IconButton(
-                        icon: const Icon(Icons.close, size: 18),
+                        icon: const Icon(PiconsRegular.x, size: 18),
                         onPressed: () {
                           _controller.clear();
                           ref.read(searchQueryProvider.notifier).setQuery('');
@@ -268,7 +269,7 @@ class _Body extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 20),
         child: EmptyState(
-          icon: Icons.search,
+          icon: PiconsRegular.magnifyingGlass,
           title: 'Find something to watch',
           message: 'Type a movie, show, or cast member above.',
         ),
@@ -293,7 +294,7 @@ class _Body extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
-              icon: Icons.search_off_rounded,
+              icon: PiconsRegular.magnifyingGlassMinus,
               title: 'No results',
               message: 'Nothing matched "$query".',
             ),
@@ -492,7 +493,7 @@ class _PersonTile extends ConsumerWidget {
                     child: LocalOrNetworkImage(
                       source: image,
                       errorBuilder: (_) => const Icon(
-                        Icons.person_outline,
+                        PiconsRegular.user,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -513,7 +514,7 @@ class _PersonTile extends ConsumerWidget {
                 ),
               ),
               const Icon(
-                Icons.chevron_right,
+                PiconsRegular.caretRight,
                 size: 20,
                 color: AppColors.textSecondary,
               ),

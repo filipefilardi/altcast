@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
@@ -63,7 +64,7 @@ class DetailHero extends StatelessWidget {
                   source: backdropUrl,
                   errorBuilder: (_) => const Center(
                     child: Icon(
-                      Icons.movie_outlined,
+                      PiconsRegular.disc,
                       color: AppColors.textTertiary,
                       size: 40,
                     ),

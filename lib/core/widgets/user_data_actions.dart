@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 
@@ -71,7 +72,7 @@ class _UserDataActionsState extends State<UserDataActions> {
           tooltip: _played ? 'Mark as unwatched' : 'Mark as watched',
           onPressed: _togglePlayed,
           icon: Icon(
-            _played ? Icons.check_circle : Icons.check_circle_outline,
+            _played ? PiconsRegular.checkCircle : PiconsRegular.circle,
             color: _played ? AppColors.success : AppColors.textSecondary,
           ),
         ),

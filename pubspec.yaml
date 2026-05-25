@@ -29,7 +29,7 @@ dependencies:
   media_kit_libs_video: ^1.0.5
   screen_brightness: ^2.1.7
   web_socket_channel: ^3.0.3
-  phosphor_flutter: ^2.1.0
+  picons: ^3.0.1
 
 
 dev_dependencies:

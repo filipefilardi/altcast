@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -27,7 +28,7 @@ class BackChip extends StatelessWidget {
               customBorder: const CircleBorder(),
               onTap: () => context.pop(),
               child: const Icon(
-                Icons.arrow_back,
+                PiconsRegular.caretLeft,
                 color: AppColors.textPrimary,
                 size: 22,
               ),
