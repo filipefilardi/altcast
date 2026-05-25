@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
@@ -151,7 +152,7 @@ class _NextUpThumb extends StatelessWidget {
               source: posterUrl,
               errorBuilder: (_) => const Center(
                 child: Icon(
-                  Icons.movie_outlined,
+                  PiconsRegular.televisionSimple,
                   color: AppColors.textTertiary,
                   size: 28,
                 ),
@@ -261,7 +262,7 @@ class _NextUpPlayPill extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.play_arrow_rounded,
+                  PiconsFill.play,
                   color: AppColors.onAccent,
                   size: 20,
                 ),

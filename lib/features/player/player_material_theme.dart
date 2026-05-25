@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -84,10 +85,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           alignment: Alignment.centerRight,
           value: value,
           icon: value == 0.0
-              ? Icons.volume_off_rounded
+              ? PiconsRegular.speakerSlash
               : value < 0.5
-              ? Icons.volume_down_rounded
-              : Icons.volume_up_rounded,
+              ? PiconsRegular.speakerHigh
+              : PiconsRegular.speakerHigh,
           activeColor: castActive ? AppColors.primary : Colors.white,
         );
       },
@@ -96,10 +97,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       alignment: Alignment.centerLeft,
       value: value,
       icon: value < 1.0 / 3.0
-          ? Icons.brightness_low_rounded
+          ? PiconsRegular.sunDim
           : value < 2.0 / 3.0
-          ? Icons.brightness_medium_rounded
-          : Icons.brightness_high_rounded,
+          ? PiconsRegular.sun
+          : PiconsRegular.sunHorizon,
       activeColor: Colors.white,
     ),
     seekBarPositionColor: AppColors.primary,
@@ -111,21 +112,21 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       Spacer(flex: 2),
       AltCastSeekRelativeButton(
         delta: Duration(seconds: -10),
-        icon: Icons.replay_10_rounded,
+        icon: PiconsRegular.rewind,
       ),
       Spacer(),
       AltCastPlayPauseButton(iconSize: 56),
       Spacer(),
       AltCastSeekRelativeButton(
         delta: Duration(seconds: 30),
-        icon: Icons.forward_30_rounded,
+        icon: PiconsRegular.fastForward,
       ),
       Spacer(flex: 2),
     ],
     topButtonBar: [
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.arrow_back_rounded,
+          icon: PiconsRegular.caretLeft,
           tooltip: 'Close',
           onPressed: () => unawaited(onClosePlayer()),
         ),
@@ -137,7 +138,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           builder: (_, ref, _) {
             final active = ref.watch(syncPlayControllerProvider).isActive;
             return AltCastChromeIconButton(
-              icon: Icons.groups_rounded,
+              icon: PiconsRegular.usersThree,
               tooltip: 'SyncPlay',
               color: active ? AppColors.primary : null,
               onPressed: () => onOpenSyncPlay(ctx),
@@ -150,7 +151,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           builder: (_, ref, _) {
             final active = ref.watch(activeRemoteSessionIdProvider) != null;
             return AltCastChromeIconButton(
-              icon: Icons.cast_rounded,
+              icon: PiconsRegular.screencast,
               tooltip: 'Cast',
               color: active ? AppColors.primary : null,
               onPressed: () => onOpenCast(ctx),
@@ -160,21 +161,21 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       ),
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.screen_rotation_rounded,
+          icon: PiconsRegular.deviceRotate,
           tooltip: 'Rotate',
           onPressed: onRotateOrientation,
         ),
       ),
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.closed_caption_outlined,
+          icon: PiconsRegular.closedCaptioning,
           tooltip: 'Audio & subtitles',
           onPressed: () => onOpenTracks(ctx),
         ),
       ),
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: Icons.settings_outlined,
+          icon: PiconsRegular.gear,
           tooltip: 'Playback settings',
           onPressed: () => onOpenSettings(ctx),
         ),
@@ -367,7 +368,7 @@ class AltCastPlayPauseButton extends ConsumerWidget {
     if (remote != null && remote.isPlayingSomething) {
       return IconButton(
         icon: Icon(
-          remote.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+          remote.isPaused ? PiconsFill.play : PiconsFill.pause,
         ),
         iconSize: iconSize ?? 48,
         color: Colors.white,
@@ -384,7 +385,7 @@ class AltCastPlayPauseButton extends ConsumerWidget {
       builder: (_, snapshot) {
         final playing = snapshot.data ?? false;
         return IconButton(
-          icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          icon: Icon(playing ? PiconsFill.pause : PiconsFill.play),
           iconSize: iconSize ?? 48,
           color: Colors.white,
           tooltip: playing ? 'Pause' : 'Play',

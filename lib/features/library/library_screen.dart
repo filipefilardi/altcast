@@ -34,7 +34,7 @@ class LibraryScreen extends ConsumerWidget {
           ),
           // Placeholder for future entries — Movies / Shows / Collections.
           _LibraryTile(
-            icon: PiconsRegular.disc,
+            icon: PiconsRegular.televisionSimple,
             label: 'Movies',
             subtitle: 'Browse all movies',
             onTap: () => context.push('/library/movies'),
@@ -46,7 +46,7 @@ class LibraryScreen extends ConsumerWidget {
             onTap: () => context.push('/library/shows'),
           ),
           _LibraryTile(
-            icon: PiconsRegular.queue,
+            icon: PiconsRegular.folder,
             label: 'Collections',
             subtitle: 'Browse movie collections',
             onTap: () => context.push('/library/collections'),

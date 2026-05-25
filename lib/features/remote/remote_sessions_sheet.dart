@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -63,7 +64,7 @@ class _RemoteSessionsSheet extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
               child: Row(
                 children: [
-                  const _SheetIcon(icon: Icons.cast_connected_rounded),
+                  const _SheetIcon(icon: PiconsRegular.screencast),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -108,7 +109,7 @@ class _RemoteSessionsSheet extends ConsumerWidget {
                     return const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 20),
                       child: EmptyState(
-                        icon: Icons.cast_outlined,
+                        icon: PiconsRegular.screencast,
                         title: 'No devices found',
                         message:
                             'Open Jellyfin on another device to see it here.',
@@ -185,7 +186,7 @@ class _ReturnToDeviceTile extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
             children: [
-              Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
+              Icon(PiconsRegular.deviceMobile, color: AppColors.primary),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -294,15 +295,15 @@ class _SessionRow extends ConsumerWidget {
                     ),
                   ),
                   if (isActive)
-                    const Icon(Icons.check_rounded, color: AppColors.primary)
+                    const Icon(PiconsRegular.check, color: AppColors.primary)
                   else if (canCast)
                     const Icon(
-                      Icons.cast_rounded,
+                      PiconsRegular.screencast,
                       color: AppColors.textTertiary,
                     )
                   else if (session.isPlayingSomething)
                     const Icon(
-                      Icons.tune_rounded,
+                      PiconsRegular.slidersHorizontal,
                       color: AppColors.textTertiary,
                     ),
                 ],
@@ -354,18 +355,18 @@ class _SessionRow extends ConsumerWidget {
   IconData _iconForClient(String client) {
     final c = client.toLowerCase();
     if (c.contains('android') || c.contains('iphone') || c.contains('ios')) {
-      return Icons.phone_iphone;
+      return PiconsRegular.deviceMobile;
     }
     if (c.contains('tv') ||
         c.contains('roku') ||
         c.contains('shield') ||
         c.contains('chromecast')) {
-      return Icons.tv;
+      return PiconsRegular.televisionSimple;
     }
     if (c.contains('web') || c.contains('chrome') || c.contains('safari')) {
-      return Icons.public;
+      return PiconsRegular.globe;
     }
-    return Icons.devices;
+    return PiconsRegular.devices;
   }
 }
 
@@ -458,10 +459,8 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
               ),
               IconButton(
                 icon: Icon(
-                  session.isPaused
-                      ? Icons.play_arrow_rounded
-                      : Icons.pause_rounded,
-                  color: AppColors.primary,
+                  session.isPaused ? PiconsFill.play : PiconsFill.pause,
+                  color: Colors.white,
                 ),
                 tooltip: session.isPaused ? 'Play' : 'Pause',
                 visualDensity: VisualDensity.compact,
@@ -469,7 +468,7 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
               ),
               IconButton(
                 icon: const Icon(
-                  Icons.stop_rounded,
+                  PiconsRegular.stop,
                   color: AppColors.textSecondary,
                 ),
                 tooltip: 'Stop',
@@ -489,10 +488,8 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
               children: [
                 IconButton(
                   icon: Icon(
-                    session.isMuted
-                        ? Icons.volume_off_rounded
-                        : Icons.volume_up_rounded,
-                    color: AppColors.textSecondary,
+                    PiconsRegular.speakerHigh,
+                    color: session.isMuted ? AppColors.error : AppColors.textSecondary,
                   ),
                   tooltip: session.isMuted ? 'Unmute' : 'Mute',
                   visualDensity: VisualDensity.compact,

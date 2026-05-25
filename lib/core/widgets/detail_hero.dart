@@ -64,7 +64,7 @@ class DetailHero extends StatelessWidget {
                   source: backdropUrl,
                   errorBuilder: (_) => const Center(
                     child: Icon(
-                      PiconsRegular.disc,
+                      PiconsRegular.televisionSimple,
                       color: AppColors.textTertiary,
                       size: 40,
                     ),

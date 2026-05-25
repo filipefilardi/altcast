@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -457,7 +458,7 @@ class _TrackRow extends StatelessWidget {
                   ),
                 ),
                 if (selected)
-                  const Icon(Icons.check, size: 18, color: AppColors.primary),
+                  const Icon(PiconsRegular.check, size: 18, color: AppColors.primary),
               ],
             ),
           ),

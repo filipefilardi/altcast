@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -38,7 +39,7 @@ class _DownloadButton extends ConsumerWidget {
     if (downloaded) {
       return IconButton(
         iconSize: iconSize,
-        icon: const Icon(Icons.download_done_rounded, color: AppColors.primary),
+        icon: const Icon(PiconsRegular.checkCircle, color: AppColors.primary),
         tooltip: 'Downloaded — tap to remove',
         onPressed: () => _confirmDelete(context, ref),
       );
@@ -61,9 +62,9 @@ class _DownloadButton extends ConsumerWidget {
           ),
           IconButton(
             iconSize: iconSize - 6,
-            icon: Icon(paused ? Icons.play_arrow : Icons.pause),
+            icon: Icon(paused ? PiconsFill.play : PiconsFill.pause),
             tooltip: paused ? 'Resume download' : 'Pause download',
-            color: AppColors.textSecondary,
+            color: Colors.white,
             onPressed: () => paused
                 ? ref.read(downloadManagerProvider.notifier).resume(itemId)
                 : ref.read(downloadManagerProvider.notifier).pause(itemId),
@@ -74,7 +75,7 @@ class _DownloadButton extends ConsumerWidget {
     if (failed) {
       return IconButton(
         iconSize: iconSize,
-        icon: const Icon(Icons.error_outline, color: AppColors.error),
+        icon: const Icon(PiconsRegular.warningCircle, color: AppColors.error),
         tooltip: 'Download failed — tap to retry',
         onPressed: () =>
             ref.read(downloadManagerProvider.notifier).retry(itemId),
@@ -82,7 +83,7 @@ class _DownloadButton extends ConsumerWidget {
     }
     return IconButton(
       iconSize: iconSize,
-      icon: const Icon(Icons.download_outlined),
+      icon: const Icon(PiconsRegular.downloadSimple),
       tooltip: 'Download for offline',
       onPressed: onEnqueue,
     );
@@ -197,7 +198,7 @@ class _SeriesDownloadButtonState extends ConsumerState<SeriesDownloadButton> {
 
     return IconButton(
       iconSize: 22,
-      icon: const Icon(Icons.download_outlined),
+      icon: const Icon(PiconsRegular.downloadSimple),
       tooltip: 'Download series',
       onPressed: widget.seasons.isEmpty ? null : _downloadSeries,
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -139,7 +140,7 @@ class TrackPreferenceRow extends ConsumerWidget {
                     if (showAudio)
                       Expanded(
                         child: _TrackTile(
-                          icon: Icons.volume_up_outlined,
+                          icon: PiconsRegular.speakerHigh,
                           title: 'Audio',
                           value: _audioLabel(streams),
                           onTap: canPickAudio
@@ -151,7 +152,7 @@ class TrackPreferenceRow extends ConsumerWidget {
                     if (showSubs)
                       Expanded(
                         child: _TrackTile(
-                          icon: Icons.subtitles_outlined,
+                          icon: PiconsRegular.closedCaptioning,
                           title: 'Subtitles',
                           value: _subLabel(streams),
                           onTap: canPickSubs
@@ -468,7 +469,7 @@ class _TrackTile extends StatelessWidget {
               ),
               if (enabled)
                 const Icon(
-                  Icons.chevron_right,
+                  PiconsRegular.caretRight,
                   size: 18,
                   color: AppColors.textTertiary,
                 ),
@@ -547,7 +548,7 @@ class _PickerRow extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(Icons.check, size: 18, color: AppColors.primary),
+              const Icon(PiconsRegular.check, size: 18, color: AppColors.primary),
           ],
         ),
       ),

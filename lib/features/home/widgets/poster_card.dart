@@ -55,7 +55,7 @@ class PosterCard extends ConsumerWidget {
                         source: url,
                         errorBuilder: (_) => const Center(
                           child: Icon(
-                            PiconsRegular.disc,
+                            PiconsRegular.televisionSimple,
                             color: AppColors.textTertiary,
                             size: 28,
                           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 
@@ -30,14 +31,14 @@ class SkipChipStack extends StatelessWidget {
         if (showIntro)
           _SkipChip(
             label: 'Skip intro',
-            icon: Icons.fast_forward_rounded,
+            icon: PiconsRegular.fastForward,
             onPressed: onSkipIntro,
           ),
         if (showIntro && showCredits) const SizedBox(height: 10),
         if (showCredits)
           _SkipChip(
             label: 'Skip credits',
-            icon: Icons.skip_next_rounded,
+            icon: PiconsFill.skipForward,
             onPressed: onSkipCredits,
           ),
       ],

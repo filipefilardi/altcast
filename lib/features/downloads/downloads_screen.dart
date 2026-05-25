@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,7 +30,7 @@ class DownloadsScreen extends ConsumerWidget {
           ? const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: EmptyState(
-                icon: Icons.download_outlined,
+                icon: PiconsRegular.downloadSimple,
                 title: 'Nothing downloaded yet',
                 message:
                     'Tap the download icon on a movie or episode to keep it offline.',
@@ -107,7 +108,7 @@ class _DownloadedRow extends ConsumerWidget {
                     source: poster,
                     errorBuilder: (_) => const Center(
                       child: Icon(
-                        Icons.movie_outlined,
+                        PiconsRegular.televisionSimple,
                         color: AppColors.textTertiary,
                         size: 20,
                       ),
@@ -148,7 +149,7 @@ class _DownloadedRow extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(
-                Icons.delete_outline,
+                PiconsRegular.trash,
                 color: AppColors.textSecondary,
               ),
               tooltip: 'Remove download',
@@ -199,7 +200,7 @@ class _FailedRow extends ConsumerWidget {
             ),
             alignment: Alignment.center,
             child: const Icon(
-              Icons.error_outline,
+              PiconsRegular.warningCircle,
               color: AppColors.error,
               size: 22,
             ),
@@ -233,14 +234,14 @@ class _FailedRow extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            icon: const Icon(PiconsRegular.arrowsClockwise, color: AppColors.textSecondary),
             tooltip: 'Retry download',
             onPressed: () => ref
                 .read(downloadManagerProvider.notifier)
                 .retry(failure.itemId),
           ),
           IconButton(
-            icon: const Icon(Icons.close, color: AppColors.textSecondary),
+            icon: const Icon(PiconsRegular.x, color: AppColors.textSecondary),
             tooltip: 'Dismiss',
             onPressed: () => ref
                 .read(downloadManagerProvider.notifier)
@@ -325,8 +326,8 @@ class _InProgressRow extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(
-              paused ? Icons.play_arrow : Icons.pause,
-              color: AppColors.textSecondary,
+              paused ? PiconsFill.play : PiconsFill.pause,
+              color: Colors.white,
             ),
             tooltip: paused ? 'Resume' : 'Pause',
             onPressed: () => paused
@@ -338,7 +339,7 @@ class _InProgressRow extends ConsumerWidget {
                       .pause(progress.itemId),
           ),
           IconButton(
-            icon: const Icon(Icons.close, color: AppColors.textSecondary),
+            icon: const Icon(PiconsRegular.x, color: AppColors.textSecondary),
             tooltip: 'Cancel',
             onPressed: () => ref
                 .read(downloadManagerProvider.notifier)

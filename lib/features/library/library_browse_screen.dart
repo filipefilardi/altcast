@@ -177,7 +177,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
-              icon: PiconsRegular.disc,
+              icon: PiconsRegular.televisionSimple,
               title: 'No items found',
               message: _filtersEnabled
                   ? 'Try changing filters.'

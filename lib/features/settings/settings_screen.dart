@@ -116,7 +116,7 @@ class _DownloadGroup extends ConsumerWidget {
           activeThumbColor: AppColors.primary,
         ),
         SwitchListTile(
-          secondary: const Icon(Icons.auto_awesome_outlined),
+          secondary: const Icon(PiconsRegular.arrowsClockwise),
           title: const Text('Auto-download next'),
           subtitle: const Text('New episodes arrive while you watch'),
           value: prefs.autoDownloadNextEpisode,
@@ -124,28 +124,28 @@ class _DownloadGroup extends ConsumerWidget {
           activeThumbColor: AppColors.primary,
         ),
         ListTile(
-          leading: const Icon(Icons.hd_outlined),
+          leading: const Icon(PiconsRegular.highDefinition),
           title: const Text('Offline video quality'),
           subtitle: Text(
             prefs.offlineVideoQuality.label,
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           trailing: const Icon(
-            Icons.expand_more,
+            PiconsRegular.caretDown,
             color: AppColors.textSecondary,
           ),
           onTap: () => _showOfflineQualityPicker(context, ref),
         ),
         if (Platform.isAndroid)
           ListTile(
-            leading: const Icon(Icons.sd_storage_outlined),
+            leading: const Icon(PiconsRegular.hardDrives),
             title: const Text('Storage location'),
             subtitle: Text(
               prefs.downloadLocation.label,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             trailing: const Icon(
-              Icons.expand_more,
+              PiconsRegular.caretDown,
               color: AppColors.textSecondary,
             ),
             onTap: () => _showLocationPicker(context, ref),
@@ -166,13 +166,13 @@ class _DownloadGroup extends ConsumerWidget {
             return ListTile(
               leading: Icon(
                 loc == DownloadLocation.internal
-                    ? Icons.phone_android
-                    : Icons.sd_card,
+                    ? PiconsRegular.deviceMobile
+                    : PiconsRegular.hardDrives,
                 color: selected ? AppColors.primary : null,
               ),
               title: Text(loc.label),
               trailing: selected
-                  ? const Icon(Icons.check, color: AppColors.primary)
+                  ? const Icon(PiconsRegular.check, color: AppColors.primary)
                   : null,
               onTap: () {
                 ref
@@ -204,7 +204,7 @@ class _DownloadGroup extends ConsumerWidget {
               ),
               title: Text(quality.label),
               trailing: selected
-                  ? const Icon(Icons.check, color: AppColors.primary)
+                  ? const Icon(PiconsRegular.check, color: AppColors.primary)
                   : null,
               onTap: () {
                 ref
@@ -230,7 +230,7 @@ class _PlaybackGroup extends ConsumerWidget {
       label: 'Playback',
       children: [
         ListTile(
-          leading: const Icon(Icons.high_quality_outlined),
+          leading: const Icon(PiconsRegular.highDefinition),
           title: const Text('Streaming quality'),
           subtitle: Text(
             prefs.streamingQuality.label,
@@ -243,7 +243,7 @@ class _PlaybackGroup extends ConsumerWidget {
           onTap: () => _showStreamingQualitySheet(context),
         ),
         SwitchListTile(
-          secondary: const Icon(Icons.play_circle_outline),
+          secondary: const Icon(PiconsRegular.playCircle),
           title: const Text('Autoplay next episode'),
           subtitle: const Text(
             'After an episode ends, continue to the next one automatically.',
@@ -257,7 +257,7 @@ class _PlaybackGroup extends ConsumerWidget {
         ),
         if (prefs.autoplayNextTvEpisode)
           ListTile(
-            leading: const Icon(Icons.timer_outlined),
+            leading: const Icon(PiconsRegular.clock),
             title: const Text('Autoplay countdown'),
             subtitle: Text(
               '${prefs.autoplayCountdownSeconds} seconds',
@@ -271,7 +271,7 @@ class _PlaybackGroup extends ConsumerWidget {
           ),
         if (Platform.isAndroid)
           SwitchListTile(
-            secondary: const Icon(Icons.memory_outlined),
+            secondary: const Icon(PiconsRegular.cpu),
             title: const Text('Software video decoding'),
             subtitle: const Text(
               'Turn on if some titles show glitchy picture on this device '
@@ -299,7 +299,7 @@ class _AudioSubtitleGroup extends ConsumerWidget {
       label: 'Audio & Subtitles',
       children: [
         ListTile(
-          leading: const Icon(Icons.volume_up_outlined),
+          leading: const Icon(PiconsRegular.speakerHigh),
           title: const Text('Default audio'),
           subtitle: Text(
             _audioDefaultLabel(prefs),
@@ -312,7 +312,7 @@ class _AudioSubtitleGroup extends ConsumerWidget {
           onTap: () => _showDefaultAudioSheet(context),
         ),
         ListTile(
-          leading: const Icon(Icons.subtitles_outlined),
+          leading: const Icon(PiconsRegular.closedCaptioning),
           title: const Text('Default subtitles'),
           subtitle: Text(
             _subtitleDefaultLabel(
@@ -568,7 +568,7 @@ class _SignOutTile extends ConsumerWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        leading: const Icon(Icons.logout, color: AppColors.error),
+        leading: const Icon(PiconsRegular.signOut, color: AppColors.error),
         title: const Text('Sign out', style: TextStyle(color: AppColors.error)),
         onTap: () async {
           final confirmed = await showDialog<bool>(
@@ -1205,7 +1205,7 @@ Widget _defaultTrackOption({
             ),
           ),
     trailing: selected
-        ? const Icon(Icons.check, color: AppColors.primary, size: 18)
+        ? const Icon(PiconsRegular.check, color: AppColors.primary, size: 18)
         : null,
     onTap: () {
       onTap();

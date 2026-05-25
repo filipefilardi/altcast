@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -197,13 +198,13 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                           preference: _preference,
                         ),
                   label: _playLabel(next),
-                  icon: Icons.play_arrow_rounded,
+                  icon: PiconsFill.play,
                 ),
                 actions: [
                   if (next != null && nextHasResume)
                     IconButton(
                       iconSize: 22,
-                      icon: const Icon(Icons.replay),
+                      icon: const Icon(PiconsRegular.arrowCounterClockwise),
                       tooltip: 'Play from start',
                       onPressed: () => _playEpisode(
                         context,
@@ -223,7 +224,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                     IconButton(
                       iconSize: 22,
                       icon: Icon(
-                        Icons.cast,
+                        PiconsRegular.screencast,
                         color: castActive ? AppColors.primary : null,
                       ),
                       tooltip: 'Play on…',

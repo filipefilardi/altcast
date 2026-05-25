@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -70,7 +71,7 @@ class _CollectionBody extends StatelessWidget {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: EmptyState(
-              icon: Icons.collections_bookmark_outlined,
+              icon: PiconsRegular.folder,
               title: 'No items found',
               message: 'This collection is empty.',
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -144,7 +145,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   if (hasResume)
                     IconButton(
                       iconSize: 22,
-                      icon: const Icon(Icons.replay),
+                      icon: const Icon(PiconsRegular.arrowCounterClockwise),
                       tooltip: 'Play from start',
                       onPressed: () => _play(context, movie, fromStart: true),
                     ),
@@ -158,7 +159,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
                   IconButton(
                     iconSize: 22,
                     icon: Icon(
-                      Icons.cast,
+                      PiconsRegular.screencast,
                       color: castActive ? AppColors.primary : null,
                     ),
                     tooltip: 'Play on…',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -101,7 +102,7 @@ class _SyncPlaySheetState extends ConsumerState<_SyncPlaySheet> {
           for (final group in state.groups)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.groups_rounded),
+              leading: const Icon(PiconsRegular.usersThree),
               title: Text(group.name),
               subtitle: Text(
                 group.participants.isEmpty
@@ -121,7 +122,7 @@ class _SyncPlaySheetState extends ConsumerState<_SyncPlaySheet> {
             ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.add_rounded),
+            leading: const Icon(PiconsRegular.plus),
             title: const Text('New group'),
             subtitle: const Text('Start a room with this video'),
             onTap: state.loading
@@ -175,7 +176,7 @@ class _SyncPlaySheetState extends ConsumerState<_SyncPlaySheet> {
         if (widget.itemId != null)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.sync_rounded),
+            leading: const Icon(PiconsRegular.arrowsClockwise),
             title: const Text('Sync current video'),
             subtitle: const Text('Make this video the room playback'),
             onTap: () async {
@@ -188,7 +189,7 @@ class _SyncPlaySheetState extends ConsumerState<_SyncPlaySheet> {
           ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.logout_rounded),
+          leading: const Icon(PiconsRegular.signOut),
           title: const Text('Leave group'),
           subtitle: const Text('Disable SyncPlay'),
           onTap: () async {

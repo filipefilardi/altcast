@@ -72,7 +72,7 @@ class _UserDataActionsState extends State<UserDataActions> {
           tooltip: _played ? 'Mark as unwatched' : 'Mark as watched',
           onPressed: _togglePlayed,
           icon: Icon(
-            _played ? PiconsRegular.checkCircle : PiconsRegular.circle,
+            PiconsRegular.checkCircle,
             color: _played ? AppColors.success : AppColors.textSecondary,
           ),
         ),

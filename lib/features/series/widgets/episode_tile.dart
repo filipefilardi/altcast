@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -55,7 +56,7 @@ class EpisodeTile extends ConsumerWidget {
                           source: stillUrl,
                           errorBuilder: (_) => const Center(
                             child: Icon(
-                              Icons.movie_outlined,
+                              PiconsRegular.televisionSimple,
                               color: AppColors.textTertiary,
                               size: 24,
                             ),
@@ -90,7 +91,7 @@ class EpisodeTile extends ConsumerWidget {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.check_rounded,
+                              PiconsRegular.check,
                               size: 14,
                               color: AppColors.primary,
                             ),

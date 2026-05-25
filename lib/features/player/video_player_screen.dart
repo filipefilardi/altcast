@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -1919,7 +1920,7 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
                 visualDensity: VisualDensity.compact,
                 color: AppColors.textSecondary,
                 onPressed: () => _setOffset(Duration.zero),
-                icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                icon: const Icon(PiconsRegular.arrowsClockwise, size: 18),
               ),
             ],
           ),

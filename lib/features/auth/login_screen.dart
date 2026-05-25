@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
@@ -107,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'Server URL',
                                   hintText: 'https://jellyfin.example.com',
-                                  prefixIcon: Icon(Icons.dns_outlined),
+                                  prefixIcon: Icon(PiconsRegular.hardDrives),
                                 ),
                                 validator: (v) =>
                                     (v == null || v.trim().isEmpty)
@@ -122,7 +123,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   labelText: 'Username',
-                                  prefixIcon: Icon(Icons.person_outline),
+                                  prefixIcon: Icon(PiconsRegular.user),
                                 ),
                                 validator: (v) =>
                                     (v == null || v.trim().isEmpty)
@@ -137,12 +138,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 onFieldSubmitted: (_) => _submit(),
                                 decoration: InputDecoration(
                                   labelText: 'Password',
-                                  prefixIcon: const Icon(Icons.lock_outline),
+                                  prefixIcon: const Icon(PiconsRegular.lock),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
+                                      PiconsRegular.eye,
+                                      color: _obscure ? AppColors.textSecondary : AppColors.primary,
                                     ),
                                     onPressed: () =>
                                         setState(() => _obscure = !_obscure),
@@ -198,7 +198,7 @@ class _LoginErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          const Icon(PiconsRegular.warningCircle, color: AppColors.error, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

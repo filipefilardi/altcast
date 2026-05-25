@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -110,7 +111,7 @@ class _PersonHeader extends ConsumerWidget {
                       child: LocalOrNetworkImage(
                         source: photoUrl,
                         errorBuilder: (_) => Icon(
-                          Icons.person_outline,
+                          PiconsRegular.user,
                           color: AppColors.textSecondary,
                           size: isDesktop ? 48 : 34,
                         ),

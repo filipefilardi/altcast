@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/dio_error_message.dart';
@@ -17,7 +18,7 @@ class PlaybackError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 40),
+            const Icon(PiconsRegular.warningCircle, color: AppColors.error, size: 40),
             const SizedBox(height: 16),
             const Text(
               'Playback failed',

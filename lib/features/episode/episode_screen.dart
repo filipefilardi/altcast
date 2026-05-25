@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -111,7 +112,7 @@ class _EpisodeBody extends ConsumerWidget {
                     children: [
                       if (hasResume)
                         IconButton(
-                          icon: const Icon(Icons.replay),
+                          icon: const Icon(PiconsRegular.arrowCounterClockwise),
                           tooltip: 'Play from start',
                           onPressed: () => _play(context, fromStart: true),
                         ),
@@ -124,7 +125,7 @@ class _EpisodeBody extends ConsumerWidget {
                       ),
                       IconButton(
                         icon: Icon(
-                          Icons.cast,
+                          PiconsRegular.screencast,
                           color: castActive ? AppColors.primary : null,
                         ),
                         tooltip: 'Play on…',
@@ -233,7 +234,7 @@ class _OpenSeriesTile extends StatelessWidget {
           child: Row(
             children: [
               const Icon(
-                Icons.tv_outlined,
+                PiconsRegular.televisionSimple,
                 size: 20,
                 color: AppColors.textSecondary,
               ),
@@ -253,7 +254,7 @@ class _OpenSeriesTile extends StatelessWidget {
                 ),
               ),
               const Icon(
-                Icons.chevron_right,
+                PiconsRegular.caretRight,
                 size: 20,
                 color: AppColors.textSecondary,
               ),

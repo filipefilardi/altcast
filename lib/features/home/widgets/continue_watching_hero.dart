@@ -261,7 +261,7 @@ class _ContinueWatchingCard extends ConsumerWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_) => const Center(
                     child: Icon(
-                      PiconsRegular.disc,
+                      PiconsRegular.televisionSimple,
                       color: AppColors.textTertiary,
                       size: 32,
                     ),
@@ -423,7 +423,7 @@ class _HeroSlide extends ConsumerWidget {
             fit: BoxFit.cover,
             errorBuilder: (_) => const Center(
               child: Icon(
-                PiconsRegular.disc,
+                PiconsRegular.televisionSimple,
                 color: AppColors.textTertiary,
                 size: 40,
               ),
@@ -585,13 +585,13 @@ Future<void> _showQueueActions({
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GlassPopoverItem(
-          icon: Icons.remove_circle_outline_rounded,
+          icon: PiconsRegular.minusCircle,
           label: 'Remove from queue',
           onTap: () => _removeFromQueue(context: context, ref: ref, item: item),
         ),
         if (canRemoveSeries)
           GlassPopoverItem(
-            icon: Icons.playlist_remove_rounded,
+            icon: PiconsRegular.minusCircle,
             label: 'Remove series from queue',
             onTap: () =>
                 _removeSeriesFromQueue(context: context, ref: ref, item: item),
