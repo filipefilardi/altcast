@@ -777,19 +777,26 @@ void _openContinueWatchingResume(
 
 String _heroTitle(BrowseItem item) {
   if (item.kind == MediaKind.episode && item.seriesName != null) {
-    return '${item.seriesName} — ${item.name}';
+    return item.seriesName!;
   }
   return item.name;
 }
 
 String _heroMetadata(BrowseItem item, String remaining) {
   final parts = <String>[];
-  if (item.kind == MediaKind.episode &&
-      item.seasonNumber != null &&
-      item.episodeNumber != null) {
-    parts.add(
-      'S${item.seasonNumber} E${item.episodeNumber.toString().padLeft(2, '0')}',
-    );
+  if (item.kind == MediaKind.episode) {
+    final season = item.seasonNumber;
+    final episode = item.episodeNumber;
+    if (season != null && episode != null) {
+      parts.add('S$season E${episode.toString().padLeft(2, '0')}');
+    } else if (season != null) {
+      parts.add('S$season');
+    } else if (episode != null) {
+      parts.add('E${episode.toString().padLeft(2, '0')}');
+    }
+    if (item.name.trim().isNotEmpty) {
+      parts.add(item.name);
+    }
   } else if (item.year != null) {
     parts.add('${item.year}');
   } else if (item.subtitle != null && item.subtitle!.isNotEmpty) {
