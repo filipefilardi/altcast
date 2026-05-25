@@ -8,6 +8,7 @@ import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/utils/format.dart';
 import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/glass_popover.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -570,86 +571,24 @@ class _HeroSlide extends ConsumerWidget {
   }
 }
 
-class _QueueMenuButton extends ConsumerWidget {
+class _QueueMenuButton extends ConsumerStatefulWidget {
   const _QueueMenuButton({required this.item});
 
   final BrowseItem item;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return PopupMenuButton<_QueueMenuAction>(
-      tooltip: 'Queue actions',
-      onSelected: (action) async {
-        switch (action) {
-          case _QueueMenuAction.removeFromQueue:
-            try {
-              await ref
-                  .read(jellyfinRepositoryProvider)
-                  .removeFromQueue(item.id);
-              ref.invalidate(continueWatchingProvider);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Removed "${item.name}" from queue.')),
-              );
-            } catch (_) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Couldn't remove this item from queue. Please try again.",
-                  ),
-                ),
-              );
-            }
-          case _QueueMenuAction.removeSeriesFromQueue:
-            final seriesId = item.kind == MediaKind.series
-                ? item.id
-                : item.seriesId;
-            if (seriesId == null || seriesId.trim().isEmpty) return;
-            try {
-              await ref
-                  .read(jellyfinRepositoryProvider)
-                  .removeSeriesFromQueue(seriesId);
-              ref.invalidate(continueWatchingProvider);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Removed series "${item.seriesName ?? item.name}" from queue.',
-                  ),
-                ),
-              );
-            } catch (_) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Couldn't remove this series from queue. Please try again.",
-                  ),
-                ),
-              );
-            }
-        }
-      },
-      color: AppColors.surfaceElevated,
-      itemBuilder: (context) {
-        final canRemoveSeries =
-            item.kind == MediaKind.series ||
-            (item.kind == MediaKind.episode &&
-                item.seriesId != null &&
-                item.seriesId!.trim().isNotEmpty);
-        return [
-          const PopupMenuItem<_QueueMenuAction>(
-            value: _QueueMenuAction.removeFromQueue,
-            child: Text('Remove from queue'),
-          ),
-          if (canRemoveSeries)
-            const PopupMenuItem<_QueueMenuAction>(
-              value: _QueueMenuAction.removeSeriesFromQueue,
-              child: Text('Remove series from queue'),
-            ),
-        ];
-      },
+  ConsumerState<_QueueMenuButton> createState() => _QueueMenuButtonState();
+}
+
+class _QueueMenuButtonState extends ConsumerState<_QueueMenuButton> {
+  final GlobalKey _anchorKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: _anchorKey,
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => _showQueueActions(context, ref),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.background.withValues(alpha: 0.68),
@@ -667,9 +606,93 @@ class _QueueMenuButton extends ConsumerWidget {
       ),
     );
   }
-}
 
-enum _QueueMenuAction { removeFromQueue, removeSeriesFromQueue }
+  Future<void> _showQueueActions(BuildContext context, WidgetRef ref) {
+    final anchorCtx = _anchorKey.currentContext ?? context;
+    final canRemoveSeries =
+        widget.item.kind == MediaKind.series ||
+        (widget.item.kind == MediaKind.episode &&
+            widget.item.seriesId != null &&
+            widget.item.seriesId!.trim().isNotEmpty);
+    return showGlassPopover<void>(
+      context: anchorCtx,
+      width: 240,
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GlassPopoverItem(
+            icon: Icons.remove_circle_outline_rounded,
+            label: 'Remove from queue',
+            onTap: () => _removeFromQueue(context, ref),
+          ),
+          if (canRemoveSeries)
+            GlassPopoverItem(
+              icon: Icons.playlist_remove_rounded,
+              label: 'Remove series from queue',
+              onTap: () => _removeSeriesFromQueue(context, ref),
+            ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _removeFromQueue(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(jellyfinRepositoryProvider)
+          .removeFromQueue(widget.item.id);
+      ref.invalidate(continueWatchingProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Removed "${widget.item.name}" from queue.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't remove this item from queue. Please try again.",
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeSeriesFromQueue(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final seriesId = widget.item.kind == MediaKind.series
+        ? widget.item.id
+        : widget.item.seriesId;
+    if (seriesId == null || seriesId.trim().isEmpty) return;
+    try {
+      await ref
+          .read(jellyfinRepositoryProvider)
+          .removeSeriesFromQueue(seriesId);
+      ref.invalidate(continueWatchingProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Removed series "${widget.item.seriesName ?? widget.item.name}" from queue.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't remove this series from queue. Please try again.",
+          ),
+        ),
+      );
+    }
+  }
+}
 
 class _ContinueWatchingHeroSkeleton extends StatelessWidget {
   const _ContinueWatchingHeroSkeleton();
