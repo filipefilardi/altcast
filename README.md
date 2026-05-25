@@ -8,6 +8,12 @@ Bring your movies and TV shows back into a focused viewing app. AltCast connects
 
 > AltCast is an unofficial, third-party client. It is not affiliated with or endorsed by the Jellyfin project.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/graphics/screenshots.png" alt="AltSound" width="800">
+</p>
+
 ## Install
 
 <p align="center">
