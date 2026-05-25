@@ -1253,6 +1253,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       valueListenable: _overlaySnapshots,
       builder: (context, snap, _) {
         final pad = MediaQuery.paddingOf(context);
+        final controlsTheme = MaterialVideoControlsTheme.maybeOf(
+          context,
+        )?.normal;
+        final controlsBottomMargin =
+            controlsTheme?.bottomButtonBarMargin
+                .resolve(Directionality.of(context))
+                .bottom ??
+            kPlayerControlsBottomBarMargin;
+        final controlsButtonBarHeight =
+            controlsTheme?.buttonBarHeight ?? kPlayerControlsBottomBarHeight;
+        final trickplayLift =
+            controlsBottomMargin + controlsButtonBarHeight - 48.0;
         // Lift the skip chips above the Next Up card when both are on
         // screen so they don't visually collide near the bottom-right.
         // Card is ~300 px tall (16:9 thumb + body); 224 lift puts the chip
@@ -1334,7 +1346,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 return Positioned(
                   left: 0,
                   right: 0,
-                  bottom: pad.bottom + 100,
+                  bottom: pad.bottom + trickplayLift,
                   child: IgnorePointer(
                     child: AltCastTrickplayPreviewBubble(
                       session: trickplay.session,

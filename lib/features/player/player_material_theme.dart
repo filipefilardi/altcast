@@ -22,6 +22,12 @@ import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/syncplay/syncplay_controller.dart';
 
 const bool _trickplayDebugLogs = true;
+const double kPlayerControlsBottomBarHeight = 96.0;
+const double kPlayerControlsBottomBarMargin = 8.0;
+const double kPlayerSeekBarHorizontalMargin = 16.0;
+const double kPlayerSeekBarBottomMargin = 8.0;
+const double kTrickplayPreviewLiftFromSafeBottom =
+    kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
 
 class TrickplayOverlayData {
   const TrickplayOverlayData({
@@ -195,12 +201,16 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       ),
     ],
     bottomButtonBarMargin: const EdgeInsets.only(
-      left: 16,
-      right: 16,
-      bottom: 8,
+      left: kPlayerSeekBarHorizontalMargin,
+      right: kPlayerSeekBarHorizontalMargin,
+      bottom: kPlayerControlsBottomBarMargin,
     ),
-    buttonBarHeight: 96,
-    seekBarMargin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+    buttonBarHeight: kPlayerControlsBottomBarHeight,
+    seekBarMargin: const EdgeInsets.only(
+      left: kPlayerSeekBarHorizontalMargin,
+      right: kPlayerSeekBarHorizontalMargin,
+      bottom: kPlayerSeekBarBottomMargin,
+    ),
   );
 }
 
