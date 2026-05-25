@@ -12,6 +12,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/core/widgets/glass_popover.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/downloads/downloaded_item.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
@@ -44,7 +45,7 @@ const _introSkipperAutoSkipDelay = Duration(seconds: 3);
 /// Clears MaterialVideoControls (seek bar + bottom bar) so chips stay visible.
 const _introSkipperChipLiftFromSafeBottom = 104.0;
 
-enum _PlayerControlOverlay { none, settings, subtitleOffset }
+enum _PlayerControlOverlay { none, subtitleOffset }
 
 /// Snapshot pushed to [ValueNotifier] so skip / next-up UI rebuilds inside
 /// [MaterialVideoControls] — required because media_kit fullscreen is a
@@ -132,6 +133,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Duration _subtitleOffset = Duration.zero;
   final ValueNotifier<_PlayerControlOverlay> _controlOverlayNotifier =
       ValueNotifier(_PlayerControlOverlay.none);
+  bool _settingsPopoverOpen = false;
 
   // Tracks the latest known position so we can report it on pause/stop
   // without awaiting an async getter.
@@ -1278,7 +1280,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 if (overlay == _PlayerControlOverlay.none) {
                   return const SizedBox.shrink();
                 }
-                final size = MediaQuery.sizeOf(context);
                 return Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1288,23 +1289,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         onTap: _hideControlOverlay,
                       ),
                     ),
-                    if (overlay == _PlayerControlOverlay.settings)
-                      Positioned(
-                        top: pad.top + 58,
-                        right: pad.right + 12,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: size.width < 380 ? size.width - 24 : 280,
-                          ),
-                          child: _PlaybackSettingsOverlay(
-                            initialRate: _playbackRate,
-                            initialSubtitleOffset: _subtitleOffset,
-                            onRateChanged: _applyPlaybackRate,
-                            onQualityChanged: _reloadStreamForQualityChange,
-                            onOpenSubtitleOffset: _showSubtitleOffsetOverlay,
-                          ),
-                        ),
-                      ),
                     if (overlay == _PlayerControlOverlay.subtitleOffset)
                       Positioned(
                         top: pad.top + 58,
@@ -1515,10 +1499,31 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   void _togglePlaybackSettings(BuildContext context) {
     _markPlayerUiBackdropActive();
-    _controlOverlayNotifier.value =
-        _controlOverlayNotifier.value == _PlayerControlOverlay.settings
-        ? _PlayerControlOverlay.none
-        : _PlayerControlOverlay.settings;
+    if (_settingsPopoverOpen) return;
+    _settingsPopoverOpen = true;
+    unawaited(_openPlaybackSettingsPopover(context));
+  }
+
+  Future<void> _openPlaybackSettingsPopover(BuildContext originContext) async {
+    try {
+      await showGlassPopover<void>(
+        context: originContext,
+        width: 280,
+        maxHeight: 420,
+        builder: (_) => _PlaybackSettingsOverlay(
+          initialRate: _playbackRate,
+          initialSubtitleOffset: _subtitleOffset,
+          onRateChanged: _applyPlaybackRate,
+          onQualityChanged: _reloadStreamForQualityChange,
+          onOpenSubtitleOffset: () {
+            Navigator.of(originContext, rootNavigator: true).pop();
+            _showSubtitleOffsetOverlay();
+          },
+        ),
+      );
+    } finally {
+      if (mounted) _settingsPopoverOpen = false;
+    }
   }
 
   void _showSubtitleOffsetOverlay() {
@@ -1718,91 +1723,81 @@ class _PlaybackSettingsOverlayState
     final currentQuality = ref
         .watch(playbackPreferencesProvider)
         .streamingQuality;
-    return Material(
-      color: Colors.transparent,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.56),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.38),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      child: DefaultTextStyle(
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+          letterSpacing: 0,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _settingsRow(
+              label: 'Speed',
+              trailing: _CompactDropdown<double>(
+                value: _rate,
+                items: _speedOptions,
+                itemLabel: _speedLabel,
+                onChanged: (value) {
+                  if (value != null) _setRate(value);
+                },
+              ),
+            ),
+            _rowDivider(),
+            _settingsRow(
+              label: 'Quality',
+              trailing: _qualityBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : _CompactDropdown<StreamingQuality>(
+                      value: currentQuality,
+                      items: StreamingQuality.values,
+                      itemLabel: (quality) => quality.label,
+                      onChanged: (value) {
+                        if (value != null) _setQuality(value);
+                      },
+                    ),
+            ),
+            _rowDivider(),
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: widget.onOpenSubtitleOffset,
+              child: _settingsRow(
+                label: 'Subtitle offset',
+                trailing: Text(
+                  _offsetLabel(widget.initialSubtitleOffset),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 10, 10),
-          child: DefaultTextStyle(
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 12,
-              letterSpacing: 0,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(child: Text('Speed')),
-                    _CompactDropdown<double>(
-                      value: _rate,
-                      items: _speedOptions,
-                      itemLabel: _speedLabel,
-                      onChanged: (value) {
-                        if (value != null) _setRate(value);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Expanded(child: Text('Quality')),
-                    if (_qualityBusy)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      _CompactDropdown<StreamingQuality>(
-                        value: currentQuality,
-                        items: StreamingQuality.values,
-                        itemLabel: (quality) => quality.label,
-                        onChanged: (value) {
-                          if (value != null) _setQuality(value);
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                InkWell(
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: widget.onOpenSubtitleOffset,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        const Expanded(child: Text('Subtitle offset')),
-                        Text(
-                          _offsetLabel(widget.initialSubtitleOffset),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
+    );
+  }
+
+  Widget _settingsRow({required String label, required Widget trailing}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [Expanded(child: Text(label)), trailing],
+      ),
+    );
+  }
+
+  Widget _rowDivider() {
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      color: Colors.white.withValues(alpha: 0.16),
     );
   }
 
@@ -2005,15 +2000,16 @@ class _CompactDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final menuSurface = AppColors.surfaceElevated.withValues(alpha: 0.88);
     return DropdownButtonHideUnderline(
       child: DropdownButton<T>(
         value: value,
-        dropdownColor: Colors.black.withValues(alpha: 0.64),
-        borderRadius: BorderRadius.circular(8),
+        dropdownColor: menuSurface,
+        borderRadius: BorderRadius.circular(12),
         icon: const SizedBox.shrink(),
         style: const TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
         selectedItemBuilder: (context) => [
@@ -2025,7 +2021,17 @@ class _CompactDropdown<T> extends StatelessWidget {
         ],
         items: [
           for (final item in items)
-            DropdownMenuItem<T>(value: item, child: Text(itemLabel(item))),
+            DropdownMenuItem<T>(
+              value: item,
+              child: Text(
+                itemLabel(item),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
         onChanged: onChanged,
         isDense: true,
