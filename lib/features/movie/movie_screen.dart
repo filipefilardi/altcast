@@ -1,24 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/format.dart';
 import 'package:altcast/core/widgets/back_chip.dart';
-import 'package:altcast/core/widgets/detail_action_row.dart';
 import 'package:altcast/core/widgets/detail_hero.dart';
 import 'package:altcast/core/widgets/detail_sections.dart';
+import 'package:altcast/core/widgets/detail_screen_skeleton.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/genre_chips.dart';
+import 'package:altcast/core/widgets/media_detail_actions.dart';
 import 'package:altcast/core/widgets/meta_pill_row.dart';
-import 'package:altcast/core/widgets/play_button.dart';
-import 'package:altcast/core/widgets/skeleton.dart';
-import 'package:altcast/core/widgets/user_data_actions.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/movie.dart';
-import 'package:altcast/data/local/playback_preferences.dart';
 import 'package:altcast/features/downloads/widgets/download_button.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
@@ -76,27 +71,22 @@ class _MovieBody extends ConsumerStatefulWidget {
   ConsumerState<_MovieBody> createState() => _MovieBodyState();
 }
 
-class _MovieBodyState extends ConsumerState<_MovieBody> {
-  late TrackPreference _preference;
-
+class _MovieBodyState extends ConsumerState<_MovieBody>
+    with TrackPreferenceStateMixin<_MovieBody> {
   @override
   void initState() {
     super.initState();
-    _preference = TrackPreference.fromPlaybackPrefs(
-      ref.read(playbackPreferencesProvider),
-      itemOriginalLanguage: widget.movie.originalLanguage,
-    );
+    initTrackPreference(originalLanguage: widget.movie.originalLanguage);
   }
 
   @override
   void didUpdateWidget(covariant _MovieBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.movie.id != widget.movie.id) {
-      _preference = TrackPreference.fromPlaybackPrefs(
-        ref.read(playbackPreferencesProvider),
-        itemOriginalLanguage: widget.movie.originalLanguage,
-      );
-    }
+    refreshTrackPreferenceIfItemChanged(
+      previousItemId: oldWidget.movie.id,
+      nextItemId: widget.movie.id,
+      originalLanguage: widget.movie.originalLanguage,
+    );
   }
 
   @override
@@ -136,48 +126,31 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DetailActionRow(
-                primary: PlayButton(
-                  onPressed: () => _play(context, movie, fromStart: false),
-                  label: hasResume ? 'Resume' : 'Play',
+              MediaDetailActions(
+                onPlay: () => _play(context, movie, fromStart: false),
+                playLabel: hasResume ? 'Resume' : 'Play',
+                onPlayFromStart: hasResume
+                    ? () => _play(context, movie, fromStart: true)
+                    : null,
+                initialPlayed: movie.userData?.played ?? false,
+                onSetPlayed: (v) async {
+                  await repo.setPlayed(movie.id, played: v);
+                  ref.invalidate(movieProvider(movie.id));
+                },
+                onCast: () => showRemoteSessionsSheet(
+                  context,
+                  itemId: movie.id,
+                  startPositionTicks:
+                      movie.userData?.playbackPositionTicks ?? 0,
                 ),
-                actions: [
-                  if (hasResume)
-                    IconButton(
-                      iconSize: 22,
-                      icon: const Icon(PiconsRegular.arrowCounterClockwise),
-                      tooltip: 'Play from start',
-                      onPressed: () => _play(context, movie, fromStart: true),
-                    ),
-                  UserDataActions(
-                    initialPlayed: movie.userData?.played ?? false,
-                    onSetPlayed: (v) async {
-                      await repo.setPlayed(movie.id, played: v);
-                      ref.invalidate(movieProvider(movie.id));
-                    },
-                  ),
-                  IconButton(
-                    iconSize: 22,
-                    icon: Icon(
-                      PiconsRegular.screencast,
-                      color: castActive ? AppColors.primary : null,
-                    ),
-                    tooltip: 'Play on…',
-                    onPressed: () => showRemoteSessionsSheet(
-                      context,
-                      itemId: movie.id,
-                      startPositionTicks:
-                          movie.userData?.playbackPositionTicks ?? 0,
-                    ),
-                  ),
-                  MovieDownloadButton(movie: movie),
-                ],
+                castActive: castActive,
+                downloadAction: MovieDownloadButton(movie: movie),
               ),
               TrackPreferenceRow(
                 itemId: movie.id,
-                preference: _preference,
+                preference: preference,
                 originalLanguageHint: movie.originalLanguage,
-                onChanged: (next) => setState(() => _preference = next),
+                onChanged: updateTrackPreference,
               ),
               if (movie.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
@@ -220,7 +193,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody> {
     final ticks = fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
     final query = <String, String>{
       if (ticks > 0) 'resumeTicks': '$ticks',
-      ..._preference.toQuery(),
+      ...preference.toQuery(),
     };
     final uri = Uri(
       path: '/play/${movie.id}',
@@ -235,45 +208,6 @@ class _MovieSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        Skeleton.group(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Skeleton.box(
-                width: double.infinity,
-                height: DetailHero.heightForWidth(
-                  constraints.maxWidth,
-                  MediaQuery.orientationOf(context),
-                ),
-                radius: 0,
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Skeleton.group(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Skeleton.box(width: 140, height: 44),
-                const SizedBox(height: 24),
-                Skeleton.line(width: 200),
-                const SizedBox(height: 8),
-                Skeleton.line(),
-                const SizedBox(height: 8),
-                Skeleton.line(),
-                const SizedBox(height: 8),
-                Skeleton.line(width: 160),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return const DetailScreenSkeleton(lineWidths: [200, null, null, 160]);
   }
 }

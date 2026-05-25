@@ -73,6 +73,35 @@ class TrackPreference {
 
 enum SubPreferenceKind { serverDefault, off, byLang }
 
+mixin TrackPreferenceStateMixin<T extends ConsumerStatefulWidget>
+    on ConsumerState<T> {
+  late TrackPreference preference;
+
+  void initTrackPreference({String? originalLanguage}) {
+    preference = _seedTrackPreference(originalLanguage: originalLanguage);
+  }
+
+  void refreshTrackPreferenceIfItemChanged({
+    required String previousItemId,
+    required String nextItemId,
+    String? originalLanguage,
+  }) {
+    if (previousItemId == nextItemId) return;
+    preference = _seedTrackPreference(originalLanguage: originalLanguage);
+  }
+
+  void updateTrackPreference(TrackPreference next) {
+    setState(() => preference = next);
+  }
+
+  TrackPreference _seedTrackPreference({String? originalLanguage}) {
+    return TrackPreference.fromPlaybackPrefs(
+      ref.read(playbackPreferencesProvider),
+      itemOriginalLanguage: originalLanguage,
+    );
+  }
+}
+
 /// A compact control card under the Play button with Audio/Subtitles selectors.
 /// Tapping opens a bottom sheet picker filled from
 /// [JellyfinRepository.getMediaStreams].

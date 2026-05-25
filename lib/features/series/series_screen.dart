@@ -5,19 +5,17 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/widgets/back_chip.dart';
-import 'package:altcast/core/widgets/detail_action_row.dart';
 import 'package:altcast/core/widgets/detail_hero.dart';
 import 'package:altcast/core/widgets/detail_sections.dart';
+import 'package:altcast/core/widgets/detail_screen_skeleton.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/genre_chips.dart';
-import 'package:altcast/core/widgets/play_button.dart';
+import 'package:altcast/core/widgets/media_detail_actions.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
-import 'package:altcast/core/widgets/user_data_actions.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/jellyfin/models/series.dart';
-import 'package:altcast/data/local/playback_preferences.dart';
 import 'package:altcast/features/downloads/widgets/download_button.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
@@ -118,27 +116,22 @@ class _SeriesBody extends ConsumerStatefulWidget {
   ConsumerState<_SeriesBody> createState() => _SeriesBodyState();
 }
 
-class _SeriesBodyState extends ConsumerState<_SeriesBody> {
-  late TrackPreference _preference;
-
+class _SeriesBodyState extends ConsumerState<_SeriesBody>
+    with TrackPreferenceStateMixin<_SeriesBody> {
   @override
   void initState() {
     super.initState();
-    _preference = TrackPreference.fromPlaybackPrefs(
-      ref.read(playbackPreferencesProvider),
-      itemOriginalLanguage: widget.series.originalLanguage,
-    );
+    initTrackPreference(originalLanguage: widget.series.originalLanguage);
   }
 
   @override
   void didUpdateWidget(covariant _SeriesBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.series.id != widget.series.id) {
-      _preference = TrackPreference.fromPlaybackPrefs(
-        ref.read(playbackPreferencesProvider),
-        itemOriginalLanguage: widget.series.originalLanguage,
-      );
-    }
+    refreshTrackPreferenceIfItemChanged(
+      previousItemId: oldWidget.series.id,
+      nextItemId: widget.series.id,
+      originalLanguage: widget.series.originalLanguage,
+    );
   }
 
   @override
@@ -188,61 +181,44 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DetailActionRow(
-                primary: PlayButton(
-                  onPressed: next == null
-                      ? null
-                      : () => _playEpisode(
-                          context,
-                          next,
-                          preference: _preference,
-                        ),
-                  label: _playLabel(next),
-                  icon: PiconsFill.play,
-                ),
-                actions: [
-                  if (next != null && nextHasResume)
-                    IconButton(
-                      iconSize: 22,
-                      icon: const Icon(PiconsRegular.arrowCounterClockwise),
-                      tooltip: 'Play from start',
-                      onPressed: () => _playEpisode(
+              MediaDetailActions(
+                onPlay: next == null
+                    ? null
+                    : () => _playEpisode(context, next, preference: preference),
+                playLabel: _playLabel(next),
+                playIcon: PiconsFill.play,
+                onPlayFromStart: next != null && nextHasResume
+                    ? () => _playEpisode(
                         context,
                         next,
-                        preference: _preference,
+                        preference: preference,
                         fromStart: true,
-                      ),
-                    ),
-                  UserDataActions(
-                    initialPlayed: series.userData?.played ?? false,
-                    onSetPlayed: (v) async {
-                      await repo.setPlayed(series.id, played: v);
-                      ref.invalidate(seriesProvider(series.id));
-                    },
-                  ),
-                  if (next != null)
-                    IconButton(
-                      iconSize: 22,
-                      icon: Icon(
-                        PiconsRegular.screencast,
-                        color: castActive ? AppColors.primary : null,
-                      ),
-                      tooltip: 'Play on…',
-                      onPressed: () => showRemoteSessionsSheet(
+                      )
+                    : null,
+                initialPlayed: series.userData?.played ?? false,
+                onSetPlayed: (v) async {
+                  await repo.setPlayed(series.id, played: v);
+                  ref.invalidate(seriesProvider(series.id));
+                },
+                onCast: next == null
+                    ? null
+                    : () => showRemoteSessionsSheet(
                         context,
                         itemId: next.id,
                         startPositionTicks:
                             next.userData?.playbackPositionTicks ?? 0,
                       ),
-                    ),
-                  SeriesDownloadButton(series: series, seasons: seasons),
-                ],
+                castActive: castActive,
+                downloadAction: SeriesDownloadButton(
+                  series: series,
+                  seasons: seasons,
+                ),
               ),
               TrackPreferenceRow(
                 itemId: next?.id ?? series.id,
-                preference: _preference,
+                preference: preference,
                 originalLanguageHint: series.originalLanguage,
-                onChanged: (next) => setState(() => _preference = next),
+                onChanged: updateTrackPreference,
               ),
               if (next != null && next.shortLabel.isNotEmpty)
                 Padding(
@@ -286,7 +262,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
           episodesAsync: episodesAsync,
           seriesName: series.name,
           seriesPosterTag: series.imageTag,
-          preference: _preference,
+          preference: preference,
         ),
         DetailMoreLikeThisSection(
           itemsAsync: similarAsync,
@@ -523,44 +499,7 @@ class _SeriesSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        Skeleton.group(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Skeleton.box(
-                width: double.infinity,
-                height: DetailHero.heightForWidth(
-                  constraints.maxWidth,
-                  MediaQuery.orientationOf(context),
-                ),
-                radius: 0,
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Skeleton.group(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Skeleton.box(width: 140, height: 44),
-                const SizedBox(height: 24),
-                Skeleton.line(),
-                const SizedBox(height: 8),
-                Skeleton.line(),
-                const SizedBox(height: 8),
-                Skeleton.line(width: 200),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return const DetailScreenSkeleton(lineWidths: [null, null, 200]);
   }
 }
 
