@@ -220,17 +220,6 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
                 originalLanguageHint: series.originalLanguage,
                 onChanged: updateTrackPreference,
               ),
-              if (next != null && next.shortLabel.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    '${next.shortLabel} • ${next.name}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textTertiary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
               DetailOverviewSection(
                 overview: series.overview,
                 tagline: tagline,
