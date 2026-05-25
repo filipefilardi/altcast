@@ -18,7 +18,11 @@ class PlaybackError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(PiconsRegular.warningCircle, color: AppColors.error, size: 40),
+            const Icon(
+              PiconsRegular.warningCircle,
+              color: AppColors.error,
+              size: 40,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Playback failed',

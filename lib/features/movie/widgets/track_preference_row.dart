@@ -548,7 +548,11 @@ class _PickerRow extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(PiconsRegular.check, size: 18, color: AppColors.primary),
+              const Icon(
+                PiconsRegular.check,
+                size: 18,
+                color: AppColors.primary,
+              ),
           ],
         ),
       ),

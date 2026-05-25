@@ -234,7 +234,10 @@ class _FailedRow extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(PiconsRegular.arrowsClockwise, color: AppColors.textSecondary),
+            icon: const Icon(
+              PiconsRegular.arrowsClockwise,
+              color: AppColors.textSecondary,
+            ),
             tooltip: 'Retry download',
             onPressed: () => ref
                 .read(downloadManagerProvider.notifier)

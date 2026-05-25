@@ -489,7 +489,9 @@ class _NowPlayingControlsState extends ConsumerState<_NowPlayingControls> {
                 IconButton(
                   icon: Icon(
                     PiconsRegular.speakerHigh,
-                    color: session.isMuted ? AppColors.error : AppColors.textSecondary,
+                    color: session.isMuted
+                        ? AppColors.error
+                        : AppColors.textSecondary,
                   ),
                   tooltip: session.isMuted ? 'Unmute' : 'Mute',
                   visualDensity: VisualDensity.compact,

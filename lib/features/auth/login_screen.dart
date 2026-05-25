@@ -142,7 +142,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       PiconsRegular.eye,
-                                      color: _obscure ? AppColors.textSecondary : AppColors.primary,
+                                      color: _obscure
+                                          ? AppColors.textSecondary
+                                          : AppColors.primary,
                                     ),
                                     onPressed: () =>
                                         setState(() => _obscure = !_obscure),
@@ -198,7 +200,11 @@ class _LoginErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(PiconsRegular.warningCircle, color: AppColors.error, size: 20),
+          const Icon(
+            PiconsRegular.warningCircle,
+            color: AppColors.error,
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

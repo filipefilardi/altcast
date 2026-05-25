@@ -1788,7 +1788,10 @@ class _PlaybackSettingsOverlayState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
-        children: [Expanded(child: Text(label)), trailing],
+        children: [
+          Expanded(child: Text(label)),
+          trailing,
+        ],
       ),
     );
   }
