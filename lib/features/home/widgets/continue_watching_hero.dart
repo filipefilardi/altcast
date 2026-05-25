@@ -12,6 +12,8 @@ import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/features/home/home_providers.dart';
 
+const _keepWatchingProgressLineHeight = 2.0;
+
 /// Home “Keep watching” block: section label, loading / error / content, and
 /// trailing spacing (24 px) for the next shelf.
 class ContinueWatchingShelf extends StatelessWidget {
@@ -335,7 +337,7 @@ class _ContinueWatchingCard extends ConsumerWidget {
                   right: 0,
                   bottom: 0,
                   child: SizedBox(
-                    height: 4,
+                    height: _keepWatchingProgressLineHeight,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -467,38 +469,6 @@ class _HeroSlide extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: onOpenDetail,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: SizedBox(
-                        height: 4,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ColoredBox(
-                              color: AppColors.background.withValues(
-                                alpha: 0.55,
-                              ),
-                            ),
-                            FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: progress.clamp(0, 1).toDouble(),
-                              child: const DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: AppGradients.accentHorizontal,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -556,6 +526,31 @@ class _HeroSlide extends ConsumerWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SizedBox(
+              height: _keepWatchingProgressLineHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: AppColors.background.withValues(alpha: 0.62),
+                  ),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress.clamp(0, 1).toDouble(),
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.accentHorizontal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Positioned(top: 12, right: 12, child: _QueueMenuButton(item: item)),
