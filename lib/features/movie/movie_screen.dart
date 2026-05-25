@@ -104,6 +104,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody>
         (movie.userData?.resumePosition ?? Duration.zero) >
         const Duration(seconds: 5);
     final tagline = movie.tagline?.trim();
+    final safeBottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -174,7 +175,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody>
                 itemsAsync: similarAsync,
                 currentItemId: movie.id,
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 4 + safeBottomInset),
             ],
           ),
         ),

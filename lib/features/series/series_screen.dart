@@ -166,6 +166,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
         const Duration(seconds: 5);
     final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
     final tagline = series.tagline?.trim();
+    final safeBottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -260,7 +261,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
             currentItemId: series.id,
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: 4 + safeBottomInset),
       ],
     );
   }
