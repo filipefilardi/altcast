@@ -85,6 +85,11 @@ class DetailMoreLikeThisSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final items = itemsAsync.asData?.value;
+    if (items != null &&
+        items.where((item) => item.id != currentItemId).isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

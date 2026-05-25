@@ -28,10 +28,7 @@ class MoreLikeThisRow extends StatelessWidget {
             .where((item) => item.id != currentItemId)
             .toList(growable: false);
         if (filtered.isEmpty) {
-          return const Text(
-            'No recommendations yet.',
-            style: TextStyle(color: AppColors.textSecondary),
-          );
+          return const SizedBox.shrink();
         }
         return SizedBox(
           height: 248,
