@@ -38,22 +38,22 @@ class PlayButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
             child: Row(
               mainAxisAlignment: expanded
                   ? MainAxisAlignment.center
                   : MainAxisAlignment.start,
               mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
               children: [
-                Icon(icon, color: AppColors.onAccent, size: 21),
+                Icon(icon, color: AppColors.onAccent, size: 20),
                 const SizedBox(width: 6),
                 Text(
                   label.toUpperCase(),
                   style: const TextStyle(
                     color: AppColors.onAccent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ],

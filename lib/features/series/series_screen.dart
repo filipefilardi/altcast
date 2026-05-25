@@ -299,7 +299,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
     final ud = next.userData;
     final hasResume =
         ud != null && ud.resumePosition > const Duration(seconds: 5);
-    return hasResume ? 'Continue' : 'Play';
+    return hasResume ? 'Resume' : 'Play';
   }
 }
 
