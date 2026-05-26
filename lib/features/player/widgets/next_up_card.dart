@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
-import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 
-/// Bottom-right card that previews the next episode and offers a play CTA
-/// matching the brand's accent-gradient pill. Shows a live countdown ring
-/// while autoplay is running, otherwise a static play arrow.
+/// Bottom-right autoplay card previewing the next episode.
+/// The full card is tappable to play now; close icon cancels/dismisses.
 class NextUpCard extends StatelessWidget {
   const NextUpCard({
     super.key,
@@ -38,15 +36,20 @@ class NextUpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 320,
-        decoration: BoxDecoration(
+    final shape = ContinuousRectangleBorder(
+      borderRadius: BorderRadius.circular(28),
+    );
+    return Material(
+      color: Colors.transparent,
+      shape: shape,
+      child: Ink(
+        width: 356,
+        decoration: ShapeDecoration(
           color: AppColors.surface.withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
-          boxShadow: [
+          shape: shape.copyWith(
+            side: BorderSide(color: AppColors.primary.withValues(alpha: 0.28)),
+          ),
+          shadows: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 22,
@@ -54,77 +57,97 @@ class NextUpCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _NextUpThumb(
-              posterUrl: posterUrl,
-              countdownRemaining: countdownForAutoplay,
-              countdownTotal: countdownDuration,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (b) => AppGradients.accent.createShader(b),
-                    child: Text(
-                      'NEXT UP',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelLarge?.copyWith(color: Colors.white),
+        child: InkWell(
+          customBorder: shape,
+          onTap: onPlayNow,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 142,
+                      child: _NextUpThumb(
+                        posterUrl: posterUrl,
+                        countdownRemaining: countdownForAutoplay,
+                        countdownTotal: countdownDuration,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (episode.shortLabel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(
-                        episode.shortLabel,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 22),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'NEXT UP',
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _episodeLine(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                            if (_autoplayRunning) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Autoplay in ${countdownForAutoplay!}s',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
-                  Text(
-                    episode.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _NextUpPlayPill(
-                          label: _autoplayRunning ? 'Play now' : 'Play next',
-                          onPressed: onPlayNow,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _NextUpCancelButton(
-                        label: _autoplayRunning ? 'Cancel' : 'Dismiss',
-                        onPressed: onCancel,
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              Positioned(
+                right: 6,
+                top: 6,
+                child: IconButton(
+                  splashRadius: 16,
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: onCancel,
+                  tooltip: _autoplayRunning ? 'Cancel autoplay' : 'Dismiss',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _episodeLine() {
+    if (episode.shortLabel.isEmpty) return episode.name;
+    return '${episode.shortLabel} · ${episode.name}';
   }
 }
 
@@ -141,47 +164,53 @@ class _NextUpThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(
-            color: AppColors.surfaceElevated,
-            child: LocalOrNetworkImage(
-              source: posterUrl,
-              errorBuilder: (_) => const Center(
-                child: Icon(
-                  PiconsRegular.televisionSimple,
-                  color: AppColors.textTertiary,
-                  size: 28,
+    final shape = ContinuousRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+    );
+    return ClipPath(
+      clipper: ShapeBorderClipper(shape: shape),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: AppColors.surfaceElevated,
+              child: LocalOrNetworkImage(
+                source: posterUrl,
+                errorBuilder: (_) => const Center(
+                  child: Icon(
+                    PiconsRegular.televisionSimple,
+                    color: AppColors.textTertiary,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  AppColors.surface.withValues(alpha: 0.85),
-                ],
-                stops: const [0.55, 1],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    AppColors.surface.withValues(alpha: 0.72),
+                  ],
+                  stops: const [0.45, 1],
+                ),
               ),
             ),
-          ),
-          if (countdownRemaining != null && countdownTotal > 0)
-            Positioned(
-              right: 10,
-              top: 10,
-              child: _CountdownRing(
-                remaining: countdownRemaining!,
-                total: countdownTotal,
+            if (countdownRemaining != null && countdownTotal > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: _CountdownRing(
+                  remaining: countdownRemaining!,
+                  total: countdownTotal,
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -208,7 +237,7 @@ class _CountdownRing extends StatelessWidget {
               shape: BoxShape.circle,
               color: AppColors.background.withValues(alpha: 0.72),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.25),
+                color: AppColors.primary.withValues(alpha: 0.2),
               ),
             ),
           ),
@@ -231,90 +260,6 @@ class _CountdownRing extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NextUpPlayPill extends StatelessWidget {
-  const _NextUpPlayPill({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: AppGradients.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  PiconsFill.play,
-                  color: AppColors.onAccent,
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.onAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NextUpCancelButton extends StatelessWidget {
-  const _NextUpCancelButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
       ),
     );
   }

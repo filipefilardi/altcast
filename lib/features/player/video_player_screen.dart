@@ -42,8 +42,8 @@ const _resumeSeekTolerance = Duration(seconds: 2);
 /// Gives time to see skip chips before we jump automatically (when enabled).
 const _introSkipperAutoSkipDelay = Duration(seconds: 3);
 
-/// Clears MaterialVideoControls (seek bar + bottom bar) so chips stay visible.
-const _introSkipperChipLiftFromSafeBottom = 104.0;
+/// Position skip buttons exactly above the seek timeline.
+const _introSkipperChipGapFromTimeline = 24.0;
 
 enum _PlayerControlOverlay { none, subtitleOffset }
 
@@ -1263,17 +1263,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             kPlayerControlsBottomBarMargin;
         final controlsButtonBarHeight =
             controlsTheme?.buttonBarHeight ?? kPlayerControlsBottomBarHeight;
+        final seekBarMargin =
+            controlsTheme?.seekBarMargin
+                .resolve(Directionality.of(context))
+                .bottom ??
+            kPlayerSeekBarBottomMargin;
+        final seekBarContainerHeight =
+            controlsTheme?.seekBarContainerHeight ?? 36.0;
         final trickplayLift =
             controlsBottomMargin + controlsButtonBarHeight - 48.0;
-        // Lift the skip chips above the Next Up card when both are on
-        // screen so they don't visually collide near the bottom-right.
-        // Card is ~300 px tall (16:9 thumb + body); 224 lift puts the chip
-        // comfortably above its top edge.
-        final nextUpLift = (snap.showNextUp && snap.nextEpisode != null)
-            ? 224.0
-            : 0.0;
+        final seekTimelineTop =
+            pad.bottom +
+            controlsBottomMargin +
+            seekBarMargin +
+            seekBarContainerHeight;
         final skipperBottom =
-            pad.bottom + _introSkipperChipLiftFromSafeBottom + nextUpLift;
+            seekTimelineTop + _introSkipperChipGapFromTimeline;
 
         return Stack(
           fit: StackFit.expand,
@@ -1317,7 +1322,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
-                right: pad.right + 16,
+                right: pad.right + 24,
                 bottom: skipperBottom,
                 child: SkipChipStack(
                   showIntro: snap.showSkipIntro,

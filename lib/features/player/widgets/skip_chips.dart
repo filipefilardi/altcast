@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 
@@ -46,9 +48,8 @@ class SkipChipStack extends StatelessWidget {
   }
 }
 
-/// Glass-style pill that matches AltCast's brand: dark navy fill, subtle
-/// cyan stroke + glow, accent-coloured leading icon. Sized for a single
-/// crisp tap target, never stretches edge-to-edge.
+/// Compact glass-style pill: blurred background, semi-opaque black fill,
+/// accent icon and uppercase label.
 class _SkipChip extends StatelessWidget {
   const _SkipChip({
     required this.label,
@@ -62,50 +63,46 @@ class _SkipChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shape = ContinuousRectangleBorder(
+      borderRadius: BorderRadius.circular(28),
+    );
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: AppColors.background.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.55),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.18),
-              blurRadius: 18,
-              spreadRadius: -2,
+      shape: shape,
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: shape),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Ink(
+            decoration: ShapeDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              shape: shape,
             ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
+            child: InkWell(
+              customBorder: shape,
+              onTap: onPressed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: AppColors.accent),
+                    const SizedBox(width: 7),
+                    Text(
+                      label.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
