@@ -133,24 +133,24 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     seekBarThumbSize: tokens.seekBarThumbSize,
     buttonBarButtonColor: Colors.white,
     primaryButtonBar: [
-      Spacer(flex: 2),
+      const Spacer(),
       AltCastSeekRelativeButton(
         delta: Duration.zero - tokens.seekBackwardStep,
         icon: PiconsRegular.rewind,
         tokens: tokens,
       ),
-      Spacer(),
+      const SizedBox(width: 32),
       AltCastPlayPauseButton(
         iconSize: tokens.playPausePrimaryIconSize,
         tokens: tokens,
       ),
-      Spacer(),
+      const SizedBox(width: 32),
       AltCastSeekRelativeButton(
         delta: tokens.seekForwardStep,
         icon: PiconsRegular.fastForward,
         tokens: tokens,
       ),
-      Spacer(flex: 2),
+      const Spacer(),
     ],
     topButtonBar: [
       Builder(
