@@ -79,7 +79,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     shiftSubtitlesOnControlsVisibilityChange: false,
     seekOnDoubleTap: true,
     seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
-    seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
+    seekOnDoubleTapForwardDuration: const Duration(seconds: 10),
     initialVolume: (player.state.volume / 100.0).clamp(0.0, 1.0),
     onVolumeChanged: onVolumeChanged,
     initialBrightness: 0.5,
@@ -127,7 +127,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       AltCastPlayPauseButton(iconSize: 56),
       Spacer(),
       AltCastSeekRelativeButton(
-        delta: Duration(seconds: 30),
+        delta: Duration(seconds: 10),
         icon: PiconsRegular.fastForward,
       ),
       Spacer(flex: 2),
