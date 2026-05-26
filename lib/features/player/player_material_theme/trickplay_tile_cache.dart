@@ -48,6 +48,24 @@ class _TrickplayTileCache {
   }
 
   static Future<Uint8List?> _fetch(Dio dio, String url) async {
+    final uri = Uri.tryParse(url);
+    if (!kIsWeb && uri != null && uri.scheme == 'file') {
+      try {
+        final file = File.fromUri(uri);
+        if (!await file.exists()) return null;
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty) return null;
+        return bytes;
+      } catch (e) {
+        if (_trickplayDebugLogs) {
+          debugPrintSynchronously(
+            'Trickplay local file read failed url=$url error=$e',
+          );
+        }
+        return null;
+      }
+    }
+
     try {
       final res = await dio.get<List<int>>(
         url,

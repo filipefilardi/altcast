@@ -61,14 +61,19 @@ class _AltCastTrickplaySeekGroupState
             manifest: offline.manifest,
             tileFilesByIndex: offline.tileFilesByIndex,
           );
+        } else {
+          // Local/offline playback without persisted trickplay tiles:
+          // don't attempt remote lookup for a local source.
+          session = null;
         }
+      } else {
+        session = await ref
+            .read(jellyfinRepositoryProvider)
+            .getTrickplaySession(
+              widget.itemId,
+              mediaSourceId: source?.mediaSourceId,
+            );
       }
-      session ??= await ref
-          .read(jellyfinRepositoryProvider)
-          .getTrickplaySession(
-            widget.itemId,
-            mediaSourceId: source?.mediaSourceId,
-          );
       if (!mounted || _lastManifestKey != key) return;
       setState(() => _trickplay = session);
       if (session != null) {
