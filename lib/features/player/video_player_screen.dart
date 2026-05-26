@@ -1084,7 +1084,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     if (remoteItemId != widget.itemId) {
       final position = session.estimatedPosition() ?? Duration.zero;
-      context.go(
+      context.pushReplacement(
         Uri(
           path: '/play/$remoteItemId',
           queryParameters: {
@@ -1205,7 +1205,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       path: '/play/${next.id}',
       queryParameters: query.isEmpty ? null : query,
     );
-    context.go(uri.toString());
+    context.pushReplacement(uri.toString());
   }
 
   @override
@@ -1478,7 +1478,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // teardown, which can touch a defunct BuildContext.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    if (context.canPop()) context.pop();
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      // Fallback for stack-replacement entry points (e.g. deep links or
+      // route resets) so the close/back action always exits the player.
+      context.go('/');
+    }
   }
 
   void _showTracksSheet(BuildContext context) {
@@ -1576,7 +1582,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           'syncPlayPlaying': event.isPlaying ? '1' : '0',
         },
       );
-      context.go(uri.toString());
+      context.pushReplacement(uri.toString());
       return;
     }
     _applyingSyncPlayCommand = true;
