@@ -5,7 +5,14 @@ class _TrickplayTileCache {
       LinkedHashMap<String, Uint8List>();
   static final Map<String, Future<Uint8List?>> _inFlight =
       <String, Future<Uint8List?>>{};
-  static const int _maxEntries = 40;
+  static int _maxEntries = kDefaultPlayerMaterialTokens.cacheMaxEntries;
+
+  static void configure(int maxEntries) {
+    _maxEntries = maxEntries.clamp(1, 500).toInt();
+    while (_memory.length > _maxEntries) {
+      _memory.remove(_memory.keys.first);
+    }
+  }
 
   static Future<void> prefetch(Dio dio, Iterable<String> urls) async {
     final unique = <String>{...urls};

@@ -6,11 +6,13 @@ class AltCastTrickplaySeekGroup extends ConsumerStatefulWidget {
     required this.itemId,
     required this.sourceListenable,
     required this.trickplayOverlayNotifier,
+    this.tokens = kDefaultPlayerMaterialTokens,
   });
 
   final String itemId;
   final ValueListenable<StreamSource?> sourceListenable;
   final ValueNotifier<TrickplayOverlayData?> trickplayOverlayNotifier;
+  final PlayerMaterialTokens tokens;
 
   @override
   ConsumerState<AltCastTrickplaySeekGroup> createState() =>
@@ -150,6 +152,7 @@ class _AltCastTrickplaySeekGroupState
                           position: position,
                           buffer: buffer,
                           value: activePercent,
+                          tokens: widget.tokens,
                           onScrubStart: (percent) {
                             setState(() {
                               _isScrubbing = true;
@@ -226,7 +229,7 @@ class _AltCastTrickplaySeekGroupState
                             }
                           },
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: widget.tokens.seekGroupTimestampGap),
                         Row(
                           children: [
                             Text(
@@ -265,6 +268,7 @@ class _AltCastSeekBar extends StatelessWidget {
     required this.position,
     required this.buffer,
     required this.value,
+    required this.tokens,
     required this.onScrubStart,
     required this.onScrubUpdate,
     required this.onScrubEnd,
@@ -275,6 +279,7 @@ class _AltCastSeekBar extends StatelessWidget {
   final Duration position;
   final Duration buffer;
   final double value;
+  final PlayerMaterialTokens tokens;
   final ValueChanged<double> onScrubStart;
   final ValueChanged<double> onScrubUpdate;
   final ValueChanged<double> onScrubEnd;
@@ -340,8 +345,8 @@ class _AltCastSeekBar extends StatelessWidget {
                           (constraints.maxWidth - theme.seekBarThumbSize / 2) *
                           value,
                       bottom:
-                          -1.0 * theme.seekBarThumbSize / 2 +
-                          theme.seekBarHeight / 2,
+                          -(tokens.seekBarThumbSize / 2) +
+                          tokens.seekBarHeight / 2,
                       child: Container(
                         width: theme.seekBarThumbSize,
                         height: theme.seekBarThumbSize,

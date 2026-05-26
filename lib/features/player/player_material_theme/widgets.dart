@@ -5,10 +5,12 @@ class AltCastSeekRelativeButton extends ConsumerWidget {
     super.key,
     required this.delta,
     required this.icon,
+    this.tokens = kDefaultPlayerMaterialTokens,
   });
 
   final Duration delta;
   final IconData icon;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,7 +38,7 @@ class AltCastSeekRelativeButton extends ConsumerWidget {
         }
       },
       icon: Icon(icon),
-      iconSize: 36,
+      iconSize: tokens.seekButtonIconSize,
       color: Colors.white,
       tooltip: delta.isNegative
           ? 'Back 10 seconds'
@@ -51,12 +53,14 @@ class _VerticalGestureIndicator extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.activeColor,
+    required this.tokens,
   });
 
   final Alignment alignment;
   final double value;
   final IconData icon;
   final Color activeColor;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context) {
@@ -64,29 +68,46 @@ class _VerticalGestureIndicator extends StatelessWidget {
     return Align(
       alignment: alignment,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 34),
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.gestureIndicatorHorizontalPadding,
+        ),
         child: SizedBox(
-          width: 54,
-          height: 164,
+          width: tokens.gestureIndicatorWidth,
+          height: tokens.gestureIndicatorHeight,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.58),
+              color: Colors.black.withValues(
+                alpha: tokens.gestureIndicatorBackgroundAlpha,
+              ),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              border: Border.all(
+                color: Colors.white.withValues(
+                  alpha: tokens.gestureIndicatorBorderAlpha,
+                ),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.36),
-                  blurRadius: 18,
+                  color: Colors.black.withValues(
+                    alpha: tokens.gestureIndicatorShadowAlpha,
+                  ),
+                  blurRadius: tokens.gestureIndicatorShadowBlur,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: tokens.gestureIndicatorInnerPaddingH,
+                vertical: tokens.gestureIndicatorInnerPaddingV,
+              ),
               child: Column(
                 children: [
-                  Icon(icon, color: activeColor, size: 22),
-                  const SizedBox(height: 10),
+                  Icon(
+                    icon,
+                    color: activeColor,
+                    size: tokens.gestureIndicatorIconSize,
+                  ),
+                  SizedBox(height: tokens.gestureIndicatorSpacing),
                   Expanded(
                     child: LayoutBuilder(
                       builder: (_, constraints) {
@@ -94,14 +115,16 @@ class _VerticalGestureIndicator extends StatelessWidget {
                           alignment: Alignment.bottomCenter,
                           children: [
                             Container(
-                              width: 4,
+                              width: tokens.gestureIndicatorTrackWidth,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.22),
+                                color: Colors.white.withValues(
+                                  alpha: tokens.gestureIndicatorTrackAlpha,
+                                ),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
                             Container(
-                              width: 4,
+                              width: tokens.gestureIndicatorTrackWidth,
                               height: constraints.maxHeight * clamped,
                               decoration: BoxDecoration(
                                 color: activeColor,
@@ -109,9 +132,12 @@ class _VerticalGestureIndicator extends StatelessWidget {
                               ),
                             ),
                             Positioned(
-                              bottom: (constraints.maxHeight - 10) * clamped,
+                              bottom:
+                                  (constraints.maxHeight -
+                                      tokens.gestureIndicatorKnobOffset) *
+                                  clamped,
                               child: SizedBox.square(
-                                dimension: 12,
+                                dimension: tokens.gestureIndicatorKnobSize,
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: activeColor,
@@ -119,9 +145,11 @@ class _VerticalGestureIndicator extends StatelessWidget {
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withValues(
-                                          alpha: 0.34,
+                                          alpha: tokens
+                                              .gestureIndicatorKnobShadowAlpha,
                                         ),
-                                        blurRadius: 8,
+                                        blurRadius: tokens
+                                            .gestureIndicatorKnobShadowBlur,
                                       ),
                                     ],
                                   ),
@@ -133,12 +161,12 @@ class _VerticalGestureIndicator extends StatelessWidget {
                       },
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: tokens.gestureIndicatorSpacing),
                   Text(
                     '${(clamped * 100).round()}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: tokens.gestureIndicatorLabelSize,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0,
                     ),
@@ -154,9 +182,14 @@ class _VerticalGestureIndicator extends StatelessWidget {
 }
 
 class AltCastPlayPauseButton extends ConsumerWidget {
-  const AltCastPlayPauseButton({super.key, this.iconSize});
+  const AltCastPlayPauseButton({
+    super.key,
+    this.iconSize,
+    this.tokens = kDefaultPlayerMaterialTokens,
+  });
 
   final double? iconSize;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -164,7 +197,7 @@ class AltCastPlayPauseButton extends ConsumerWidget {
     if (remote != null && remote.isPlayingSomething) {
       return IconButton(
         icon: Icon(remote.isPaused ? PiconsFill.play : PiconsFill.pause),
-        iconSize: iconSize ?? 48,
+        iconSize: iconSize ?? tokens.playPauseDefaultIconSize,
         color: Colors.white,
         tooltip: remote.isPaused ? 'Play' : 'Pause',
         onPressed: () =>
@@ -180,7 +213,7 @@ class AltCastPlayPauseButton extends ConsumerWidget {
         final playing = snapshot.data ?? false;
         return IconButton(
           icon: Icon(playing ? PiconsFill.pause : PiconsFill.play),
-          iconSize: iconSize ?? 48,
+          iconSize: iconSize ?? tokens.playPauseDefaultIconSize,
           color: Colors.white,
           tooltip: playing ? 'Pause' : 'Play',
           onPressed: () async {
@@ -197,9 +230,14 @@ class AltCastPlayPauseButton extends ConsumerWidget {
 }
 
 class AltCastPlayerTitle extends StatelessWidget {
-  const AltCastPlayerTitle({super.key, required this.title});
+  const AltCastPlayerTitle({
+    super.key,
+    required this.title,
+    this.tokens = kDefaultPlayerMaterialTokens,
+  });
 
   final String title;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context) {
@@ -210,14 +248,14 @@ class AltCastPlayerTitle extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.95),
-        fontSize: 15,
+        color: Colors.white.withValues(alpha: tokens.titleAlpha),
+        fontSize: tokens.titleFontSize,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
         shadows: [
           Shadow(
-            color: Colors.black.withValues(alpha: 0.75),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: tokens.titleShadowAlpha),
+            blurRadius: tokens.titleShadowBlur,
             offset: const Offset(0, 1),
           ),
         ],
@@ -260,23 +298,25 @@ class AltCastChromeIconButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     this.color,
+    this.tokens = kDefaultPlayerMaterialTokens,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
   final Color? color;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       icon: Icon(
         icon,
-        color: color ?? Colors.white.withValues(alpha: 0.95),
+        color: color ?? Colors.white.withValues(alpha: tokens.titleAlpha),
         shadows: [
           Shadow(
-            color: Colors.black.withValues(alpha: 0.75),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: tokens.titleShadowAlpha),
+            blurRadius: tokens.titleShadowBlur,
             offset: const Offset(0, 1),
           ),
         ],

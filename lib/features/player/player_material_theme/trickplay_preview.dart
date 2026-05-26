@@ -7,12 +7,14 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
     required this.position,
     required this.totalDuration,
     required this.alignPercent,
+    this.tokens = kDefaultPlayerMaterialTokens,
   });
 
   final TrickplaySession session;
   final Duration position;
   final Duration totalDuration;
   final double alignPercent;
+  final PlayerMaterialTokens tokens;
 
   @override
   Widget build(BuildContext context) {
@@ -21,13 +23,23 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
       totalDuration: totalDuration,
     );
     final shortestSide = MediaQuery.sizeOf(context).shortestSide;
-    final isTabletOrDesktop = shortestSide >= 600;
-    final safeThumbWidth = frame.thumbWidth <= 0 ? 320 : frame.thumbWidth;
-    final safeThumbHeight = frame.thumbHeight <= 0 ? 180 : frame.thumbHeight;
+    final isTabletOrDesktop = shortestSide >= tokens.previewTabletBreakpoint;
+    final safeThumbWidth = frame.thumbWidth <= 0
+        ? tokens.previewFallbackThumbWidth
+        : frame.thumbWidth.toDouble();
+    final safeThumbHeight = frame.thumbHeight <= 0
+        ? tokens.previewFallbackThumbHeight
+        : frame.thumbHeight.toDouble();
     final thumbAspect = safeThumbWidth / safeThumbHeight;
-    final preferredWidth = isTabletOrDesktop ? 300.0 : 164.0;
-    final minHeight = isTabletOrDesktop ? 160.0 : 92.0;
-    final maxHeight = isTabletOrDesktop ? 220.0 : 132.0;
+    final preferredWidth = isTabletOrDesktop
+        ? tokens.previewWidthLarge
+        : tokens.previewWidthSmall;
+    final minHeight = isTabletOrDesktop
+        ? tokens.previewMinHeightLarge
+        : tokens.previewMinHeightSmall;
+    final maxHeight = isTabletOrDesktop
+        ? tokens.previewMaxHeightLarge
+        : tokens.previewMaxHeightSmall;
     var frameWidth = preferredWidth;
     var frameHeight = frameWidth / thumbAspect;
     if (frameHeight > maxHeight) {
@@ -40,7 +52,7 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
     final tileColumns = session.manifest.tileWidth;
     final tileRows = session.manifest.tileHeight;
     final tileImageWidth = frameWidth * tileColumns;
-    final safeTileRows = tileRows.clamp(1, 20);
+    final safeTileRows = tileRows.clamp(1, tokens.previewTileRowsMax);
     final tileImageHeight = frameHeight * safeTileRows;
     final xOffset = frame.tileX * frameWidth;
     final yOffset = frame.tileY * frameHeight;
@@ -52,13 +64,15 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
           (constraints.maxWidth - frameWidth).clamp(0.0, double.infinity),
         );
         return SizedBox(
-          height: frameHeight + 28,
+          height: frameHeight + tokens.previewCaptionHeight,
           child: Stack(
             children: [
               Positioned(
                 left: left,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(
+                    tokens.previewBorderRadius,
+                  ),
                   child: SizedBox(
                     width: frameWidth,
                     height: frameHeight,
@@ -66,7 +80,9 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
                       fit: StackFit.expand,
                       children: [
                         Container(
-                          color: Colors.black.withValues(alpha: 0.8),
+                          color: Colors.black.withValues(
+                            alpha: tokens.previewFrameBackgroundAlpha,
+                          ),
                           child: ClipRect(
                             child: OverflowBox(
                               alignment: Alignment.topLeft,
@@ -83,6 +99,7 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
                                     urls: frame.urls,
                                     width: tileImageWidth,
                                     height: tileImageHeight,
+                                    tokens: tokens,
                                   ),
                                 ),
                               ),
@@ -93,17 +110,21 @@ class AltCastTrickplayPreviewBubble extends StatelessWidget {
                           alignment: Alignment.bottomCenter,
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: tokens.previewCaptionPaddingH,
+                              vertical: tokens.previewCaptionPaddingV,
                             ),
-                            color: Colors.black.withValues(alpha: 0.62),
+                            color: Colors.black.withValues(
+                              alpha: tokens.previewCaptionBackgroundAlpha,
+                            ),
                             child: Text(
                               _formatPlayerTimestamp(position),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: isTabletOrDesktop ? 14 : 11,
+                                fontSize: isTabletOrDesktop
+                                    ? tokens.previewCaptionFontSizeLarge
+                                    : tokens.previewCaptionFontSizeSmall,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -127,11 +148,13 @@ class _FallbackNetworkImage extends ConsumerStatefulWidget {
     required this.urls,
     required this.width,
     required this.height,
+    required this.tokens,
   });
 
   final List<String> urls;
   final double width;
   final double height;
+  final PlayerMaterialTokens tokens;
 
   @override
   ConsumerState<_FallbackNetworkImage> createState() =>
@@ -189,11 +212,13 @@ class _FallbackNetworkImageState extends ConsumerState<_FallbackNetworkImage> {
       future: _bytesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(
+          return Center(
             child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              width: widget.tokens.previewLoadingSpinnerSize,
+              height: widget.tokens.previewLoadingSpinnerSize,
+              child: CircularProgressIndicator(
+                strokeWidth: widget.tokens.previewLoadingSpinnerStrokeWidth,
+              ),
             ),
           );
         }

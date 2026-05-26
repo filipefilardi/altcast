@@ -27,6 +27,7 @@ part 'player_material_theme/trickplay_seek_group.dart';
 part 'player_material_theme/trickplay_preview.dart';
 part 'player_material_theme/trickplay_tile_cache.dart';
 part 'player_material_theme/helpers.dart';
+part 'player_material_theme/tokens.dart';
 
 const bool _trickplayDebugLogs = true;
 const double kPlayerControlsBottomBarHeight = 96.0;
@@ -35,6 +36,8 @@ const double kPlayerSeekBarHorizontalMargin = 16.0;
 const double kPlayerSeekBarBottomMargin = 8.0;
 const double kTrickplayPreviewLiftFromSafeBottom =
     kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
+const PlayerMaterialTokens kDefaultPlayerMaterialTokens =
+    PlayerMaterialTokens();
 
 class TrickplayOverlayData {
   const TrickplayOverlayData({
@@ -66,7 +69,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required VoidCallback onRotateOrientation,
   required void Function(double value) onVolumeChanged,
   required String title,
+  PlayerMaterialTokens tokens = kDefaultPlayerMaterialTokens,
 }) {
+  _TrickplayTileCache.configure(tokens.cacheMaxEntries);
   final screenBrightness = ScreenBrightness();
   return MaterialVideoControlsThemeData(
     // Avoid double-insetting on mobile (safe-area + internal controls bounds).
@@ -74,7 +79,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     padding: EdgeInsets.zero,
     displaySeekBar: false,
     visibleOnMount: true,
-    controlsHoverDuration: const Duration(seconds: 20),
+    controlsHoverDuration: tokens.controlsHoverDuration,
     automaticallyImplySkipNextButton: false,
     automaticallyImplySkipPreviousButton: false,
     volumeGesture: true,
@@ -85,11 +90,11 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     // controls fade in/out.
     shiftSubtitlesOnControlsVisibilityChange: false,
     seekOnDoubleTap: true,
-    seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
-    seekOnDoubleTapForwardDuration: const Duration(seconds: 10),
+    seekOnDoubleTapBackwardDuration: tokens.seekDoubleTapBackwardDuration,
+    seekOnDoubleTapForwardDuration: tokens.seekDoubleTapForwardDuration,
     initialVolume: (player.state.volume / 100.0).clamp(0.0, 1.0),
     onVolumeChanged: onVolumeChanged,
-    initialBrightness: 0.5,
+    initialBrightness: tokens.initialBrightness,
     onBrightnessChanged: (v) =>
         unawaited(_applyScreenBrightness(screenBrightness, v)),
     onBrightnessReset: () =>
@@ -100,9 +105,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         return _VerticalGestureIndicator(
           alignment: Alignment.centerRight,
           value: value,
+          tokens: tokens,
           icon: value == 0.0
               ? PiconsRegular.speakerSlash
-              : value < 0.5
+              : value < tokens.volumeMidThreshold
               ? PiconsRegular.speakerHigh
               : PiconsRegular.speakerHigh,
           activeColor: castActive ? AppColors.primary : Colors.white,
@@ -112,30 +118,36 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     brightnessIndicatorBuilder: (_, value) => _VerticalGestureIndicator(
       alignment: Alignment.centerLeft,
       value: value,
-      icon: value < 1.0 / 3.0
+      tokens: tokens,
+      icon: value < tokens.brightnessLowThreshold
           ? PiconsRegular.sunDim
-          : value < 2.0 / 3.0
+          : value < tokens.brightnessHighThreshold
           ? PiconsRegular.sun
           : PiconsRegular.sunHorizon,
       activeColor: Colors.white,
     ),
     seekBarPositionColor: AppColors.primary,
     seekBarThumbColor: AppColors.primary,
-    seekBarHeight: 5.0,
-    seekBarThumbSize: 14.0,
+    seekBarHeight: tokens.seekBarHeight,
+    seekBarThumbSize: tokens.seekBarThumbSize,
     buttonBarButtonColor: Colors.white,
-    primaryButtonBar: const [
+    primaryButtonBar: [
       Spacer(flex: 2),
       AltCastSeekRelativeButton(
-        delta: Duration(seconds: -10),
+        delta: Duration.zero - tokens.seekBackwardStep,
         icon: PiconsRegular.rewind,
+        tokens: tokens,
       ),
       Spacer(),
-      AltCastPlayPauseButton(iconSize: 56),
+      AltCastPlayPauseButton(
+        iconSize: tokens.playPausePrimaryIconSize,
+        tokens: tokens,
+      ),
       Spacer(),
       AltCastSeekRelativeButton(
-        delta: Duration(seconds: 10),
+        delta: tokens.seekForwardStep,
         icon: PiconsRegular.fastForward,
+        tokens: tokens,
       ),
       Spacer(flex: 2),
     ],
@@ -144,11 +156,14 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         builder: (ctx) => AltCastChromeIconButton(
           icon: PiconsRegular.caretLeft,
           tooltip: 'Close',
+          tokens: tokens,
           onPressed: () => unawaited(onClosePlayer()),
         ),
       ),
-      const SizedBox(width: 8),
-      Expanded(child: AltCastPlayerTitle(title: title)),
+      SizedBox(width: tokens.topBarButtonGap),
+      Expanded(
+        child: AltCastPlayerTitle(title: title, tokens: tokens),
+      ),
       Builder(
         builder: (ctx) => Consumer(
           builder: (_, ref, _) {
@@ -157,6 +172,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
               icon: PiconsRegular.usersThree,
               tooltip: 'SyncPlay',
               color: active ? AppColors.primary : null,
+              tokens: tokens,
               onPressed: () => onOpenSyncPlay(ctx),
             );
           },
@@ -170,6 +186,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
               icon: PiconsRegular.screencast,
               tooltip: 'Cast',
               color: active ? AppColors.primary : null,
+              tokens: tokens,
               onPressed: () => onOpenCast(ctx),
             );
           },
@@ -179,6 +196,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         builder: (ctx) => AltCastChromeIconButton(
           icon: PiconsRegular.deviceRotate,
           tooltip: 'Rotate',
+          tokens: tokens,
           onPressed: onRotateOrientation,
         ),
       ),
@@ -186,6 +204,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         builder: (ctx) => AltCastChromeIconButton(
           icon: PiconsRegular.closedCaptioning,
           tooltip: 'Audio & subtitles',
+          tokens: tokens,
           onPressed: () => onOpenTracks(ctx),
         ),
       ),
@@ -193,6 +212,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         builder: (ctx) => AltCastChromeIconButton(
           icon: PiconsRegular.gear,
           tooltip: 'Playback settings',
+          tokens: tokens,
           onPressed: () => onOpenSettings(ctx),
         ),
       ),
@@ -204,6 +224,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
           itemId: itemId,
           sourceListenable: sourceListenable,
           trickplayOverlayNotifier: trickplayOverlayNotifier,
+          tokens: tokens,
         ),
       ),
     ],
