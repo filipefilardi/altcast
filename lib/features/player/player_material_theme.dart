@@ -81,6 +81,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     displaySeekBar: false,
     visibleOnMount: true,
     controlsHoverDuration: tokens.controlsHoverDuration,
+    // Use media_kit's built-in backdrop so dimming is perfectly synchronized
+    // with the controls visibility lifecycle.
+    backdropColor: const Color.fromARGB(124, 0, 0, 0),
     automaticallyImplySkipNextButton: false,
     automaticallyImplySkipPreviousButton: false,
     volumeGesture: true,
