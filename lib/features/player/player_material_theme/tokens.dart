@@ -12,7 +12,7 @@ class PlayerMaterialTokens {
     // Brightness & seek bar behavior.
     this.initialBrightness = 0.5,
     this.seekBarHeight = 5.0,
-    this.seekBarThumbSize = 14.0,
+    this.seekBarThumbSize = 18.0,
 
     // Top bar spacing and gesture thresholds (0..1 range).
     this.topBarButtonGap = 8.0,
