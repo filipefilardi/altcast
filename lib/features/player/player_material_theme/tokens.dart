@@ -3,7 +3,7 @@ part of '../player_material_theme.dart';
 class PlayerMaterialTokens {
   const PlayerMaterialTokens({
     // Interaction timing.
-    this.controlsHoverDuration = const Duration(seconds: 20),
+    this.controlsHoverDuration = const Duration(seconds: 4),
     this.seekDoubleTapBackwardDuration = const Duration(seconds: 10),
     this.seekDoubleTapForwardDuration = const Duration(seconds: 10),
     this.seekBackwardStep = const Duration(seconds: 10),
