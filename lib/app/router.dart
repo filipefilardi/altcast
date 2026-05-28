@@ -6,7 +6,6 @@ import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/collection/collection_screen.dart';
 import 'package:altcast/features/auth/login_screen.dart';
 import 'package:altcast/features/downloads/downloads_screen.dart';
-import 'package:altcast/features/episode/episode_screen.dart';
 import 'package:altcast/features/home/home_screen.dart';
 import 'package:altcast/features/library/library_screen.dart';
 import 'package:altcast/features/library/library_browse_screen.dart';
@@ -79,10 +78,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/season/:id',
         builder: (_, st) => SeasonScreen(seasonId: st.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/episode/:id',
-        builder: (_, st) => EpisodeScreen(episodeId: st.pathParameters['id']!),
       ),
       GoRoute(
         path: '/play/:id',
