@@ -166,7 +166,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
-  bool _landscapeOrientation = true;
   bool _applyingSyncPlayCommand = false;
   bool _applyingRemoteCastState = false;
   bool _playerReadyForCastMirror = false;
@@ -193,10 +192,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       ValueNotifier<String?>(null);
   final ValueNotifier<TrickplayOverlayData?> _trickplayOverlayNotifier =
       ValueNotifier<TrickplayOverlayData?>(null);
-  final ValueNotifier<bool> _playerUiBackdropActiveNotifier =
-      ValueNotifier<bool>(true);
-  Timer? _playerUiBackdropTimer;
-  static const Duration _controlsBackdropActiveDuration = Duration(seconds: 20);
 
   StreamSource? get _source => _sourceNotifier.value;
 
@@ -226,7 +221,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _positionSub = _player.stream.position.listen((p) => _lastPosition = p);
-    _armPlayerUiBackdropTimer();
 
     // iOS: default animated brightness updates cancel each other during fast
     // vertical drags, so the OS level never settles — disable animation.
@@ -235,22 +229,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     unawaited(_loadPlayerTitle());
     final castActiveOnOpen = ref.read(activeRemoteSessionIdProvider) != null;
     _open(play: widget.syncPlayStartPlaying ?? !castActiveOnOpen);
-  }
-
-  void _markPlayerUiBackdropActive() {
-    if (_playerUiBackdropActiveNotifier.value != true) {
-      _playerUiBackdropActiveNotifier.value = true;
-    }
-    _armPlayerUiBackdropTimer();
-  }
-
-  void _armPlayerUiBackdropTimer() {
-    _playerUiBackdropTimer?.cancel();
-    _playerUiBackdropTimer = Timer(_controlsBackdropActiveDuration, () {
-      if (mounted) {
-        _playerUiBackdropActiveNotifier.value = false;
-      }
-    });
   }
 
   Future<void> _loadPlayerTitle() async {
@@ -311,7 +289,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _applyPlayerOrientation({required bool landscape}) {
-    _landscapeOrientation = landscape;
     SystemChrome.setPreferredOrientations(
       landscape
           ? const [
@@ -323,10 +300,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               DeviceOrientation.portraitDown,
             ],
     );
-  }
-
-  void _togglePlayerOrientation() {
-    _applyPlayerOrientation(landscape: !_landscapeOrientation);
   }
 
   Future<void> _open({Duration? startPosition, bool play = true}) async {
@@ -1237,8 +1210,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
     _trickplayOverlayNotifier.dispose();
-    _playerUiBackdropTimer?.cancel();
-    _playerUiBackdropActiveNotifier.dispose();
     _overlaySnapshots.dispose();
     _controlOverlayNotifier.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
@@ -1284,12 +1255,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           fit: StackFit.expand,
           clipBehavior: Clip.none,
           children: [
-            ValueListenableBuilder<bool>(
-              valueListenable: _playerUiBackdropActiveNotifier,
-              builder: (context, active, _) {
-                return _PlayerUiBackdropOverlay(active: active);
-              },
-            ),
             MaterialVideoControls(videoState),
             ValueListenableBuilder<_PlayerControlOverlay>(
               valueListenable: _controlOverlayNotifier,
@@ -1309,8 +1274,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                     if (overlay == _PlayerControlOverlay.subtitleOffset)
                       Positioned(
                         top: pad.top + 58,
-                        left: pad.left + 20,
-                        right: pad.right + 20,
+                        left: pad.left + 16,
+                        right: pad.right + 16,
                         child: _SubtitleOffsetOverlay(
                           initialSubtitleOffset: _subtitleOffset,
                           onSubtitleOffsetChanged: _applySubtitleOffset,
@@ -1322,7 +1287,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
-                right: pad.right + 24,
+                right: pad.right + 16,
                 bottom: skipperBottom,
                 child: SkipChipStack(
                   showIntro: snap.showSkipIntro,
@@ -1389,7 +1354,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
-      onRotateOrientation: _togglePlayerOrientation,
       onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );
@@ -1420,13 +1384,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           if (_openError != null)
             PlaybackError(error: _openError!, onClose: () => context.pop())
           else
-            MaterialVideoControlsTheme(
-              normal: controlsTheme,
-              fullscreen: controlsTheme,
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (_) => _markPlayerUiBackdropActive(),
-                onPointerMove: (_) => _markPlayerUiBackdropActive(),
+            TooltipVisibility(
+              visible: false,
+              child: MaterialVideoControlsTheme(
+                normal: controlsTheme,
+                fullscreen: controlsTheme,
                 child: Video(
                   key: _videoKey,
                   controller: _controller,
@@ -1468,6 +1430,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   /// Pops media_kit fullscreen (if active) then the player route.
   Future<void> _closePlayer() async {
+    Tooltip.dismissAllToolTips();
     final vs = _videoKey.currentState;
     if (vs != null && vs.isFullscreen()) {
       await vs.exitFullscreen();
@@ -1521,7 +1484,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _togglePlaybackSettings(BuildContext context) {
-    _markPlayerUiBackdropActive();
     if (_settingsPopoverOpen) return;
     _settingsPopoverOpen = true;
     unawaited(_openPlaybackSettingsPopover(context));
@@ -1550,7 +1512,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _showSubtitleOffsetOverlay() {
-    _markPlayerUiBackdropActive();
     _controlOverlayNotifier.value = _PlayerControlOverlay.subtitleOffset;
   }
 
@@ -2064,83 +2025,6 @@ class _CompactDropdown<T> extends StatelessWidget {
         alignment: AlignmentDirectional.centerEnd,
         menuMaxHeight: 260,
         menuWidth: 148,
-      ),
-    );
-  }
-}
-
-class _PlayerUiBackdropOverlay extends StatelessWidget {
-  const _PlayerUiBackdropOverlay({required this.active});
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: AnimatedOpacity(
-        opacity: active ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                height: 120,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.40),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: SizedBox(
-                height: 120,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.40),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.center,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  // True vignette: keep center clear and darken only outward.
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 0.96,
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.10),
-                      Colors.black.withValues(alpha: 0.18),
-                    ],
-                    stops: [0.0, 0.62, 0.84, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

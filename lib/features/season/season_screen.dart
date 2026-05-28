@@ -67,7 +67,7 @@ class SeasonScreen extends ConsumerWidget {
                       episode: ep,
                       seriesName: season.seriesName ?? 'Series',
                       seriesPosterTag: season.imageTag,
-                      onTap: () => context.push('/episode/${ep.id}'),
+                      onTap: () => context.push('/series/${season.seriesId!}'),
                     ),
                 ],
               ),

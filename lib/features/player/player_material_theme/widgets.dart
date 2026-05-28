@@ -322,7 +322,10 @@ class AltCastChromeIconButton extends StatelessWidget {
         ],
       ),
       tooltip: tooltip,
-      onPressed: onPressed,
+      onPressed: () {
+        Tooltip.dismissAllToolTips();
+        onPressed();
+      },
     );
   }
 }

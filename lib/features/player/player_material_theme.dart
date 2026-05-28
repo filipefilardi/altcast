@@ -32,9 +32,9 @@ part 'player_material_theme/tokens.dart';
 
 const bool _trickplayDebugLogs = true;
 const double kPlayerControlsBottomBarHeight = 96.0;
-const double kPlayerControlsBottomBarMargin = 8.0;
+const double kPlayerControlsBottomBarMargin = 16.0;
 const double kPlayerSeekBarHorizontalMargin = 16.0;
-const double kPlayerSeekBarBottomMargin = 8.0;
+const double kPlayerSeekBarBottomMargin = 16.0;
 const double kTrickplayPreviewLiftFromSafeBottom =
     kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
 const PlayerMaterialTokens kDefaultPlayerMaterialTokens =
@@ -67,7 +67,6 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
   required void Function(BuildContext origin) onOpenSyncPlay,
-  required VoidCallback onRotateOrientation,
   required void Function(double value) onVolumeChanged,
   required String title,
   PlayerMaterialTokens tokens = kDefaultPlayerMaterialTokens,
@@ -81,6 +80,9 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     displaySeekBar: false,
     visibleOnMount: true,
     controlsHoverDuration: tokens.controlsHoverDuration,
+    // Use media_kit's built-in backdrop so dimming is perfectly synchronized
+    // with the controls visibility lifecycle.
+    backdropColor: const Color.fromARGB(124, 0, 0, 0),
     automaticallyImplySkipNextButton: false,
     automaticallyImplySkipPreviousButton: false,
     volumeGesture: true,
@@ -136,18 +138,18 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       const Spacer(),
       AltCastSeekRelativeButton(
         delta: Duration.zero - tokens.seekBackwardStep,
-        icon: PiconsRegular.rewind,
+        icon: Icons.replay_10,
         tokens: tokens,
       ),
-      const SizedBox(width: 32),
+      SizedBox(width: tokens.primaryControlGap),
       AltCastPlayPauseButton(
         iconSize: tokens.playPausePrimaryIconSize,
         tokens: tokens,
       ),
-      const SizedBox(width: 32),
+      SizedBox(width: tokens.primaryControlGap),
       AltCastSeekRelativeButton(
         delta: tokens.seekForwardStep,
-        icon: PiconsRegular.fastForward,
+        icon: Icons.forward_10,
         tokens: tokens,
       ),
       const Spacer(),
@@ -195,14 +197,6 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       ),
       Builder(
         builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.deviceRotate,
-          tooltip: 'Rotate',
-          tokens: tokens,
-          onPressed: onRotateOrientation,
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
           icon: PiconsRegular.closedCaptioning,
           tooltip: 'Audio & subtitles',
           tokens: tokens,
@@ -218,6 +212,8 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         ),
       ),
     ],
+    // Bottom controls include seek timestamps, so matching raw margins makes
+    // the top look visually farther. Keep top margin tighter for balance.
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     bottomButtonBar: [
       Expanded(

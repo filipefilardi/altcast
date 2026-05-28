@@ -3,7 +3,7 @@ part of '../player_material_theme.dart';
 class PlayerMaterialTokens {
   const PlayerMaterialTokens({
     // Interaction timing.
-    this.controlsHoverDuration = const Duration(seconds: 20),
+    this.controlsHoverDuration = const Duration(seconds: 4),
     this.seekDoubleTapBackwardDuration = const Duration(seconds: 10),
     this.seekDoubleTapForwardDuration = const Duration(seconds: 10),
     this.seekBackwardStep = const Duration(seconds: 10),
@@ -12,7 +12,7 @@ class PlayerMaterialTokens {
     // Brightness & seek bar behavior.
     this.initialBrightness = 0.5,
     this.seekBarHeight = 5.0,
-    this.seekBarThumbSize = 14.0,
+    this.seekBarThumbSize = 18.0,
 
     // Top bar spacing and gesture thresholds (0..1 range).
     this.topBarButtonGap = 8.0,
@@ -22,8 +22,9 @@ class PlayerMaterialTokens {
 
     // Primary playback button sizing.
     this.playPausePrimaryIconSize = 56.0,
-    this.seekButtonIconSize = 36.0,
+    this.seekButtonIconSize = 44.0,
     this.playPauseDefaultIconSize = 48.0,
+    this.primaryControlGap = 128.0,
 
     // Vertical gesture indicator layout.
     this.gestureIndicatorWidth = 54.0,
@@ -102,6 +103,7 @@ class PlayerMaterialTokens {
   final double playPausePrimaryIconSize;
   final double seekButtonIconSize;
   final double playPauseDefaultIconSize;
+  final double primaryControlGap;
 
   // Vertical gesture indicator layout.
   final double gestureIndicatorWidth;

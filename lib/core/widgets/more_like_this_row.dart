@@ -64,7 +64,10 @@ void openMediaDetail(BuildContext context, BrowseItem item) {
     case MediaKind.season:
       context.push('/season/${item.id}');
     case MediaKind.episode:
-      context.push('/episode/${item.id}');
+      final seriesId = item.seriesId;
+      if (seriesId != null && seriesId.isNotEmpty) {
+        context.push('/series/$seriesId');
+      }
     case MediaKind.person:
       context.push('/person/${item.id}');
     case MediaKind.collection:
