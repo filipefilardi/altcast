@@ -195,11 +195,11 @@ class AltCastPlayPauseButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final remote = ref.watch(activeRemoteSessionProvider).value;
     if (remote != null && remote.isPlayingSomething) {
-        return IconButton(
-          icon: Icon(remote.isPaused ? PiconsFill.play : PiconsFill.pause),
-          iconSize: iconSize ?? tokens.playPauseDefaultIconSize,
-          color: Colors.white,
-          tooltip: remote.isPaused ? 'Play' : 'Pause',
+      return IconButton(
+        icon: Icon(remote.isPaused ? PiconsFill.play : PiconsFill.pause),
+        iconSize: iconSize ?? tokens.playPauseDefaultIconSize,
+        color: Colors.white,
+        tooltip: remote.isPaused ? 'Play' : 'Pause',
         onPressed: () =>
             ref.read(remoteSessionsRepositoryProvider).playPause(remote.id),
       );
