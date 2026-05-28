@@ -32,9 +32,9 @@ part 'player_material_theme/tokens.dart';
 
 const bool _trickplayDebugLogs = true;
 const double kPlayerControlsBottomBarHeight = 96.0;
-const double kPlayerControlsBottomBarMargin = 8.0;
+const double kPlayerControlsBottomBarMargin = 16.0;
 const double kPlayerSeekBarHorizontalMargin = 16.0;
-const double kPlayerSeekBarBottomMargin = 8.0;
+const double kPlayerSeekBarBottomMargin = 16.0;
 const double kTrickplayPreviewLiftFromSafeBottom =
     kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
 const PlayerMaterialTokens kDefaultPlayerMaterialTokens =
@@ -221,6 +221,8 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         ),
       ),
     ],
+    // Bottom controls include seek timestamps, so matching raw margins makes
+    // the top look visually farther. Keep top margin tighter for balance.
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     bottomButtonBar: [
       Expanded(

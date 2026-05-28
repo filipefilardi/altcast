@@ -1280,8 +1280,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                     if (overlay == _PlayerControlOverlay.subtitleOffset)
                       Positioned(
                         top: pad.top + 58,
-                        left: pad.left + 20,
-                        right: pad.right + 20,
+                        left: pad.left + 16,
+                        right: pad.right + 16,
                         child: _SubtitleOffsetOverlay(
                           initialSubtitleOffset: _subtitleOffset,
                           onSubtitleOffsetChanged: _applySubtitleOffset,
@@ -1293,7 +1293,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
-                right: pad.right + 24,
+                right: pad.right + 16,
                 bottom: skipperBottom,
                 child: SkipChipStack(
                   showIntro: snap.showSkipIntro,
