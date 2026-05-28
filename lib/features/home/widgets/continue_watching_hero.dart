@@ -10,6 +10,7 @@ import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/utils/format.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/glass_popover.dart';
+import 'package:altcast/core/widgets/horizontal_shelf_with_arrows.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -173,11 +174,30 @@ class _ContinueWatchingHeroState extends ConsumerState<ContinueWatchingHero> {
   }
 }
 
-class _ContinueWatchingRail extends StatelessWidget {
+class _ContinueWatchingRail extends StatefulWidget {
   const _ContinueWatchingRail({required this.items, required this.onOpen});
 
   final List<BrowseItem> items;
   final void Function(BrowseItem item) onOpen;
+
+  @override
+  State<_ContinueWatchingRail> createState() => _ContinueWatchingRailState();
+}
+
+class _ContinueWatchingRailState extends State<_ContinueWatchingRail> {
+  late final ScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,18 +206,23 @@ class _ContinueWatchingRail extends StatelessWidget {
         const spacing = 12.0;
         final cardWidth = _desktopContinueCardWidth(c.maxWidth);
 
-        return SizedBox(
-          height: cardWidth * 9 / 16,
-          child: ListView.separated(
-            primary: false,
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: spacing),
-            itemBuilder: (context, i) => SizedBox(
-              width: cardWidth,
-              child: _ContinueWatchingCard(
-                item: items[i],
-                onOpenDetail: () => onOpen(items[i]),
+        return HorizontalShelfWithArrows(
+          controller: _controller,
+          enabled: true,
+          child: SizedBox(
+            height: cardWidth * 9 / 16,
+            child: ListView.separated(
+              controller: _controller,
+              primary: false,
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: spacing),
+              itemBuilder: (context, i) => SizedBox(
+                width: cardWidth,
+                child: _ContinueWatchingCard(
+                  item: widget.items[i],
+                  onOpenDetail: () => widget.onOpen(widget.items[i]),
+                ),
               ),
             ),
           ),

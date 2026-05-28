@@ -7,6 +7,7 @@ import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/navigation.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/horizontal_shelf_with_arrows.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
@@ -382,22 +383,47 @@ class _SkeletonRow extends StatelessWidget {
   }
 }
 
-class _PosterRow extends StatelessWidget {
+class _PosterRow extends StatefulWidget {
   const _PosterRow({required this.items});
   final List<BrowseItem> items;
 
   @override
+  State<_PosterRow> createState() => _PosterRowState();
+}
+
+class _PosterRowState extends State<_PosterRow> {
+  late final ScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 248,
-      child: ListView.separated(
-        primary: false,
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => PosterCard(
-          item: items[i],
-          onTap: () => openItemDetail(context, items[i]),
+    final desktop = MediaQuery.sizeOf(context).width >= 900;
+    return HorizontalShelfWithArrows(
+      controller: _controller,
+      enabled: desktop,
+      child: SizedBox(
+        height: 248,
+        child: ListView.separated(
+          controller: _controller,
+          primary: false,
+          scrollDirection: Axis.horizontal,
+          itemCount: widget.items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (_, i) => PosterCard(
+            item: widget.items[i],
+            onTap: () => openItemDetail(context, widget.items[i]),
+          ),
         ),
       ),
     );
