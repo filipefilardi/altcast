@@ -1384,38 +1384,41 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           if (_openError != null)
             PlaybackError(error: _openError!, onClose: () => context.pop())
           else
-            MaterialVideoControlsTheme(
-              normal: controlsTheme,
-              fullscreen: controlsTheme,
-              child: Video(
-                key: _videoKey,
-                controller: _controller,
-                controls: _buildVideoControls,
-                fit: BoxFit.contain,
-                subtitleViewConfiguration: SubtitleViewConfiguration(
-                  visible: true,
-                  textAlign: TextAlign.center,
-                  textScaler: TextScaler.noScaling,
-                  padding: EdgeInsets.fromLTRB(
-                    subtitleHorizontalPadding,
-                    0,
-                    subtitleHorizontalPadding,
-                    subtitleBottomPadding,
-                  ),
-                  style: TextStyle(
-                    fontSize: subtitleFontSize,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                    letterSpacing: 0,
-                    backgroundColor: Colors.black26,
-                    shadows: [
-                      Shadow(
-                        offset: Offset(0, 1),
-                        blurRadius: 2,
-                        color: Colors.black,
-                      ),
-                    ],
+            TooltipVisibility(
+              visible: false,
+              child: MaterialVideoControlsTheme(
+                normal: controlsTheme,
+                fullscreen: controlsTheme,
+                child: Video(
+                  key: _videoKey,
+                  controller: _controller,
+                  controls: _buildVideoControls,
+                  fit: BoxFit.contain,
+                  subtitleViewConfiguration: SubtitleViewConfiguration(
+                    visible: true,
+                    textAlign: TextAlign.center,
+                    textScaler: TextScaler.noScaling,
+                    padding: EdgeInsets.fromLTRB(
+                      subtitleHorizontalPadding,
+                      0,
+                      subtitleHorizontalPadding,
+                      subtitleBottomPadding,
+                    ),
+                    style: TextStyle(
+                      fontSize: subtitleFontSize,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                      letterSpacing: 0,
+                      backgroundColor: Colors.black26,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0, 1),
+                          blurRadius: 2,
+                          color: Colors.black,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
