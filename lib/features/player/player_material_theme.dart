@@ -67,7 +67,6 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
   required void Function(BuildContext origin) onOpenSyncPlay,
-  required VoidCallback onRotateOrientation,
   required void Function(double value) onVolumeChanged,
   required String title,
   PlayerMaterialTokens tokens = kDefaultPlayerMaterialTokens,
@@ -194,14 +193,6 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
               onPressed: () => onOpenCast(ctx),
             );
           },
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.deviceRotate,
-          tooltip: 'Rotate',
-          tokens: tokens,
-          onPressed: onRotateOrientation,
         ),
       ),
       Builder(

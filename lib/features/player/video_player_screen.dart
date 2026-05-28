@@ -166,7 +166,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
   bool _scheduledFullscreen = false;
-  bool _landscapeOrientation = true;
   bool _applyingSyncPlayCommand = false;
   bool _applyingRemoteCastState = false;
   bool _playerReadyForCastMirror = false;
@@ -290,7 +289,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _applyPlayerOrientation({required bool landscape}) {
-    _landscapeOrientation = landscape;
     SystemChrome.setPreferredOrientations(
       landscape
           ? const [
@@ -302,10 +300,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
               DeviceOrientation.portraitDown,
             ],
     );
-  }
-
-  void _togglePlayerOrientation() {
-    _applyPlayerOrientation(landscape: !_landscapeOrientation);
   }
 
   Future<void> _open({Duration? startPosition, bool play = true}) async {
@@ -1360,7 +1354,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
-      onRotateOrientation: _togglePlayerOrientation,
       onVolumeChanged: _handlePlayerVolumeChanged,
       title: _playerTitle,
     );
@@ -1434,6 +1427,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   /// Pops media_kit fullscreen (if active) then the player route.
   Future<void> _closePlayer() async {
+    Tooltip.dismissAllToolTips();
     final vs = _videoKey.currentState;
     if (vs != null && vs.isFullscreen()) {
       await vs.exitFullscreen();
