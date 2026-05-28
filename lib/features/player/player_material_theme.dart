@@ -141,12 +141,12 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         icon: PiconsRegular.rewind,
         tokens: tokens,
       ),
-      const SizedBox(width: 32),
+      SizedBox(width: tokens.primaryControlGap),
       AltCastPlayPauseButton(
         iconSize: tokens.playPausePrimaryIconSize,
         tokens: tokens,
       ),
-      const SizedBox(width: 32),
+      SizedBox(width: tokens.primaryControlGap),
       AltCastSeekRelativeButton(
         delta: tokens.seekForwardStep,
         icon: PiconsRegular.fastForward,

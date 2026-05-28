@@ -24,6 +24,7 @@ class PlayerMaterialTokens {
     this.playPausePrimaryIconSize = 56.0,
     this.seekButtonIconSize = 36.0,
     this.playPauseDefaultIconSize = 48.0,
+    this.primaryControlGap = 128.0,
 
     // Vertical gesture indicator layout.
     this.gestureIndicatorWidth = 54.0,
@@ -102,6 +103,7 @@ class PlayerMaterialTokens {
   final double playPausePrimaryIconSize;
   final double seekButtonIconSize;
   final double playPauseDefaultIconSize;
+  final double primaryControlGap;
 
   // Vertical gesture indicator layout.
   final double gestureIndicatorWidth;
