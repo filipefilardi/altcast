@@ -138,7 +138,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       const Spacer(),
       AltCastSeekRelativeButton(
         delta: Duration.zero - tokens.seekBackwardStep,
-        icon: PiconsRegular.rewind,
+        icon: Icons.replay_10,
         tokens: tokens,
       ),
       SizedBox(width: tokens.primaryControlGap),
@@ -149,7 +149,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       SizedBox(width: tokens.primaryControlGap),
       AltCastSeekRelativeButton(
         delta: tokens.seekForwardStep,
-        icon: PiconsRegular.fastForward,
+        icon: Icons.forward_10,
         tokens: tokens,
       ),
       const Spacer(),

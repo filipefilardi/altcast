@@ -22,7 +22,7 @@ class PlayerMaterialTokens {
 
     // Primary playback button sizing.
     this.playPausePrimaryIconSize = 56.0,
-    this.seekButtonIconSize = 36.0,
+    this.seekButtonIconSize = 44.0,
     this.playPauseDefaultIconSize = 48.0,
     this.primaryControlGap = 128.0,
 
