@@ -1772,11 +1772,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       return true;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      unawaited(_player.seek(_player.state.position - _keyboardSeekStep));
+      unawaited(_seekRelativeFromKeyboard(Duration.zero - _keyboardSeekStep));
       return true;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      unawaited(_player.seek(_player.state.position + _keyboardSeekStep));
+      unawaited(_seekRelativeFromKeyboard(_keyboardSeekStep));
       return true;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -1855,6 +1855,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       return _currentVolumeLevel;
     }
     return (_player.state.volume / 100.0).clamp(0.0, 1.0);
+  }
+
+  Future<void> _seekRelativeFromKeyboard(Duration delta) async {
+    final current = _player.state.position;
+    final duration = _player.state.duration;
+    var target = current + delta;
+
+    if (target < Duration.zero) {
+      target = Duration.zero;
+    }
+    if (duration > Duration.zero && target > duration) {
+      target = duration;
+    }
+
+    await _player.seek(target);
   }
 }
 
