@@ -54,7 +54,7 @@ class TrickplayOverlayData {
   final double alignPercent;
 }
 
-/// Material mobile controls: −10s / +30s, close + CC (tracks sheet) in the top
+/// Material mobile controls: −10s / +10s, close + CC (tracks sheet) in the top
 /// bar (visible in media_kit fullscreen), **brightness on the left** and
 /// **volume on the right** via vertical drag only (no extra icon buttons).
 MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
@@ -102,23 +102,10 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
         unawaited(_applyScreenBrightness(screenBrightness, v)),
     onBrightnessReset: () =>
         unawaited(_resetScreenBrightness(screenBrightness)),
-    volumeIndicatorBuilder: (context, value) => Consumer(
-      builder: (_, ref, _) {
-        final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
-        return _VerticalGestureIndicator(
-          alignment: Alignment.centerRight,
-          value: value,
-          tokens: tokens,
-          icon: value == 0.0
-              ? PiconsRegular.speakerSlash
-              : value < tokens.volumeMidThreshold
-              ? PiconsRegular.speakerHigh
-              : PiconsRegular.speakerHigh,
-          activeColor: castActive ? AppColors.primary : Colors.white,
-        );
-      },
-    ),
-    brightnessIndicatorBuilder: (_, value) => _VerticalGestureIndicator(
+    // Volume indicator is rendered by the player screen so gesture + keyboard
+    // volume changes share exactly one overlay implementation.
+    volumeIndicatorBuilder: (context, value) => const SizedBox.shrink(),
+    brightnessIndicatorBuilder: (_, value) => AltCastVerticalGestureIndicator(
       alignment: Alignment.centerLeft,
       value: value,
       tokens: tokens,

@@ -47,8 +47,9 @@ class AltCastSeekRelativeButton extends ConsumerWidget {
   }
 }
 
-class _VerticalGestureIndicator extends StatelessWidget {
-  const _VerticalGestureIndicator({
+class AltCastVerticalGestureIndicator extends StatelessWidget {
+  const AltCastVerticalGestureIndicator({
+    super.key,
     required this.alignment,
     required this.value,
     required this.icon,

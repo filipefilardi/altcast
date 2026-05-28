@@ -44,6 +44,8 @@ const _introSkipperAutoSkipDelay = Duration(seconds: 3);
 
 /// Position skip buttons exactly above the seek timeline.
 const _introSkipperChipGapFromTimeline = 24.0;
+const _keyboardSeekStep = Duration(seconds: 10);
+const _keyboardVolumeStep = 0.05;
 
 enum _PlayerControlOverlay { none, subtitleOffset }
 
@@ -177,6 +179,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _lastSyncCommandSerial = 0;
   String? _lastSyncCommandKey;
   DateTime? _lastSyncCommandAt;
+  final FocusNode _keyboardFocusNode = FocusNode(
+    debugLabel: 'video-player-keyboard-focus',
+  );
+  final ValueNotifier<double?> _keyboardVolumeIndicator =
+      ValueNotifier<double?>(null);
+  Timer? _keyboardVolumeIndicatorTimer;
+  double _currentVolumeLevel = 1.0;
+  double _lastNonZeroVolume = 1.0;
   DateTime? _lastSyncSeekSentAt;
 
   /// Live source — set as soon as PlaybackInfo (or local-file resolution)
@@ -214,6 +224,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             )
           : const VideoControllerConfiguration(),
     );
+    _currentVolumeLevel = (_player.state.volume / 100.0).clamp(0.0, 1.0);
+    if (_currentVolumeLevel > 0) {
+      _lastNonZeroVolume = _currentVolumeLevel;
+    }
 
     // Lock to landscape while the player is on screen. Best-effort:
     // ignore platforms (web, desktop) that don't support orientation locks.
@@ -225,6 +239,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // iOS: default animated brightness updates cancel each other during fast
     // vertical drags, so the OS level never settles — disable animation.
     unawaited(_prepareScreenBrightnessForGestures());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _keyboardFocusNode.requestFocus();
+      }
+    });
+    HardwareKeyboard.instance.addHandler(_handleHardwareKeyboardEvent);
 
     unawaited(_loadPlayerTitle());
     final castActiveOnOpen = ref.read(activeRemoteSessionIdProvider) != null;
@@ -948,9 +968,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _applyingRemoteCastState || _volumeBeforeCastMirror != null;
 
   void _handlePlayerVolumeChanged(double value) {
+    final normalized = value.clamp(0.0, 1.0);
+    _currentVolumeLevel = normalized;
+    if (normalized > 0) _lastNonZeroVolume = normalized;
+    _showVolumeIndicator(normalized);
     final remoteSessionId = ref.read(activeRemoteSessionIdProvider);
     if (remoteSessionId == null) {
-      unawaited(_player.setVolume(value * 100.0));
+      unawaited(_player.setVolume(normalized * 100.0));
       return;
     }
 
@@ -959,7 +983,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       unawaited(
         ref
             .read(remoteSessionsRepositoryProvider)
-            .setVolume(remoteSessionId, (value * 100).round()),
+            .setVolume(remoteSessionId, (normalized * 100).round()),
       );
     });
   }
@@ -1186,6 +1210,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _progressTimer?.cancel();
     _autoplayTimer?.cancel();
     _castVolumeDebounce?.cancel();
+    _keyboardVolumeIndicatorTimer?.cancel();
     _cancelIntroSkipperTimers();
     _positionSub?.cancel();
     _playingSub?.cancel();
@@ -1207,11 +1232,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           .closeActiveEncoding(playSessionId: src.playSessionId!);
     }
     _player.dispose();
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKeyboardEvent);
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
     _trickplayOverlayNotifier.dispose();
+    _keyboardVolumeIndicator.dispose();
     _overlaySnapshots.dispose();
     _controlOverlayNotifier.dispose();
+    _keyboardFocusNode.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
     // Restore app default orientation after leaving the landscape-only player.
     SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
@@ -1282,6 +1310,25 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         ),
                       ),
                   ],
+                );
+              },
+            ),
+            ValueListenableBuilder<double?>(
+              valueListenable: _keyboardVolumeIndicator,
+              builder: (context, value, _) {
+                if (value == null) return const SizedBox.shrink();
+                return Positioned.fill(
+                  child: IgnorePointer(
+                    child: AltCastVerticalGestureIndicator(
+                      alignment: Alignment.centerRight,
+                      value: value,
+                      tokens: kDefaultPlayerMaterialTokens,
+                      icon: value == 0.0
+                          ? PiconsRegular.speakerSlash
+                          : PiconsRegular.speakerHigh,
+                      activeColor: Colors.white,
+                    ),
+                  ),
                 );
               },
             ),
@@ -1378,52 +1425,57 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_openError != null)
-            PlaybackError(error: _openError!, onClose: () => context.pop())
-          else
-            TooltipVisibility(
-              visible: false,
-              child: MaterialVideoControlsTheme(
-                normal: controlsTheme,
-                fullscreen: controlsTheme,
-                child: Video(
-                  key: _videoKey,
-                  controller: _controller,
-                  controls: _buildVideoControls,
-                  fit: BoxFit.contain,
-                  subtitleViewConfiguration: SubtitleViewConfiguration(
-                    visible: true,
-                    textAlign: TextAlign.center,
-                    textScaler: TextScaler.noScaling,
-                    padding: EdgeInsets.fromLTRB(
-                      subtitleHorizontalPadding,
-                      0,
-                      subtitleHorizontalPadding,
-                      subtitleBottomPadding,
-                    ),
-                    style: TextStyle(
-                      fontSize: subtitleFontSize,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      letterSpacing: 0,
-                      backgroundColor: Colors.black26,
-                      shadows: [
-                        Shadow(
-                          offset: Offset(0, 1),
-                          blurRadius: 2,
-                          color: Colors.black,
-                        ),
-                      ],
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_openError != null)
+              PlaybackError(error: _openError!, onClose: () => context.pop())
+            else
+              TooltipVisibility(
+                visible: false,
+                child: MaterialVideoControlsTheme(
+                  normal: controlsTheme,
+                  fullscreen: controlsTheme,
+                  child: Video(
+                    key: _videoKey,
+                    controller: _controller,
+                    controls: _buildVideoControls,
+                    focusNode: _keyboardFocusNode,
+                    fit: BoxFit.contain,
+                    subtitleViewConfiguration: SubtitleViewConfiguration(
+                      visible: true,
+                      textAlign: TextAlign.center,
+                      textScaler: TextScaler.noScaling,
+                      padding: EdgeInsets.fromLTRB(
+                        subtitleHorizontalPadding,
+                        0,
+                        subtitleHorizontalPadding,
+                        subtitleBottomPadding,
+                      ),
+                      style: TextStyle(
+                        fontSize: subtitleFontSize,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        letterSpacing: 0,
+                        backgroundColor: Colors.black26,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1672,6 +1724,137 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       startPosition: _lastPosition,
       isPlaying: _player.state.playing,
     );
+  }
+
+  bool _handleHardwareKeyboardEvent(KeyEvent event) {
+    if (!mounted) return false;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    if (_hasTextInputFocus()) return false;
+
+    final key = event.logicalKey;
+    final isRepeat = event is KeyRepeatEvent;
+    final keyboard = HardwareKeyboard.instance;
+    final hasModifiers =
+        keyboard.isAltPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isMetaPressed;
+    if (hasModifiers &&
+        key != LogicalKeyboardKey.mediaPlay &&
+        key != LogicalKeyboardKey.mediaPause &&
+        key != LogicalKeyboardKey.mediaPlayPause &&
+        key != LogicalKeyboardKey.mediaTrackNext &&
+        key != LogicalKeyboardKey.mediaTrackPrevious) {
+      return false;
+    }
+    if (isRepeat && _isNonRepeatableShortcut(key)) {
+      return true;
+    }
+
+    if (key == LogicalKeyboardKey.mediaPlay) {
+      unawaited(_player.play());
+      return true;
+    }
+    if (key == LogicalKeyboardKey.mediaPause) {
+      unawaited(_player.pause());
+      return true;
+    }
+    if (key == LogicalKeyboardKey.mediaPlayPause ||
+        key == LogicalKeyboardKey.space) {
+      _player.playOrPause();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackNext) {
+      unawaited(_player.next());
+      return true;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackPrevious) {
+      unawaited(_player.previous());
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      unawaited(_player.seek(_player.state.position - _keyboardSeekStep));
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      unawaited(_player.seek(_player.state.position + _keyboardSeekStep));
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _adjustKeyboardVolume(_keyboardVolumeStep);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _adjustKeyboardVolume(-_keyboardVolumeStep);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.keyM) {
+      _toggleMuteFromKeyboard();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.keyF) {
+      unawaited(_videoKey.currentState?.toggleFullscreen());
+      return true;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      unawaited(_videoKey.currentState?.exitFullscreen());
+      return true;
+    }
+    return false;
+  }
+
+  bool _hasTextInputFocus() {
+    final focusedContext = FocusManager.instance.primaryFocus?.context;
+    if (focusedContext == null) return false;
+    return focusedContext.widget is EditableText;
+  }
+
+  void _adjustKeyboardVolume(double delta) {
+    final current = _currentVolumeForShortcuts();
+    final next = (current + delta).clamp(0.0, 1.0);
+    _handlePlayerVolumeChanged(next);
+  }
+
+  void _showVolumeIndicator(double value) {
+    _keyboardVolumeIndicator.value = value.clamp(0.0, 1.0);
+    _keyboardVolumeIndicatorTimer?.cancel();
+    _keyboardVolumeIndicatorTimer = Timer(
+      const Duration(milliseconds: 220),
+      () {
+        if (!mounted) return;
+        _keyboardVolumeIndicator.value = null;
+      },
+    );
+  }
+
+  void _toggleMuteFromKeyboard() {
+    final current = _currentVolumeForShortcuts();
+    if (current > 0) {
+      _handlePlayerVolumeChanged(0);
+      return;
+    }
+    final restore = _lastNonZeroVolume > 0 ? _lastNonZeroVolume : 1.0;
+    _handlePlayerVolumeChanged(restore);
+  }
+
+  bool _isNonRepeatableShortcut(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.mediaPlayPause ||
+        key == LogicalKeyboardKey.keyM ||
+        key == LogicalKeyboardKey.keyF ||
+        key == LogicalKeyboardKey.escape;
+  }
+
+  double _currentVolumeForShortcuts() {
+    final remote = ref.read(activeRemoteSessionProvider).value;
+    if (remote != null) {
+      if (remote.isMuted) return 0.0;
+      final remoteLevel = remote.volumeLevel;
+      if (remoteLevel != null) {
+        return (remoteLevel.clamp(0, 100) / 100.0).toDouble();
+      }
+      return _currentVolumeLevel;
+    }
+    return (_player.state.volume / 100.0).clamp(0.0, 1.0);
   }
 }
 
