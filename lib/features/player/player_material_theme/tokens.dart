@@ -11,6 +11,7 @@ class PlayerMaterialTokens {
 
     // Brightness & seek bar behavior.
     this.initialBrightness = 0.5,
+    this.seekBarTouchTargetHeight = 48.0,
     this.seekBarHeight = 5.0,
     this.seekBarThumbSize = 18.0,
 
@@ -90,6 +91,7 @@ class PlayerMaterialTokens {
 
   // Brightness & seek bar behavior.
   final double initialBrightness;
+  final double seekBarTouchTargetHeight;
   final double seekBarHeight;
   final double seekBarThumbSize;
 
