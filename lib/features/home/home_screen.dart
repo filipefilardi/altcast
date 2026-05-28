@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/horizontal_shelf_with_arrows.dart';
@@ -58,14 +59,11 @@ class HomeScreen extends ConsumerWidget {
         }),
       ]);
       if (context.mounted && errors.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              errors.length == 3
-                  ? "Couldn't refresh home. Check your connection."
-                  : "Some sections didn't refresh. Pull to try again.",
-            ),
-          ),
+        showAppSnackBar(
+          context,
+          errors.length == 3
+              ? "Couldn't refresh home. Check your connection."
+              : "Some sections didn't refresh. Pull to try again.",
         );
       }
     }

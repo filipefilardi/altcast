@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 
 /// Watched toggle used on the movie / series detail screens.
 ///
@@ -57,9 +58,7 @@ class _UserDataActionsState extends State<UserDataActions> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showAppSnackBar(context, message);
   }
 
   @override

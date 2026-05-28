@@ -3,6 +3,7 @@ import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
@@ -224,38 +225,21 @@ class _SeriesDownloadButtonState extends ConsumerState<SeriesDownloadButton> {
             seriesPosterTag: widget.series.imageTag,
           );
       if (!mounted) return;
-      _showBatchQueuedSnackBar(
-        ScaffoldMessenger.of(context),
-        queued,
-        widget.series.name,
-      );
+      _showBatchQueuedSnackBar(context, queued, widget.series.name);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text("Couldn't queue ${widget.series.name}")),
-        );
+      showAppSnackBar(context, "Couldn't queue ${widget.series.name}");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 }
 
-void _showBatchQueuedSnackBar(
-  ScaffoldMessengerState messenger,
-  int queued,
-  String label,
-) {
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(
-          queued == 0
-              ? '$label is already downloaded or queued.'
-              : 'Queued $queued episode${queued == 1 ? '' : 's'} from $label.',
-        ),
-      ),
-    );
+void _showBatchQueuedSnackBar(BuildContext context, int queued, String label) {
+  showAppSnackBar(
+    context,
+    queued == 0
+        ? '$label is already downloaded or queued.'
+        : 'Queued $queued episode${queued == 1 ? '' : 's'} from $label.',
+  );
 }

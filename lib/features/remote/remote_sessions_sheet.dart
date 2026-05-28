@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/data/jellyfin/models/remote_session.dart';
@@ -320,7 +321,6 @@ class _SessionRow extends ConsumerWidget {
   }
 
   Future<void> _cast(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final repo = ref.read(remoteSessionsRepositoryProvider);
     try {
       await repo.playOnSession(
@@ -332,23 +332,18 @@ class _SessionRow extends ConsumerWidget {
       await onCastStarted?.call(session.id);
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Playing on ${session.deviceName}'),
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Stop',
-            onPressed: () async {
-              await repo.stop(session.id);
-              ref.read(activeRemoteSessionIdProvider.notifier).clear();
-            },
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'Playing on ${session.deviceName}',
+        duration: const Duration(seconds: 3),
+        actionLabel: 'Stop',
+        onAction: () async {
+          await repo.stop(session.id);
+          ref.read(activeRemoteSessionIdProvider.notifier).clear();
+        },
       );
     } catch (e) {
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text('Cast failed: $e')));
+      showAppSnackBar(context, 'Cast failed: $e');
     }
   }
 
