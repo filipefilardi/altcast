@@ -158,12 +158,16 @@ class _DownloadGroup extends ConsumerWidget {
         ListTile(
           leading: Icon(
             PiconsRegular.trash,
-            color: hasDownloads ? AppColors.textSecondary : AppColors.textTertiary,
+            color: hasDownloads
+                ? AppColors.textSecondary
+                : AppColors.textTertiary,
           ),
           title: Text(
             'Delete all downloads',
             style: TextStyle(
-              color: hasDownloads ? AppColors.textPrimary : AppColors.textTertiary,
+              color: hasDownloads
+                  ? AppColors.textPrimary
+                  : AppColors.textTertiary,
             ),
           ),
           subtitle: const Text(

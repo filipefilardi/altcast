@@ -114,15 +114,15 @@ class _GenreSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title.toUpperCase(), style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          title.toUpperCase(),
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
         const SizedBox(height: 12),
         if (genresState.isLoading && genres == null)
           const Center(child: CircularProgressIndicator())
         else if (genresState.hasError && genres == null)
-          ErrorStateView(
-            title: "Couldn't load $title",
-            onRetry: onRetry,
-          )
+          ErrorStateView(title: "Couldn't load $title", onRetry: onRetry)
         else if (isEmpty)
           const EmptyState(
             icon: Icons.movie_filter_outlined,
