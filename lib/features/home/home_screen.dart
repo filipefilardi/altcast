@@ -31,18 +31,24 @@ class HomeScreen extends ConsumerWidget {
     final resumeAsync = ref.watch(continueWatchingProvider);
     final moviesAsync = ref.watch(recentMoviesProvider);
     final showsAsync = ref.watch(recentShowsProvider);
+    final recommendedAsync = ref.watch(recommendedMoviesProvider);
 
     final everythingFailed =
-        resumeAsync.hasError && moviesAsync.hasError && showsAsync.hasError;
+        resumeAsync.hasError &&
+        moviesAsync.hasError &&
+        showsAsync.hasError &&
+        recommendedAsync.hasError;
     final everythingEmpty =
         resumeAsync.value?.isEmpty == true &&
         moviesAsync.value?.isEmpty == true &&
-        showsAsync.value?.isEmpty == true;
+        showsAsync.value?.isEmpty == true &&
+        recommendedAsync.value?.isEmpty == true;
 
     Future<void> refresh() async {
       ref.invalidate(continueWatchingProvider);
       ref.invalidate(recentMoviesProvider);
       ref.invalidate(recentShowsProvider);
+      ref.invalidate(recommendedMoviesProvider);
       final errors = <Object?>[];
       await Future.wait([
         ref.read(continueWatchingProvider.future).catchError((e, _) {
@@ -57,11 +63,15 @@ class HomeScreen extends ConsumerWidget {
           errors.add(e);
           return <BrowseItem>[];
         }),
+        ref.read(recommendedMoviesProvider.future).catchError((e, _) {
+          errors.add(e);
+          return <BrowseItem>[];
+        }),
       ]);
       if (context.mounted && errors.isNotEmpty) {
         showAppSnackBar(
           context,
-          errors.length == 3
+          errors.length == 4
               ? "Couldn't refresh home. Check your connection."
               : "Some sections didn't refresh. Pull to try again.",
         );
@@ -101,6 +111,14 @@ class HomeScreen extends ConsumerWidget {
                 itemsAsync: resumeAsync,
                 onRetry: () => ref.invalidate(continueWatchingProvider),
                 onOpen: (item) => openItemDetail(context, item),
+              ),
+              _Section<List<BrowseItem>>(
+                title: 'Recommended for you',
+                state: recommendedAsync,
+                onRetry: () => ref.invalidate(recommendedMoviesProvider),
+                builder: (items) => _PosterRow(items: items),
+                hideWhenEmpty: true,
+                skeletonHeight: 248,
               ),
               _Section<List<BrowseItem>>(
                 title: 'Recently added movies',
@@ -239,13 +257,6 @@ class _LibraryNav extends StatelessWidget {
           child: _LibraryNavItem(
             label: 'Series',
             onTap: () => context.push('/library/shows'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _LibraryNavItem(
-            label: 'Collections',
-            onTap: () => context.push('/library/collections'),
           ),
         ),
       ],
