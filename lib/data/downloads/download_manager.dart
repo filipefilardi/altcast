@@ -60,8 +60,12 @@ final downloadManagerProvider =
     NotifierProvider<DownloadManager, DownloadsState>(DownloadManager.new);
 
 class DownloadManager extends Notifier<DownloadsState> {
+  static const int _maxAutoRetries = 4;
+  static const Duration _baseRetryDelay = Duration(seconds: 3);
   final List<_QueueEntry> _queue = [];
   final Map<String, _QueueEntry> _paused = {};
+  final Map<String, int> _retryAttempts = {};
+  final Set<String> _userCancelled = <String>{};
   bool _draining = false;
   CancelToken? _activeCancel;
   String? _activeItemId;
@@ -133,9 +137,9 @@ class DownloadManager extends Notifier<DownloadsState> {
     } catch (_) {}
   }
 
-  Future<void> enqueueMovie(Movie movie) async {
+  Future<bool> enqueueMovie(Movie movie) async {
     if (state.items.containsKey(movie.id) || state.isDownloading(movie.id)) {
-      return;
+      return false;
     }
     final entry = _QueueEntry.movie(movie);
     _queue.add(entry);
@@ -149,9 +153,10 @@ class DownloadManager extends Notifier<DownloadsState> {
     );
     await _persistQueue();
     _drain();
+    return true;
   }
 
-  Future<void> enqueueEpisode(
+  Future<bool> enqueueEpisode(
     Episode episode, {
     required String seriesName,
     String? seriesPosterTag,
@@ -161,7 +166,7 @@ class DownloadManager extends Notifier<DownloadsState> {
       seriesName: seriesName,
       seriesPosterTag: seriesPosterTag,
     );
-    _enqueueEntries([entry]);
+    return _enqueueEntries([entry]) > 0;
   }
 
   Future<int> enqueueEpisodes(
@@ -191,6 +196,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     _queue.addAll(fresh);
     for (final entry in fresh) {
       _paused.remove(entry.itemId);
+      _retryAttempts.remove(entry.itemId);
+      _userCancelled.remove(entry.itemId);
     }
     state = state.copyWith(
       progress: {
@@ -208,6 +215,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> cancel(String itemId) async {
+    _userCancelled.add(itemId);
     _queue.removeWhere((e) => e.itemId == itemId);
     if (_activeItemId == itemId) {
       _activeCancel?.cancel('Cancelled by user');
@@ -215,6 +223,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     final newProgress = Map<String, DownloadProgress>.from(state.progress)
       ..remove(itemId);
     _paused.remove(itemId);
+    _retryAttempts.remove(itemId);
     state = state.copyWith(
       progress: newProgress,
       queueLength: _queue.length,
@@ -256,6 +265,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     final newFailures = Map<String, DownloadFailure>.from(state.failures)
       ..remove(itemId);
     state = state.copyWith(failures: newFailures);
+    _retryAttempts.remove(itemId);
     _enqueueEntries([_QueueEntry.failure(failure)]);
   }
 
@@ -268,23 +278,54 @@ class DownloadManager extends Notifier<DownloadsState> {
   Future<void> delete(String itemId) async {
     final item = state.items[itemId];
     if (item == null) return;
-    try {
-      final f = File(item.filePath);
-      if (f.existsSync()) await f.delete();
-      for (final sub in item.externalSubtitles) {
-        final sf = File(sub.filePath);
-        if (sf.existsSync()) await sf.delete();
-      }
-      if (item.offlineTrickplay != null) {
-        for (final p in item.offlineTrickplay!.tileFilesByIndex.values) {
-          final tf = File(p);
-          if (tf.existsSync()) await tf.delete();
-        }
-      }
-    } catch (_) {}
+    final dir = await _downloadsDir();
+    await _deleteDownloadedAssets(item);
+    await _deleteResidualFiles(itemId, dir);
     final newItems = Map<String, DownloadedItem>.from(state.items)
       ..remove(itemId);
+    _retryAttempts.remove(itemId);
+    _userCancelled.remove(itemId);
     state = state.copyWith(items: newItems);
+    await _persist();
+  }
+
+  Future<void> deleteAll() async {
+    final itemIdSet = <String>{
+      ...state.items.keys,
+      ...state.progress.keys,
+      ...state.failures.keys,
+      ..._queue.map((entry) => entry.itemId),
+      ..._paused.keys,
+      ?_activeItemId,
+    };
+
+    _queue.clear();
+    _paused.clear();
+    _retryAttempts.clear();
+    if (_activeItemId != null) {
+      _userCancelled
+        ..clear()
+        ..add(_activeItemId!);
+    } else {
+      _userCancelled.clear();
+    }
+    _activeCancel?.cancel('Cleared by user');
+
+    final dir = await _downloadsDir();
+    for (final item in state.items.values) {
+      await _deleteDownloadedAssets(item);
+    }
+    for (final itemId in itemIdSet) {
+      await _deleteResidualFiles(itemId, dir);
+    }
+
+    state = state.copyWith(
+      items: const {},
+      progress: const {},
+      failures: const {},
+      queueLength: 0,
+      pausedIds: const {},
+    );
     await _persist();
   }
 
@@ -294,8 +335,23 @@ class DownloadManager extends Notifier<DownloadsState> {
     try {
       while (_queue.isNotEmpty) {
         final entry = _queue.first;
-        await _download(entry);
-        _queue.removeWhere((e) => e.itemId == entry.itemId);
+        final outcome = await _download(entry);
+        switch (outcome.kind) {
+          case _DownloadOutcomeKind.success:
+          case _DownloadOutcomeKind.failed:
+          case _DownloadOutcomeKind.cancelled:
+            _queue.removeWhere((e) => e.itemId == entry.itemId);
+            _retryAttempts.remove(entry.itemId);
+            break;
+          case _DownloadOutcomeKind.paused:
+            _queue.removeWhere((e) => e.itemId == entry.itemId);
+            break;
+          case _DownloadOutcomeKind.retry:
+            _queue.removeWhere((e) => e.itemId == entry.itemId);
+            _queue.add(entry);
+            await Future<void>.delayed(outcome.retryDelay ?? _baseRetryDelay);
+            break;
+        }
         state = state.copyWith(queueLength: _queue.length);
         await _persistQueue();
       }
@@ -308,7 +364,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     }
   }
 
-  Future<void> _download(_QueueEntry entry) async {
+  Future<_DownloadOutcome> _download(_QueueEntry entry) async {
     final repo = ref.read(jellyfinRepositoryProvider);
     final sidecarSubs = await _resolveExternalSubs(entry.itemId);
     final dir = await _downloadsDir();
@@ -380,24 +436,50 @@ class DownloadManager extends Notifier<DownloadsState> {
         ..remove(entry.itemId);
       state = state.copyWith(items: newItems, progress: newProgress);
       await _persist();
+      _retryAttempts.remove(entry.itemId);
+      _userCancelled.remove(entry.itemId);
 
       _maybeAutoDownloadNext(entry);
+      return const _DownloadOutcome.success();
     } catch (e) {
       final wasCancelled = e is DioException && CancelToken.isCancel(e);
       final paused = _paused.containsKey(entry.itemId);
+      final cancelledByUser = _userCancelled.remove(entry.itemId);
       final newProgress = Map<String, DownloadProgress>.from(state.progress);
       if (!paused) {
         newProgress.remove(entry.itemId);
       }
+      if (paused) {
+        state = state.copyWith(progress: newProgress);
+        return const _DownloadOutcome.paused();
+      }
+      if (wasCancelled && cancelledByUser) {
+        state = state.copyWith(progress: newProgress);
+        return const _DownloadOutcome.cancelled();
+      }
+
+      if (_shouldAutoRetry(e)) {
+        final attempt = (_retryAttempts[entry.itemId] ?? 0) + 1;
+        _retryAttempts[entry.itemId] = attempt;
+        final blockedByPolicyOrOffline = e is _DownloadBlockedException;
+        if (blockedByPolicyOrOffline || attempt <= _maxAutoRetries) {
+          state = state.copyWith(
+            progress: {...state.progress, entry.itemId: entry.toProgress(-1)},
+          );
+          return _DownloadOutcome.retry(
+            retryDelay: _retryDelayForAttempt(attempt),
+          );
+        }
+      }
+
       state = state.copyWith(
         progress: newProgress,
-        failures: wasCancelled
-            ? state.failures
-            : {
-                ...state.failures,
-                entry.itemId: entry.toFailure(_downloadFailureMessage(e)),
-              },
+        failures: {
+          ...state.failures,
+          entry.itemId: entry.toFailure(_downloadFailureMessage(e)),
+        },
       );
+      return const _DownloadOutcome.failed();
     } finally {
       _activeItemId = null;
       _activeCancel = null;
@@ -463,6 +545,40 @@ class DownloadManager extends Notifier<DownloadsState> {
     final dir = await _downloadsDir();
     final f = File('${dir.path}/$itemId.partial');
     if (f.existsSync()) await f.delete();
+  }
+
+  Future<void> _deleteDownloadedAssets(DownloadedItem item) async {
+    try {
+      final f = File(item.filePath);
+      if (f.existsSync()) await f.delete();
+      for (final sub in item.externalSubtitles) {
+        final sf = File(sub.filePath);
+        if (sf.existsSync()) await sf.delete();
+      }
+      if (item.offlineTrickplay != null) {
+        for (final p in item.offlineTrickplay!.tileFilesByIndex.values) {
+          final tf = File(p);
+          if (tf.existsSync()) await tf.delete();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _deleteResidualFiles(String itemId, Directory dir) async {
+    final prefix = '$itemId.';
+    try {
+      for (final entity in dir.listSync()) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (name != itemId && !name.startsWith(prefix)) continue;
+        try {
+          if (entity is File) {
+            await entity.delete();
+          } else if (entity is Directory) {
+            await entity.delete(recursive: true);
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<List<DownloadedExternalSubtitle>> _downloadExternalSubs({
@@ -623,14 +739,50 @@ class DownloadManager extends Notifier<DownloadsState> {
           error.type == DioExceptionType.sendTimeout) {
         return 'Connection timed out.';
       }
+      if (CancelToken.isCancel(error)) {
+        return 'Download was interrupted.';
+      }
       final status = error.response?.statusCode;
       if (status == 416) {
         return 'Resume failed, try re-downloading.';
       }
+      final detail = error.error?.toString().trim();
+      if (status != null && detail != null && detail.isNotEmpty) {
+        return 'Server returned HTTP $status ($detail).';
+      }
       if (status != null) return 'Server returned HTTP $status.';
+      if (detail != null && detail.isNotEmpty) {
+        return 'Network error: $detail';
+      }
       return 'Network error while downloading.';
     }
-    return 'Download failed.';
+    return 'Download failed: $error';
+  }
+
+  bool _shouldAutoRetry(Object error) {
+    if (error is _DownloadBlockedException) return true;
+    if (error is DioException) {
+      if (CancelToken.isCancel(error)) return true;
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.connectionError) {
+        return true;
+      }
+      final status = error.response?.statusCode;
+      if (status == null) return true;
+      if (status >= 500) return true;
+      if (status == 429 || status == 408 || status == 409) return true;
+      if (status == 416) return true;
+    }
+    return false;
+  }
+
+  Duration _retryDelayForAttempt(int attempt) {
+    final multiplier = attempt <= 1 ? 1 : (1 << (attempt - 1));
+    final seconds = _baseRetryDelay.inSeconds * multiplier;
+    final clamped = seconds.clamp(3, 60);
+    return Duration(seconds: clamped);
   }
 
   Future<void> _maybeAutoDownloadNext(_QueueEntry entry) async {
@@ -905,4 +1057,20 @@ class _PersistedQueueEntry {
       paused: json['paused'] == true,
     );
   }
+}
+
+enum _DownloadOutcomeKind { success, paused, cancelled, retry, failed }
+
+class _DownloadOutcome {
+  const _DownloadOutcome._(this.kind, {this.retryDelay});
+
+  const _DownloadOutcome.success() : this._(_DownloadOutcomeKind.success);
+  const _DownloadOutcome.paused() : this._(_DownloadOutcomeKind.paused);
+  const _DownloadOutcome.cancelled() : this._(_DownloadOutcomeKind.cancelled);
+  const _DownloadOutcome.failed() : this._(_DownloadOutcomeKind.failed);
+  const _DownloadOutcome.retry({Duration? retryDelay})
+    : this._(_DownloadOutcomeKind.retry, retryDelay: retryDelay);
+
+  final _DownloadOutcomeKind kind;
+  final Duration? retryDelay;
 }

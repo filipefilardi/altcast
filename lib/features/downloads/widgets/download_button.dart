@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
@@ -26,7 +28,7 @@ class _DownloadButton extends ConsumerWidget {
 
   final String itemId;
   final String itemName;
-  final VoidCallback onEnqueue;
+  final Future<void> Function(BuildContext context, WidgetRef ref) onEnqueue;
   final double iconSize;
 
   @override
@@ -77,15 +79,17 @@ class _DownloadButton extends ConsumerWidget {
         iconSize: iconSize,
         icon: const Icon(PiconsRegular.warningCircle, color: AppColors.error),
         tooltip: 'Download failed — tap to retry',
-        onPressed: () =>
-            ref.read(downloadManagerProvider.notifier).retry(itemId),
+        onPressed: () {
+          ref.read(downloadManagerProvider.notifier).retry(itemId);
+          _showDownloadToast(context, 'Retrying "$itemName".');
+        },
       );
     }
     return IconButton(
       iconSize: iconSize,
       icon: const Icon(PiconsRegular.downloadSimple),
       tooltip: 'Download for offline',
-      onPressed: onEnqueue,
+      onPressed: () => onEnqueue(context, ref),
     );
   }
 
@@ -123,8 +127,18 @@ class MovieDownloadButton extends ConsumerWidget {
     return _DownloadButton(
       itemId: movie.id,
       itemName: movie.name,
-      onEnqueue: () =>
-          ref.read(downloadManagerProvider.notifier).enqueueMovie(movie),
+      onEnqueue: (context, ref) async {
+        final queued = await ref
+            .read(downloadManagerProvider.notifier)
+            .enqueueMovie(movie);
+        if (!context.mounted) return;
+        _showDownloadToast(
+          context,
+          queued
+              ? 'Queued "${movie.name}" for download.'
+              : '"${movie.name}" is already downloaded or queued.',
+        );
+      },
     );
   }
 }
@@ -151,13 +165,22 @@ class EpisodeDownloadButton extends ConsumerWidget {
       itemId: episode.id,
       itemName: '$seriesName — ${episode.name}',
       iconSize: 20,
-      onEnqueue: () => ref
-          .read(downloadManagerProvider.notifier)
-          .enqueueEpisode(
-            episode,
-            seriesName: seriesName,
-            seriesPosterTag: seriesPosterTag,
-          ),
+      onEnqueue: (context, ref) async {
+        final queued = await ref
+            .read(downloadManagerProvider.notifier)
+            .enqueueEpisode(
+              episode,
+              seriesName: seriesName,
+              seriesPosterTag: seriesPosterTag,
+            );
+        if (!context.mounted) return;
+        _showDownloadToast(
+          context,
+          queued
+              ? 'Queued "$seriesName — ${episode.name}" for download.'
+              : '"$seriesName — ${episode.name}" is already downloaded or queued.',
+        );
+      },
     );
   }
 }
@@ -224,38 +247,30 @@ class _SeriesDownloadButtonState extends ConsumerState<SeriesDownloadButton> {
             seriesPosterTag: widget.series.imageTag,
           );
       if (!mounted) return;
-      _showBatchQueuedSnackBar(
-        ScaffoldMessenger.of(context),
-        queued,
-        widget.series.name,
-      );
+      _showBatchQueuedSnackBar(context, queued, widget.series.name);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text("Couldn't queue ${widget.series.name}")),
-        );
+      showAppSnackBar(context, "Couldn't queue ${widget.series.name}");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 }
 
-void _showBatchQueuedSnackBar(
-  ScaffoldMessengerState messenger,
-  int queued,
-  String label,
-) {
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(
-          queued == 0
-              ? '$label is already downloaded or queued.'
-              : 'Queued $queued episode${queued == 1 ? '' : 's'} from $label.',
-        ),
-      ),
-    );
+void _showBatchQueuedSnackBar(BuildContext context, int queued, String label) {
+  _showDownloadToast(
+    context,
+    queued == 0
+        ? '$label is already downloaded or queued.'
+        : 'Queued $queued episode${queued == 1 ? '' : 's'} from $label.',
+  );
+}
+
+void _showDownloadToast(BuildContext context, String message) {
+  showAppSnackBar(
+    context,
+    message,
+    actionLabel: 'View',
+    onAction: () => context.push('/downloads'),
+  );
 }

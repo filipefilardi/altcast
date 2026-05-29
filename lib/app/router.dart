@@ -9,6 +9,7 @@ import 'package:altcast/features/downloads/downloads_screen.dart';
 import 'package:altcast/features/home/home_screen.dart';
 import 'package:altcast/features/library/library_screen.dart';
 import 'package:altcast/features/library/library_browse_screen.dart';
+import 'package:altcast/features/library/library_genres_screen.dart';
 import 'package:altcast/features/movie/movie_screen.dart';
 import 'package:altcast/features/person/person_screen.dart';
 import 'package:altcast/features/player/video_player_screen.dart';
@@ -132,6 +133,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             initialGenre: genre,
           );
         },
+      ),
+      GoRoute(
+        path: '/library/genres',
+        builder: (_, _) => const LibraryGenresScreen(),
       ),
       GoRoute(
         path: '/library/collections',

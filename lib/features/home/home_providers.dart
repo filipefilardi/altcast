@@ -18,3 +18,9 @@ final recentMoviesProvider = FutureProvider.autoDispose<List<BrowseItem>>((
 final recentShowsProvider = FutureProvider.autoDispose<List<BrowseItem>>((ref) {
   return ref.watch(jellyfinRepositoryProvider).recentlyAddedShows();
 });
+
+final recommendedMoviesProvider = FutureProvider.autoDispose<List<BrowseItem>>((
+  ref,
+) {
+  return ref.watch(jellyfinRepositoryProvider).recommendedMovies();
+});

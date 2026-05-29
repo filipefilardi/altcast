@@ -297,6 +297,10 @@ class _AltCastSeekBar extends StatelessWidget {
     final bufferPercent = duration <= Duration.zero
         ? 0.0
         : (buffer.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    final hitTargetHeight = math.max(
+      theme.seekBarContainerHeight,
+      tokens.seekBarTouchTargetHeight,
+    );
     return Container(
       margin: theme.seekBarMargin,
       child: LayoutBuilder(
@@ -323,47 +327,58 @@ class _AltCastSeekBar extends StatelessWidget {
               onTapCancel: () => onScrubEnd(value),
               child: SizedBox(
                 width: constraints.maxWidth,
-                height: theme.seekBarContainerHeight,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    Container(
-                      width: constraints.maxWidth,
-                      height: theme.seekBarHeight,
-                      color: theme.seekBarColor,
-                      child: Stack(
-                        children: [
-                          FractionallySizedBox(
-                            widthFactor: bufferPercent,
-                            child: Container(color: theme.seekBarBufferColor),
-                          ),
-                          FractionallySizedBox(
-                            widthFactor: value,
-                            child: Container(color: theme.seekBarPositionColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      left:
-                          (constraints.maxWidth - theme.seekBarThumbSize / 2) *
-                          value,
-                      bottom:
-                          -(tokens.seekBarThumbSize / 2) +
-                          tokens.seekBarHeight / 2,
-                      child: Container(
-                        width: theme.seekBarThumbSize,
-                        height: theme.seekBarThumbSize,
-                        decoration: BoxDecoration(
-                          color: theme.seekBarThumbColor,
-                          borderRadius: BorderRadius.circular(
-                            theme.seekBarThumbSize / 2,
+                height: hitTargetHeight,
+                child: Center(
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    height: theme.seekBarContainerHeight,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Container(
+                          width: constraints.maxWidth,
+                          height: theme.seekBarHeight,
+                          color: theme.seekBarColor,
+                          child: Stack(
+                            children: [
+                              FractionallySizedBox(
+                                widthFactor: bufferPercent,
+                                child: Container(
+                                  color: theme.seekBarBufferColor,
+                                ),
+                              ),
+                              FractionallySizedBox(
+                                widthFactor: value,
+                                child: Container(
+                                  color: theme.seekBarPositionColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                        Positioned(
+                          left:
+                              (constraints.maxWidth -
+                                  theme.seekBarThumbSize / 2) *
+                              value,
+                          bottom:
+                              -(tokens.seekBarThumbSize / 2) +
+                              tokens.seekBarHeight / 2,
+                          child: Container(
+                            width: theme.seekBarThumbSize,
+                            height: theme.seekBarThumbSize,
+                            decoration: BoxDecoration(
+                              color: theme.seekBarThumbColor,
+                              borderRadius: BorderRadius.circular(
+                                theme.seekBarThumbSize / 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

@@ -184,6 +184,46 @@ class JellyfinRepository {
         .toList();
   }
 
+  /// Personalized movie picks from Jellyfin's recommendations endpoint.
+  /// The API returns grouped categories; we flatten them into one shelf.
+  Future<List<BrowseItem>> recommendedMovies({
+    int limit = 20,
+    int categoryLimit = 5,
+    int itemLimit = 8,
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<List<dynamic>>(
+      '/Movies/Recommendations',
+      queryParameters: {
+        'UserId': s.userId,
+        'CategoryLimit': categoryLimit,
+        'ItemLimit': itemLimit,
+        'Fields': 'UserData,ProductionYear',
+        'EnableImages': true,
+      },
+    );
+
+    final categories = (res.data ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+    final seenIds = <String>{};
+    final items = <BrowseItem>[];
+
+    for (final category in categories) {
+      final categoryItems = ((category['Items'] as List?) ?? const [])
+          .whereType<Map<String, dynamic>>();
+      for (final raw in categoryItems) {
+        final item = BrowseItem.fromJson(raw);
+        if (item.kind != MediaKind.movie) continue;
+        if (!seenIds.add(item.id)) continue;
+        items.add(item);
+        if (items.length >= limit) return items;
+      }
+    }
+
+    return items;
+  }
+
   /// Search across movies and series. Returns a single mixed list ordered
   /// by Jellyfin's relevance (the API doesn't expose a finer signal).
   /// Empty/blank queries short-circuit to an empty list — callers shouldn't

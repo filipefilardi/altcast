@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
@@ -90,6 +91,10 @@ class _DownloadGroup extends ConsumerWidget {
     final prefs = ref.watch(downloadPreferencesProvider);
     final notifier = ref.read(downloadPreferencesProvider.notifier);
     final downloads = ref.watch(downloadManagerProvider);
+    final hasDownloads =
+        downloads.items.isNotEmpty ||
+        downloads.progress.isNotEmpty ||
+        downloads.failures.isNotEmpty;
 
     return _SettingsGroup(
       label: 'Library',
@@ -150,8 +155,61 @@ class _DownloadGroup extends ConsumerWidget {
             ),
             onTap: () => _showLocationPicker(context, ref),
           ),
+        ListTile(
+          leading: Icon(
+            PiconsRegular.trash,
+            color: hasDownloads
+                ? AppColors.textSecondary
+                : AppColors.textTertiary,
+          ),
+          title: Text(
+            'Delete all downloads',
+            style: TextStyle(
+              color: hasDownloads
+                  ? AppColors.textPrimary
+                  : AppColors.textTertiary,
+            ),
+          ),
+          subtitle: const Text(
+            'Remove all offline videos and queued downloads from this device.',
+          ),
+          onTap: hasDownloads
+              ? () => _confirmDeleteAllDownloads(context, ref)
+              : null,
+        ),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteAllDownloads(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Delete all downloads?'),
+        content: const Text(
+          'This removes all offline videos and queued downloads from this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await ref.read(downloadManagerProvider.notifier).deleteAll();
+    if (!context.mounted) return;
+    showAppSnackBar(context, 'All downloads were deleted.');
   }
 
   void _showLocationPicker(BuildContext context, WidgetRef ref) {
