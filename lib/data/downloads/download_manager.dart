@@ -278,25 +278,54 @@ class DownloadManager extends Notifier<DownloadsState> {
   Future<void> delete(String itemId) async {
     final item = state.items[itemId];
     if (item == null) return;
-    try {
-      final f = File(item.filePath);
-      if (f.existsSync()) await f.delete();
-      for (final sub in item.externalSubtitles) {
-        final sf = File(sub.filePath);
-        if (sf.existsSync()) await sf.delete();
-      }
-      if (item.offlineTrickplay != null) {
-        for (final p in item.offlineTrickplay!.tileFilesByIndex.values) {
-          final tf = File(p);
-          if (tf.existsSync()) await tf.delete();
-        }
-      }
-    } catch (_) {}
+    final dir = await _downloadsDir();
+    await _deleteDownloadedAssets(item);
+    await _deleteResidualFiles(itemId, dir);
     final newItems = Map<String, DownloadedItem>.from(state.items)
       ..remove(itemId);
     _retryAttempts.remove(itemId);
     _userCancelled.remove(itemId);
     state = state.copyWith(items: newItems);
+    await _persist();
+  }
+
+  Future<void> deleteAll() async {
+    final itemIdSet = <String>{
+      ...state.items.keys,
+      ...state.progress.keys,
+      ...state.failures.keys,
+      ..._queue.map((entry) => entry.itemId),
+      ..._paused.keys,
+      ?_activeItemId,
+    };
+
+    _queue.clear();
+    _paused.clear();
+    _retryAttempts.clear();
+    if (_activeItemId != null) {
+      _userCancelled
+        ..clear()
+        ..add(_activeItemId!);
+    } else {
+      _userCancelled.clear();
+    }
+    _activeCancel?.cancel('Cleared by user');
+
+    final dir = await _downloadsDir();
+    for (final item in state.items.values) {
+      await _deleteDownloadedAssets(item);
+    }
+    for (final itemId in itemIdSet) {
+      await _deleteResidualFiles(itemId, dir);
+    }
+
+    state = state.copyWith(
+      items: const {},
+      progress: const {},
+      failures: const {},
+      queueLength: 0,
+      pausedIds: const {},
+    );
     await _persist();
   }
 
@@ -516,6 +545,40 @@ class DownloadManager extends Notifier<DownloadsState> {
     final dir = await _downloadsDir();
     final f = File('${dir.path}/$itemId.partial');
     if (f.existsSync()) await f.delete();
+  }
+
+  Future<void> _deleteDownloadedAssets(DownloadedItem item) async {
+    try {
+      final f = File(item.filePath);
+      if (f.existsSync()) await f.delete();
+      for (final sub in item.externalSubtitles) {
+        final sf = File(sub.filePath);
+        if (sf.existsSync()) await sf.delete();
+      }
+      if (item.offlineTrickplay != null) {
+        for (final p in item.offlineTrickplay!.tileFilesByIndex.values) {
+          final tf = File(p);
+          if (tf.existsSync()) await tf.delete();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _deleteResidualFiles(String itemId, Directory dir) async {
+    final prefix = '$itemId.';
+    try {
+      for (final entity in dir.listSync()) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (name != itemId && !name.startsWith(prefix)) continue;
+        try {
+          if (entity is File) {
+            await entity.delete();
+          } else if (entity is Directory) {
+            await entity.delete(recursive: true);
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<List<DownloadedExternalSubtitle>> _downloadExternalSubs({
