@@ -344,7 +344,9 @@ class _AltCastSeekBar extends StatelessWidget {
                             children: [
                               FractionallySizedBox(
                                 widthFactor: bufferPercent,
-                                child: Container(color: theme.seekBarBufferColor),
+                                child: Container(
+                                  color: theme.seekBarBufferColor,
+                                ),
                               ),
                               FractionallySizedBox(
                                 widthFactor: value,
