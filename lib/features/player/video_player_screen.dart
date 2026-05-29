@@ -39,9 +39,6 @@ import 'package:altcast/features/player/widgets/tracks_sheet.dart';
 const _ticksPerMs = 10000;
 const _resumeSeekTolerance = Duration(seconds: 2);
 
-/// Gives time to see skip chips before we jump automatically (when enabled).
-const _introSkipperAutoSkipDelay = Duration(seconds: 3);
-
 /// Position skip buttons exactly above the seek timeline.
 const _introSkipperChipGapFromTimeline = 24.0;
 const _keyboardSeekStep = Duration(seconds: 10);
@@ -160,8 +157,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   IntroSkipperTimestamps? _introSkipper;
   bool _showSkipIntroChip = false;
   bool _showSkipCreditsChip = false;
-  Timer? _introSkipperAutoTimer;
-  Timer? _creditsSkipperAutoTimer;
 
   final ValueNotifier<_PlayerOverlaysSnapshot> _overlaySnapshots =
       ValueNotifier(const _PlayerOverlaysSnapshot());
@@ -487,16 +482,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return Duration(microseconds: ticks ~/ 10);
   }
 
-  void _cancelIntroSkipperTimers() {
-    _introSkipperAutoTimer?.cancel();
-    _introSkipperAutoTimer = null;
-    _creditsSkipperAutoTimer?.cancel();
-    _creditsSkipperAutoTimer = null;
-  }
-
-  /// Hides Intro Skipper UI and cancels delayed auto-skip timers.
+  /// Hides Intro Skipper UI.
   void _clearIntroSkipperOverlay() {
-    _cancelIntroSkipperTimers();
     if (!mounted) return;
     if (_showSkipIntroChip || _showSkipCreditsChip) {
       _showSkipIntroChip = false;
@@ -508,8 +495,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Future<void> _manualSkipIntro() async {
     final intro = _introSkipper?.introduction;
     if (intro == null) return;
-    _introSkipperAutoTimer?.cancel();
-    _introSkipperAutoTimer = null;
     await _player.seek(intro.end);
     if (mounted) {
       _showSkipIntroChip = false;
@@ -520,8 +505,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Future<void> _manualSkipCredits() async {
     final credits = _introSkipper?.credits;
     if (credits == null) return;
-    _creditsSkipperAutoTimer?.cancel();
-    _creditsSkipperAutoTimer = null;
     await _player.seek(credits.end);
     if (mounted) {
       _showSkipCreditsChip = false;
@@ -529,24 +512,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  /// Shows skip chips while playback sits inside a segment and schedules a
-  /// delayed auto-jump so taps remain optional.
+  /// Shows skip chips while playback sits inside intro/credits segments.
   void _syncIntroSkipperOverlay(Duration position) {
-    final autoSkip = ref.read(playbackPreferencesProvider).autoSkipIntroCredits;
-    if (!autoSkip) {
-      _introSkipperAutoTimer?.cancel();
-      _introSkipperAutoTimer = null;
-      _creditsSkipperAutoTimer?.cancel();
-      _creditsSkipperAutoTimer = null;
-    }
-
     final data = _introSkipper;
     if (data == null) {
       _clearIntroSkipperOverlay();
       return;
     }
 
-    final playing = _player.state.playing;
     final intro = data.introduction;
     final inIntro = intro != null && intro.contains(position);
     final credits = data.credits;
@@ -561,51 +534,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         _showSkipCreditsChip = nextCreditsChip;
         _publishOverlays();
       }
-    }
-
-    // Delayed auto-skip while actively playing inside each segment.
-    if (autoSkip && intro != null && playing && inIntro) {
-      _introSkipperAutoTimer ??= Timer(_introSkipperAutoSkipDelay, () async {
-        _introSkipperAutoTimer = null;
-        if (!mounted) return;
-        final pos = _lastPosition;
-        final i = _introSkipper?.introduction;
-        if (i != null &&
-            i.contains(pos) &&
-            _player.state.playing &&
-            ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
-          await _player.seek(i.end);
-          if (mounted) {
-            _showSkipIntroChip = false;
-            _publishOverlays();
-          }
-        }
-      });
-    } else {
-      _introSkipperAutoTimer?.cancel();
-      _introSkipperAutoTimer = null;
-    }
-
-    if (autoSkip && credits != null && playing && inCredits) {
-      _creditsSkipperAutoTimer ??= Timer(_introSkipperAutoSkipDelay, () async {
-        _creditsSkipperAutoTimer = null;
-        if (!mounted) return;
-        final pos = _lastPosition;
-        final c = _introSkipper?.credits;
-        if (c != null &&
-            c.contains(pos) &&
-            _player.state.playing &&
-            ref.read(playbackPreferencesProvider).autoSkipIntroCredits) {
-          await _player.seek(c.end);
-          if (mounted) {
-            _showSkipCreditsChip = false;
-            _publishOverlays();
-          }
-        }
-      });
-    } else {
-      _creditsSkipperAutoTimer?.cancel();
-      _creditsSkipperAutoTimer = null;
     }
   }
 
@@ -1211,7 +1139,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _autoplayTimer?.cancel();
     _castVolumeDebounce?.cancel();
     _keyboardVolumeIndicatorTimer?.cancel();
-    _cancelIntroSkipperTimers();
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
