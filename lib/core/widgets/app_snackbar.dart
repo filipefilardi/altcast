@@ -83,7 +83,7 @@ void showAppSnackBar(
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w500,
-                                  fontSize: 15,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
@@ -110,7 +110,7 @@ void showAppSnackBar(
                                       actionLabel,
                                       style: const TextStyle(
                                         color: AppColors.primary,
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 0.2,
                                       ),

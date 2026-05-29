@@ -137,9 +137,9 @@ class DownloadManager extends Notifier<DownloadsState> {
     } catch (_) {}
   }
 
-  Future<void> enqueueMovie(Movie movie) async {
+  Future<bool> enqueueMovie(Movie movie) async {
     if (state.items.containsKey(movie.id) || state.isDownloading(movie.id)) {
-      return;
+      return false;
     }
     final entry = _QueueEntry.movie(movie);
     _queue.add(entry);
@@ -153,9 +153,10 @@ class DownloadManager extends Notifier<DownloadsState> {
     );
     await _persistQueue();
     _drain();
+    return true;
   }
 
-  Future<void> enqueueEpisode(
+  Future<bool> enqueueEpisode(
     Episode episode, {
     required String seriesName,
     String? seriesPosterTag,
@@ -165,7 +166,7 @@ class DownloadManager extends Notifier<DownloadsState> {
       seriesName: seriesName,
       seriesPosterTag: seriesPosterTag,
     );
-    _enqueueEntries([entry]);
+    return _enqueueEntries([entry]) > 0;
   }
 
   Future<int> enqueueEpisodes(
