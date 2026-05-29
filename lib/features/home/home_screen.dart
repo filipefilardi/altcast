@@ -259,6 +259,13 @@ class _LibraryNav extends StatelessWidget {
             onTap: () => context.push('/library/shows'),
           ),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _LibraryNavItem(
+            label: 'Genres',
+            onTap: () => context.push('/library/genres'),
+          ),
+        ),
       ],
     );
   }
