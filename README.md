@@ -54,7 +54,7 @@ That's it. Your credentials stay in the device's secure storage, and the app onl
 
 AltCast works great on a plain Jellyfin install, but one server-side plugin unlocks a smoother viewing experience:
 
-- **[Intro Skipper](https://github.com/intro-skipper/intro-skipper)** — community plugin that detects intros, outros, and recaps in your TV shows. AltCast picks up the segment timestamps automatically and shows a *Skip Intro* / *Skip Credits* chip during playback (with optional auto-skip). Without it, episodes still play normally — you just skip manually.
+- **[Intro Skipper](https://github.com/intro-skipper/intro-skipper)** — community plugin that detects intros, outros, and recaps in your TV shows. AltCast picks up the segment timestamps automatically and shows a *Skip Intro* / *Skip Credits* chip during playback. Without it, episodes still play normally — you just skip manually.
 
 Install it through your Jellyfin server's Dashboard → Plugins.
 
