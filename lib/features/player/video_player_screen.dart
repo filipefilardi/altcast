@@ -660,7 +660,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final impl = _player.platform as dynamic;
       if (impl != null) {
         final seconds = offset.inMilliseconds / 1000.0;
-        await impl.setProperty('sub-delay', seconds.toStringAsFixed(3));
+        await impl.setProperty('sub-delay', (-seconds).toStringAsFixed(3));
       }
     } catch (_) {}
   }
@@ -1935,9 +1935,9 @@ class _PlaybackSettingsOverlayState
 
   String _offsetLabel(Duration offset) {
     final seconds = offset.inMilliseconds / 1000.0;
-    if (seconds == 0) return '0.00s';
+    if (seconds == 0) return '0s';
     final sign = seconds > 0 ? '+' : '';
-    return '$sign${seconds.toStringAsFixed(2)}s';
+    return '$sign${seconds.toStringAsFixed(1)}s';
   }
 }
 
@@ -1957,6 +1957,8 @@ class _SubtitleOffsetOverlay extends StatefulWidget {
 class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
   static const _minOffsetSeconds = -30.0;
   static const _maxOffsetSeconds = 30.0;
+  static const _offsetStepSeconds = 0.1;
+  static const _offsetDivisions = 600;
   static const _zeroMarkerWidth = 2.0;
   static const _zeroMarkerHeight = 16.0;
 
@@ -2044,7 +2046,7 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
                             Slider(
                               min: _minOffsetSeconds,
                               max: _maxOffsetSeconds,
-                              divisions: 240,
+                              divisions: _offsetDivisions,
                               label: _offsetLabel(_subtitleOffset),
                               value: _subtitleOffset.inMilliseconds / 1000.0,
                               onChanged: _setOffsetSeconds,
@@ -2071,7 +2073,9 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
   }
 
   void _setOffsetSeconds(double value) {
-    final offset = Duration(milliseconds: (value * 1000).round());
+    final steppedValue =
+        (value / _offsetStepSeconds).round() * _offsetStepSeconds;
+    final offset = Duration(milliseconds: (steppedValue * 1000).round());
     _setOffset(offset);
   }
 
@@ -2091,9 +2095,9 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
 
   String _offsetLabel(Duration offset) {
     final seconds = offset.inMilliseconds / 1000.0;
-    if (seconds == 0) return '0.00s';
+    if (seconds == 0) return '0s';
     final sign = seconds > 0 ? '+' : '';
-    return '$sign${seconds.toStringAsFixed(2)}s';
+    return '$sign${seconds.toStringAsFixed(1)}s';
   }
 }
 
