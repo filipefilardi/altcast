@@ -24,6 +24,7 @@ import 'package:altcast/data/jellyfin/models/stream_source.dart';
 import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
+import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/syncplay/syncplay_controller.dart';
@@ -124,6 +125,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late final Player _player;
   late final VideoController _controller;
+  late ProviderContainer _providerContainer;
   Scrobbler? _scrobbler;
   Object? _openError;
   String _playerTitle = '';
@@ -199,6 +201,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       ValueNotifier<TrickplayOverlayData?>(null);
 
   StreamSource? get _source => _sourceNotifier.value;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _providerContainer = ProviderScope.containerOf(context, listen: false);
+  }
 
   @override
   void initState() {
@@ -694,6 +702,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _durationSub = null;
   }
 
+  void _stopScrobblerAndRefreshContinueWatching({Duration? position}) {
+    final scrobbler = _scrobbler;
+    if (scrobbler == null) return;
+    final stopFuture = scrobbler.stop(
+      positionTicks: (position ?? _lastPosition).inMilliseconds * _ticksPerMs,
+    );
+    unawaited(stopFuture.whenComplete(_refreshContinueWatching));
+  }
+
+  void _refreshContinueWatching() {
+    _providerContainer.invalidate(continueWatchingProvider);
+  }
+
   Future<void> _closeActiveEncoding(StreamSource? src) async {
     if (src != null && src.isTranscoding && src.playSessionId != null) {
       await ref
@@ -856,9 +877,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (_remoteCastMirrorActive) return;
       if (completed) {
         _cancelAutoplay();
-        scrobbler.stop(
-          positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
-        );
+        _stopScrobblerAndRefreshContinueWatching();
         if (_nextEpisode != null) {
           final autoplay = ref
               .read(playbackPreferencesProvider)
@@ -1145,9 +1164,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _durationSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
     if (!_remoteCastMirrorActive) {
-      _scrobbler?.stop(
-        positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
-      );
+      _stopScrobblerAndRefreshContinueWatching();
     }
     // Release the server-side transcoder if we were transcoding. Fire-and-
     // forget — `_player.dispose` doesn't wait for it, but we don't need to
