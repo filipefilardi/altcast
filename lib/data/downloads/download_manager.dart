@@ -613,6 +613,8 @@ class DownloadManager extends Notifier<DownloadsState> {
             title: sub.title,
             language: sub.language,
             codec: sub.codec,
+            isForced: sub.isForced,
+            isHearingImpaired: sub.isHearingImpaired,
           ),
         );
       } catch (_) {

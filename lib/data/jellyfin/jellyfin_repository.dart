@@ -12,6 +12,7 @@ import 'package:altcast/data/jellyfin/models/intro_skipper_timestamps.dart';
 import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
 import 'package:altcast/data/jellyfin/models/media_stream.dart';
 import 'package:altcast/data/jellyfin/models/movie.dart';
+import 'package:altcast/data/jellyfin/models/original_language.dart';
 import 'package:altcast/data/jellyfin/models/person_details.dart';
 import 'package:altcast/data/jellyfin/models/series.dart';
 import 'package:altcast/data/jellyfin/models/stream_source.dart';
@@ -19,6 +20,13 @@ import 'package:altcast/data/jellyfin/models/trickplay.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
 
 const bool _trickplayDebugLogs = true;
+const _unsupportedSubtitleCodecs = <String>{
+  'pgs',
+  'hdmv_pgs_subtitle',
+  'dvdsub',
+  'dvd_subtitle',
+  'vobsub',
+};
 
 enum LibrarySort { recentlyAdded, nameAsc, nameDesc, yearDesc }
 
@@ -823,6 +831,17 @@ class JellyfinRepository {
     return title == null || title.isEmpty ? 'Now playing' : title;
   }
 
+  /// Lightweight original-language lookup for playback defaults.
+  Future<String?> getItemOriginalLanguage(String itemId) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items/$itemId',
+      queryParameters: const {'Fields': 'OriginalLanguage,Tags'},
+    );
+    final data = res.data;
+    return data == null ? null : parseOriginalLanguageFromItemJson(data);
+  }
+
   /// Picks the episode that follows S[seasonNumber]E[episodeNumber] for
   /// autoplay/Next-Up. Searches the current season first, then falls back to
   /// the start of the next season — bounded queries so long-running shows
@@ -954,26 +973,8 @@ class JellyfinRepository {
     StreamingQuality quality = StreamingQuality.auto,
   }) async {
     final s = _session;
-    final maxBitrate = _maxStreamingBitrate(quality);
     try {
-      final res = await _api.dio.post<Map<String, dynamic>>(
-        '/Items/$itemId/PlaybackInfo',
-        queryParameters: {'UserId': s.userId},
-        data: {
-          'MaxStreamingBitrate': maxBitrate,
-          'EnableDirectPlay': true,
-          'EnableDirectStream': true,
-          'EnableTranscoding': true,
-          'AutoOpenLiveStream': true,
-          'AllowVideoStreamCopy': true,
-          'AllowAudioStreamCopy': true,
-          'DeviceProfile': {
-            ..._libmpvDeviceProfile,
-            'MaxStreamingBitrate': maxBitrate,
-          },
-        },
-      );
-      final data = res.data;
+      final data = await _getPlaybackInfo(itemId, quality: quality);
       if (data == null) {
         return StreamSource(url: streamUrl(itemId), isTranscoding: false);
       }
@@ -1000,6 +1001,7 @@ class JellyfinRepository {
           (data['PlaySessionId'] as String?) ??
           const Uuid().v4();
       final externalSubs = _externalSubtitles(src, itemId);
+      final subtitleStreams = _subtitleMediaStreams(src);
 
       if (supportsDirectPlay || supportsDirectStream) {
         return StreamSource(
@@ -1008,6 +1010,7 @@ class JellyfinRepository {
           playSessionId: playSessionId,
           mediaSourceId: mediaSourceId,
           externalSubtitles: externalSubs,
+          subtitleStreams: subtitleStreams,
         );
       }
 
@@ -1022,6 +1025,7 @@ class JellyfinRepository {
           playSessionId: playSessionId,
           mediaSourceId: mediaSourceId,
           externalSubtitles: externalSubs,
+          subtitleStreams: subtitleStreams,
         );
       }
 
@@ -1032,12 +1036,39 @@ class JellyfinRepository {
         playSessionId: playSessionId,
         mediaSourceId: mediaSourceId,
         externalSubtitles: externalSubs,
+        subtitleStreams: subtitleStreams,
       );
     } catch (_) {
       // Negotiation failed — fall back to the simple static URL. Better to
       // try playback than to block on a server quirk.
       return StreamSource(url: streamUrl(itemId), isTranscoding: false);
     }
+  }
+
+  Future<Map<String, dynamic>?> _getPlaybackInfo(
+    String itemId, {
+    StreamingQuality quality = StreamingQuality.auto,
+  }) async {
+    final s = _session;
+    final maxBitrate = _maxStreamingBitrate(quality);
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/Items/$itemId/PlaybackInfo',
+      queryParameters: {'UserId': s.userId},
+      data: {
+        'MaxStreamingBitrate': maxBitrate,
+        'EnableDirectPlay': true,
+        'EnableDirectStream': true,
+        'EnableTranscoding': true,
+        'AutoOpenLiveStream': true,
+        'AllowVideoStreamCopy': true,
+        'AllowAudioStreamCopy': true,
+        'DeviceProfile': {
+          ..._libmpvDeviceProfile,
+          'MaxStreamingBitrate': maxBitrate,
+        },
+      },
+    );
+    return res.data;
   }
 
   /// Pulls subtitle streams Jellyfin can serve as a sidecar from a
@@ -1076,6 +1107,9 @@ class JellyfinRepository {
       if (!isExtractable) continue;
 
       final codec = (st['Codec'] as String?)?.toLowerCase();
+      if (codec != null && _unsupportedSubtitleCodecs.contains(codec)) {
+        continue;
+      }
       final index = st['Index'] as int?;
       final url = _resolveSubtitleUrl(
         deliveryUrl: deliveryUrl,
@@ -1096,10 +1130,22 @@ class JellyfinRepository {
           title: (st['DisplayTitle'] as String?) ?? (st['Title'] as String?),
           language: st['Language'] as String?,
           codec: codec,
+          isForced: st['IsForced'] as bool? ?? false,
+          isHearingImpaired: st['IsHearingImpaired'] as bool? ?? false,
         ),
       );
     }
     return out;
+  }
+
+  List<MediaStream> _subtitleMediaStreams(Map<String, dynamic> src) {
+    final streams =
+        (src['MediaStreams'] as List?)?.cast<Map<String, dynamic>>() ??
+        const [];
+    return [
+      for (final json in streams)
+        if (json['Type'] == 'Subtitle') MediaStream.fromJson(json),
+    ];
   }
 
   /// Builds a fully-authenticated URL the player can fetch directly.
@@ -1500,49 +1546,6 @@ class JellyfinRepository {
     if (value is num) return value.round();
     if (value is String) return int.tryParse(value);
     return null;
-  }
-
-  /// Fetches just the audio + subtitle stream listing for an item — used by
-  /// the pre-play picker on detail screens. Read-only; doesn't touch
-  /// PlaybackInfo, so no transcoder is spun up as a side effect.
-  Future<ItemMediaStreams> getMediaStreams(String itemId) async {
-    final s = _session;
-    final res = await _api.dio.get<Map<String, dynamic>>(
-      '/Users/${s.userId}/Items/$itemId',
-      queryParameters: {'Fields': 'MediaSources,MediaStreams'},
-    );
-    final data = res.data;
-    if (data == null) {
-      return const ItemMediaStreams(audio: [], subtitle: []);
-    }
-
-    // MediaStreams can come either flat at the item level or nested under the
-    // first MediaSource — check both for robustness across server versions.
-    final flat = (data['MediaStreams'] as List?)?.cast<Map<String, dynamic>>();
-    final fromSources =
-        ((data['MediaSources'] as List?)
-                    ?.cast<Map<String, dynamic>>()
-                    .firstOrNull?['MediaStreams']
-                as List?)
-            ?.cast<Map<String, dynamic>>() ??
-        const [];
-    final raw = flat ?? fromSources;
-
-    final audio = <MediaStream>[];
-    final subs = <MediaStream>[];
-    for (final json in raw) {
-      final stream = MediaStream.fromJson(json);
-      switch (stream.kind) {
-        case MediaStreamKind.audio:
-          audio.add(stream);
-        case MediaStreamKind.subtitle:
-          subs.add(stream);
-        case MediaStreamKind.video:
-        case MediaStreamKind.unknown:
-          break;
-      }
-    }
-    return ItemMediaStreams(audio: audio, subtitle: subs);
   }
 
   /// Tells the server to release a transcoding session so it can stop the
