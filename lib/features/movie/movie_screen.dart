@@ -18,7 +18,6 @@ import 'package:altcast/features/downloads/widgets/download_button.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/movie/movie_providers.dart';
-import 'package:altcast/features/movie/widgets/track_preference_row.dart';
 
 class MovieScreen extends ConsumerWidget {
   const MovieScreen({required this.movieId, super.key});
@@ -63,35 +62,12 @@ class MovieScreen extends ConsumerWidget {
   }
 }
 
-class _MovieBody extends ConsumerStatefulWidget {
+class _MovieBody extends ConsumerWidget {
   const _MovieBody({required this.movie});
   final Movie movie;
 
   @override
-  ConsumerState<_MovieBody> createState() => _MovieBodyState();
-}
-
-class _MovieBodyState extends ConsumerState<_MovieBody>
-    with TrackPreferenceStateMixin<_MovieBody> {
-  @override
-  void initState() {
-    super.initState();
-    initTrackPreference(originalLanguage: widget.movie.originalLanguage);
-  }
-
-  @override
-  void didUpdateWidget(covariant _MovieBody oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    refreshTrackPreferenceIfItemChanged(
-      previousItemId: oldWidget.movie.id,
-      nextItemId: widget.movie.id,
-      originalLanguage: widget.movie.originalLanguage,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final movie = widget.movie;
+  Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
     final similarAsync = ref.watch(similarMoviesProvider(movie.id));
     final castActive = ref.watch(activeRemoteSessionIdProvider) != null;
@@ -147,12 +123,6 @@ class _MovieBodyState extends ConsumerState<_MovieBody>
                 castActive: castActive,
                 downloadAction: MovieDownloadButton(movie: movie),
               ),
-              TrackPreferenceRow(
-                itemId: movie.id,
-                preference: preference,
-                originalLanguageHint: movie.originalLanguage,
-                onChanged: updateTrackPreference,
-              ),
               if (movie.genres.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 GenreChips(
@@ -192,10 +162,7 @@ class _MovieBodyState extends ConsumerState<_MovieBody>
 
   void _play(BuildContext context, Movie movie, {required bool fromStart}) {
     final ticks = fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
-    final query = <String, String>{
-      if (ticks > 0) 'resumeTicks': '$ticks',
-      ...preference.toQuery(),
-    };
+    final query = <String, String>{if (ticks > 0) 'resumeTicks': '$ticks'};
     final uri = Uri(
       path: '/play/${movie.id}',
       queryParameters: query.isEmpty ? null : query,

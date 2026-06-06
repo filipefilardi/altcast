@@ -18,12 +18,15 @@ import 'package:altcast/data/downloads/downloaded_item.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/intro_skipper_timestamps.dart';
+import 'package:altcast/data/jellyfin/models/media_stream.dart';
 import 'package:altcast/data/jellyfin/models/remote_session.dart';
 import 'package:altcast/data/jellyfin/models/syncplay.dart';
 import 'package:altcast/data/jellyfin/models/stream_source.dart';
 import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
+import 'package:altcast/data/local/title_subtitle_preferences.dart';
+import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/syncplay/syncplay_controller.dart';
@@ -45,6 +48,22 @@ const _keyboardSeekStep = Duration(seconds: 10);
 const _keyboardVolumeStep = 0.05;
 
 enum _PlayerControlOverlay { none, subtitleOffset }
+
+class _StartupSubtitlePreference {
+  const _StartupSubtitlePreference({this.language, this.index})
+    : disabled = false;
+
+  /// Explicitly turn subtitles off, as opposed to leaving the player's
+  /// selection alone (the default, all-null instance).
+  const _StartupSubtitlePreference.disabled()
+    : language = null,
+      index = null,
+      disabled = true;
+
+  final String? language;
+  final int? index;
+  final bool disabled;
+}
 
 /// Snapshot pushed to [ValueNotifier] so skip / next-up UI rebuilds inside
 /// [MaterialVideoControls] — required because media_kit fullscreen is a
@@ -84,9 +103,6 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     super.key,
     required this.itemId,
     this.resumeTicks,
-    this.preferredAudioLang,
-    this.preferredSubLang,
-    this.preferredSubIndex,
     this.seriesId,
     this.seasonNumber,
     this.episodeNumber,
@@ -99,19 +115,6 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   /// `microseconds = ticks ~/ 10`.
   final int? resumeTicks;
 
-  /// ISO 639 language code chosen on the detail screen. The player picks
-  /// the first matching audio track after open. `null` → leave the player's
-  /// default selection alone.
-  final String? preferredAudioLang;
-
-  /// ISO 639 code for the preferred subtitle, or the literal `"off"` to
-  /// explicitly disable. Matches both embedded and external subs by
-  /// language. `null` → no override.
-  final String? preferredSubLang;
-
-  /// Jellyfin media stream index from the detail subtitle picker. Used to
-  /// disambiguate multiple subtitle streams with the same language.
-  final int? preferredSubIndex;
   final String? seriesId;
   final int? seasonNumber;
   final int? episodeNumber;
@@ -124,6 +127,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late final Player _player;
   late final VideoController _controller;
+  late ProviderContainer _providerContainer;
   Scrobbler? _scrobbler;
   Object? _openError;
   String _playerTitle = '';
@@ -199,6 +203,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       ValueNotifier<TrickplayOverlayData?>(null);
 
   StreamSource? get _source => _sourceNotifier.value;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _providerContainer = ProviderScope.containerOf(context, listen: false);
+  }
 
   @override
   void initState() {
@@ -347,7 +357,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 title: sub.title,
                 language: sub.language,
                 codec: sub.codec,
+                isForced: sub.isForced,
+                isHearingImpaired: sub.isHearingImpaired,
               ),
+          ],
+          subtitleStreams: [
+            for (final sub in localItem?.externalSubtitles ?? const [])
+              if (sub.streamIndex != null)
+                MediaStream(
+                  index: sub.streamIndex!,
+                  title: sub.title,
+                  displayTitle: sub.title,
+                  language: sub.language,
+                  codec: sub.codec,
+                  isForced: sub.isForced,
+                  isHearingImpaired: sub.isHearingImpaired,
+                ),
           ],
         );
       } else {
@@ -383,7 +408,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
 
-      if (mounted) _applyTrackPreferences();
+      if (mounted) await _applyTrackPreferences();
       await _resolveNextEpisode();
       unawaited(_loadIntroSkipper());
       if (mounted) _tryEnterFullscreenAfterOpen();
@@ -660,7 +685,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final impl = _player.platform as dynamic;
       if (impl != null) {
         final seconds = offset.inMilliseconds / 1000.0;
-        await impl.setProperty('sub-delay', seconds.toStringAsFixed(3));
+        await impl.setProperty('sub-delay', (-seconds).toStringAsFixed(3));
       }
     } catch (_) {}
   }
@@ -694,6 +719,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _durationSub = null;
   }
 
+  void _stopScrobblerAndRefreshContinueWatching({Duration? position}) {
+    final scrobbler = _scrobbler;
+    if (scrobbler == null) return;
+    final stopFuture = scrobbler.stop(
+      positionTicks: (position ?? _lastPosition).inMilliseconds * _ticksPerMs,
+    );
+    unawaited(stopFuture.whenComplete(_refreshContinueWatching));
+  }
+
+  void _refreshContinueWatching() {
+    _providerContainer.invalidate(continueWatchingProvider);
+  }
+
   Future<void> _closeActiveEncoding(StreamSource? src) async {
     if (src != null && src.isTranscoding && src.playSessionId != null) {
       await ref
@@ -702,15 +740,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  /// Applies the audio/subtitle language preferences passed via /play/:id
-  /// query params. No-op when neither was set, when the matching track
-  /// isn't available, or after dispose.
+  /// Applies route overrides, remembered per-title subtitle choices, or global
+  /// playback defaults once media_kit has populated tracks.
   ///
   /// Audio: first track whose `language` matches (case-insensitive).
-  /// Subtitle: `"off"` → disable. Otherwise prefer an embedded match, then
-  /// fall back to an external one, then leave alone.
-  void _applyTrackPreferences() {
-    final wantAudio = widget.preferredAudioLang;
+  /// Subtitle: disabled → turn off. Otherwise prefer a Jellyfin-served match,
+  /// then an embedded one, then leave alone.
+  Future<void> _applyTrackPreferences() async {
+    final playbackPrefs = ref.read(playbackPreferencesProvider);
+    final wantAudio = await _defaultAudioLanguage(playbackPrefs);
     if (wantAudio != null && wantAudio.isNotEmpty) {
       final tracks = _player.state.tracks.audio;
       final match = tracks.firstWhere(
@@ -725,56 +763,46 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       }
     }
 
-    final wantSub = widget.preferredSubLang;
-    final wantSubIndex = widget.preferredSubIndex;
-    if ((wantSub == null || wantSub.isEmpty) && wantSubIndex == null) return;
-    if (wantSub != null && wantSub.toLowerCase() == 'off') {
+    final resolvedSubtitle = _resolvedStartupSubtitle(playbackPrefs);
+    if (resolvedSubtitle.disabled) {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(SubtitleTrack.no());
       _setSubVisibility(false);
       return;
     }
+    final wantSub = resolvedSubtitle.language;
+    final wantSubIndex = resolvedSubtitle.index;
+    if ((wantSub == null || wantSub.isEmpty) && wantSubIndex == null) return;
 
     if (wantSubIndex != null) {
-      final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
-      for (final ext in externals) {
-        if (ext.streamIndex == wantSubIndex) {
-          _selectedExternalSubNotifier.value = ext.id;
-          _player.setSubtitleTrack(
-            SubtitleTrack.uri(
-              ext.url,
-              title: ext.title,
-              language: ext.language,
-            ),
-          );
-          _setSubVisibility(true);
-          return;
-        }
-      }
-
-      final embedded = _player.state.tracks.subtitle.firstWhere(
-        (t) =>
-            t.id != SubtitleTrack.auto().id &&
-            t.id != SubtitleTrack.no().id &&
-            _subtitleTrackMatchesStreamIndex(t, wantSubIndex),
-        orElse: () => SubtitleTrack.no(),
-      );
-      if (embedded.id != SubtitleTrack.no().id) {
-        _selectedExternalSubNotifier.value = null;
-        _player.setSubtitleTrack(embedded);
-        _setSubVisibility(true);
-        return;
-      }
+      if (_activateSubtitleStreamIndex(wantSubIndex)) return;
     }
 
     if (wantSub == null || wantSub.isEmpty) return;
 
-    // Try embedded first.
+    // Prefer Jellyfin-served text subtitles when available: they carry the
+    // same stream metadata the detail page used to resolve Default, and they
+    // render through the Flutter subtitle overlay consistently.
+    final external = _bestExternalSubtitleLanguageMatch(wantSub);
+    if (external != null) {
+      _selectedExternalSubNotifier.value = external.id;
+      _player.setSubtitleTrack(
+        SubtitleTrack.uri(
+          external.url,
+          title: external.title,
+          language: external.language,
+        ),
+      );
+      _setSubVisibility(true);
+      return;
+    }
+
+    // Then embedded tracks reported by media_kit.
     final embedded = _player.state.tracks.subtitle.firstWhere(
       (t) =>
           t.id != SubtitleTrack.auto().id &&
           t.id != SubtitleTrack.no().id &&
-          ((t.language ?? '').toLowerCase() == wantSub.toLowerCase() ||
+          (languageCodesMatch(t.language, wantSub) ||
               (languageDisplay(t.language) ?? '').toLowerCase() ==
                   wantSub.toLowerCase()),
       orElse: () => SubtitleTrack.no(),
@@ -785,26 +813,196 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _setSubVisibility(true);
       return;
     }
+  }
 
-    // Then external — comes from the StreamSource we just resolved.
-    final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
-    for (final ext in externals) {
-      if ((ext.language ?? '').toLowerCase() == wantSub.toLowerCase() ||
-          (languageDisplay(ext.language) ?? '').toLowerCase() ==
-              wantSub.toLowerCase()) {
-        _selectedExternalSubNotifier.value = ext.id;
-        _player.setSubtitleTrack(
-          SubtitleTrack.uri(ext.url, title: ext.title, language: ext.language),
-        );
-        _setSubVisibility(true);
-        return;
+  Future<String?> _defaultAudioLanguage(PlaybackPreferences prefs) async {
+    if (prefs.defaultAudioMode != DefaultAudioMode.originalLanguage) {
+      return prefs.resolvedAudioLanguage(null);
+    }
+    final originalLanguage = await _loadItemOriginalLanguage();
+    return prefs.resolvedAudioLanguage(originalLanguage);
+  }
+
+  Future<String?> _loadItemOriginalLanguage() async {
+    try {
+      return await ref
+          .read(jellyfinRepositoryProvider)
+          .getItemOriginalLanguage(widget.itemId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  _StartupSubtitlePreference _resolvedStartupSubtitle(
+    PlaybackPreferences prefs,
+  ) {
+    final titlePreference = ref.read(
+      titleSubtitlePreferencesProvider,
+    )[widget.itemId];
+    if (titlePreference != null) {
+      switch (titlePreference.mode) {
+        case TitleSubtitleMode.serverDefault:
+          return const _StartupSubtitlePreference();
+        case TitleSubtitleMode.off:
+          return const _StartupSubtitlePreference.disabled();
+        case TitleSubtitleMode.byLanguage:
+          return _StartupSubtitlePreference(
+            language: titlePreference.language,
+            index: titlePreference.streamIndex,
+          );
       }
     }
+
+    switch (prefs.defaultSubtitleMode) {
+      case DefaultSubtitleMode.auto:
+        return const _StartupSubtitlePreference();
+      case DefaultSubtitleMode.off:
+        return const _StartupSubtitlePreference.disabled();
+      case DefaultSubtitleMode.byLanguage:
+        final language = prefs.defaultSubtitleLanguage?.trim();
+        if (language == null || language.isEmpty) {
+          return const _StartupSubtitlePreference.disabled();
+        }
+        final match = _bestSubtitleStreamLanguageMatch(language);
+        if (match == null) {
+          return const _StartupSubtitlePreference.disabled();
+        }
+        return _StartupSubtitlePreference(
+          language: language,
+          index: match.index,
+        );
+    }
+  }
+
+  MediaStream? _bestSubtitleStreamLanguageMatch(String language) {
+    final matches = [
+      for (final stream in _sourceNotifier.value?.subtitleStreams ?? const [])
+        if (languageCodesMatch(stream.language, language)) stream,
+    ];
+    if (matches.isEmpty) return null;
+    matches.sort(
+      (a, b) => _compareSubtitleCandidates(
+        (forced: a.isForced, sdh: a.isHearingImpaired, index: a.index),
+        (forced: b.isForced, sdh: b.isHearingImpaired, index: b.index),
+      ),
+    );
+    return matches.first;
   }
 
   bool _subtitleTrackMatchesStreamIndex(SubtitleTrack track, int index) {
     if (track.id == '$index') return true;
     return int.tryParse(track.id) == index;
+  }
+
+  bool _activateSubtitleStreamIndex(int streamIndex) {
+    final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
+    for (final ext in externals) {
+      if (ext.streamIndex == streamIndex) {
+        _selectedExternalSubNotifier.value = ext.id;
+        _player.setSubtitleTrack(
+          SubtitleTrack.uri(ext.url, title: ext.title, language: ext.language),
+        );
+        _setSubVisibility(true);
+        return true;
+      }
+    }
+
+    final embedded = _player.state.tracks.subtitle.firstWhere(
+      (track) =>
+          track.id != SubtitleTrack.auto().id &&
+          track.id != SubtitleTrack.no().id &&
+          _subtitleTrackMatchesStreamIndex(track, streamIndex),
+      orElse: () => SubtitleTrack.no(),
+    );
+    if (embedded.id == SubtitleTrack.no().id) return false;
+    _selectedExternalSubNotifier.value = null;
+    _player.setSubtitleTrack(embedded);
+    _setSubVisibility(true);
+    return true;
+  }
+
+  ExternalSubtitle? _bestExternalSubtitleLanguageMatch(String language) {
+    final matches = [
+      for (final subtitle
+          in _sourceNotifier.value?.externalSubtitles ??
+              const <ExternalSubtitle>[])
+        if (languageCodesMatch(subtitle.language, language) ||
+            (languageDisplay(subtitle.language) ?? '').toLowerCase() ==
+                language.toLowerCase())
+          subtitle,
+    ];
+    if (matches.isEmpty) return null;
+    const noIndex = 1 << 30;
+    matches.sort(
+      (a, b) => _compareSubtitleCandidates(
+        (
+          forced: a.isForced,
+          sdh: a.isHearingImpaired,
+          index: a.streamIndex ?? noIndex,
+        ),
+        (
+          forced: b.isForced,
+          sdh: b.isHearingImpaired,
+          index: b.streamIndex ?? noIndex,
+        ),
+      ),
+    );
+    return matches.first;
+  }
+
+  /// Orders subtitle candidates so plain tracks rank ahead of Forced, then SDH,
+  /// then by lowest stream index. Lower sorts first.
+  int _compareSubtitleCandidates(
+    ({bool forced, bool sdh, int index}) a,
+    ({bool forced, bool sdh, int index}) b,
+  ) {
+    final forced = _boolPriority(a.forced).compareTo(_boolPriority(b.forced));
+    if (forced != 0) return forced;
+    final sdh = _boolPriority(a.sdh).compareTo(_boolPriority(b.sdh));
+    if (sdh != 0) return sdh;
+    return a.index.compareTo(b.index);
+  }
+
+  int _boolPriority(bool value) => value ? 1 : 0;
+
+  bool _selectSubtitleStreamForPlayer(MediaStream stream) {
+    if (!_activateSubtitleStreamIndex(stream.index)) return false;
+    _rememberSubtitleForTitle(
+      language: stream.language,
+      streamIndex: stream.index,
+    );
+    return true;
+  }
+
+  void _rememberSubtitleOffForTitle() {
+    unawaited(
+      ref
+          .read(titleSubtitlePreferencesProvider.notifier)
+          .setPreference(widget.itemId, const TitleSubtitlePreference.off()),
+    );
+  }
+
+  /// Persists the active subtitle choice for this title so the next playback
+  /// restores it. No-op when neither a language nor a stream index is known.
+  void _rememberSubtitleForTitle({String? language, int? streamIndex}) {
+    final cleaned = _cleanTrackLanguage(language);
+    if (cleaned == null && streamIndex == null) return;
+    unawaited(
+      ref
+          .read(titleSubtitlePreferencesProvider.notifier)
+          .setPreference(
+            widget.itemId,
+            TitleSubtitlePreference.byLanguage(
+              language: cleaned,
+              streamIndex: streamIndex,
+            ),
+          ),
+    );
+  }
+
+  String? _cleanTrackLanguage(String? language) {
+    final trimmed = language?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   /// Wires the scrobbler to media_kit streams. Reports playback to Jellyfin
@@ -856,9 +1054,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (_remoteCastMirrorActive) return;
       if (completed) {
         _cancelAutoplay();
-        scrobbler.stop(
-          positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
-        );
+        _stopScrobblerAndRefreshContinueWatching();
         if (_nextEpisode != null) {
           final autoplay = ref
               .read(playbackPreferencesProvider)
@@ -1145,9 +1341,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _durationSub?.cancel();
     // Best-effort final stop so the server records where the user left off.
     if (!_remoteCastMirrorActive) {
-      _scrobbler?.stop(
-        positionTicks: _lastPosition.inMilliseconds * _ticksPerMs,
-      );
+      _stopScrobblerAndRefreshContinueWatching();
     }
     // Release the server-side transcoder if we were transcoding. Fire-and-
     // forget — `_player.dispose` doesn't wait for it, but we don't need to
@@ -1441,22 +1635,51 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         sourceListenable: _sourceNotifier,
         selectedExternalSubListenable: _selectedExternalSubNotifier,
         onSetSubVisibility: _setSubVisibility,
-        onSelectExternalSubtitle: (sub) {
+        onSelectSubtitleOff: () {
           if (!mounted) return;
-          _selectedExternalSubNotifier.value = sub?.id;
-          if (sub == null) {
-            _player.setSubtitleTrack(SubtitleTrack.no());
-            _setSubVisibility(false);
-          } else {
-            _player.setSubtitleTrack(
-              SubtitleTrack.uri(
-                sub.url,
-                title: sub.title,
-                language: sub.language,
+          _selectedExternalSubNotifier.value = null;
+          _player.setSubtitleTrack(SubtitleTrack.no());
+          _setSubVisibility(false);
+          _rememberSubtitleOffForTitle();
+        },
+        onSelectSubtitleStream: (stream) {
+          if (!mounted) return;
+          final activated = _selectSubtitleStreamForPlayer(stream);
+          if (!activated) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Subtitle track unavailable for this playback mode.',
+                ),
               ),
             );
-            _setSubVisibility(true);
           }
+        },
+        onSelectEmbeddedSubtitle: (track) {
+          if (!mounted) return;
+          _selectedExternalSubNotifier.value = null;
+          _player.setSubtitleTrack(track);
+          _setSubVisibility(true);
+          _rememberSubtitleForTitle(
+            language: track.language,
+            streamIndex: int.tryParse(track.id),
+          );
+        },
+        onSelectExternalSubtitle: (sub) {
+          if (!mounted) return;
+          _selectedExternalSubNotifier.value = sub.id;
+          _player.setSubtitleTrack(
+            SubtitleTrack.uri(
+              sub.url,
+              title: sub.title,
+              language: sub.language,
+            ),
+          );
+          _setSubVisibility(true);
+          _rememberSubtitleForTitle(
+            language: sub.language,
+            streamIndex: sub.streamIndex,
+          );
         },
       ),
     );
@@ -1935,9 +2158,9 @@ class _PlaybackSettingsOverlayState
 
   String _offsetLabel(Duration offset) {
     final seconds = offset.inMilliseconds / 1000.0;
-    if (seconds == 0) return '0.00s';
+    if (seconds == 0) return '0s';
     final sign = seconds > 0 ? '+' : '';
-    return '$sign${seconds.toStringAsFixed(2)}s';
+    return '$sign${seconds.toStringAsFixed(1)}s';
   }
 }
 
@@ -1957,6 +2180,8 @@ class _SubtitleOffsetOverlay extends StatefulWidget {
 class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
   static const _minOffsetSeconds = -30.0;
   static const _maxOffsetSeconds = 30.0;
+  static const _offsetStepSeconds = 0.1;
+  static const _offsetDivisions = 600;
   static const _zeroMarkerWidth = 2.0;
   static const _zeroMarkerHeight = 16.0;
 
@@ -2044,7 +2269,7 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
                             Slider(
                               min: _minOffsetSeconds,
                               max: _maxOffsetSeconds,
-                              divisions: 240,
+                              divisions: _offsetDivisions,
                               label: _offsetLabel(_subtitleOffset),
                               value: _subtitleOffset.inMilliseconds / 1000.0,
                               onChanged: _setOffsetSeconds,
@@ -2071,7 +2296,9 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
   }
 
   void _setOffsetSeconds(double value) {
-    final offset = Duration(milliseconds: (value * 1000).round());
+    final steppedValue =
+        (value / _offsetStepSeconds).round() * _offsetStepSeconds;
+    final offset = Duration(milliseconds: (steppedValue * 1000).round());
     _setOffset(offset);
   }
 
@@ -2091,9 +2318,9 @@ class _SubtitleOffsetOverlayState extends State<_SubtitleOffsetOverlay> {
 
   String _offsetLabel(Duration offset) {
     final seconds = offset.inMilliseconds / 1000.0;
-    if (seconds == 0) return '0.00s';
+    if (seconds == 0) return '0s';
     final sign = seconds > 0 ? '+' : '';
-    return '$sign${seconds.toStringAsFixed(2)}s';
+    return '$sign${seconds.toStringAsFixed(1)}s';
   }
 }
 

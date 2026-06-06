@@ -112,8 +112,12 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (_, constraints) {
+                        final knobBottom =
+                            (constraints.maxHeight * clamped) -
+                            (tokens.gestureIndicatorKnobSize / 2);
                         return Stack(
                           alignment: Alignment.bottomCenter,
+                          clipBehavior: Clip.none,
                           children: [
                             Container(
                               width: tokens.gestureIndicatorTrackWidth,
@@ -133,10 +137,7 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
                               ),
                             ),
                             Positioned(
-                              bottom:
-                                  (constraints.maxHeight -
-                                      tokens.gestureIndicatorKnobOffset) *
-                                  clamped,
+                              bottom: knobBottom,
                               child: SizedBox.square(
                                 dimension: tokens.gestureIndicatorKnobSize,
                                 child: DecoratedBox(

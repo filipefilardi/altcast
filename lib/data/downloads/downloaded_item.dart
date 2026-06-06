@@ -136,6 +136,8 @@ class DownloadedExternalSubtitle {
     this.title,
     this.language,
     this.codec,
+    this.isForced = false,
+    this.isHearingImpaired = false,
   });
 
   final String id;
@@ -144,6 +146,8 @@ class DownloadedExternalSubtitle {
   final String? title;
   final String? language;
   final String? codec;
+  final bool isForced;
+  final bool isHearingImpaired;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -152,6 +156,8 @@ class DownloadedExternalSubtitle {
     if (title != null) 'title': title,
     if (language != null) 'language': language,
     if (codec != null) 'codec': codec,
+    if (isForced) 'isForced': isForced,
+    if (isHearingImpaired) 'isHearingImpaired': isHearingImpaired,
   };
 
   factory DownloadedExternalSubtitle.fromJson(Map<String, dynamic> json) {
@@ -162,6 +168,8 @@ class DownloadedExternalSubtitle {
       title: json['title'] as String?,
       language: json['language'] as String?,
       codec: json['codec'] as String?,
+      isForced: json['isForced'] as bool? ?? false,
+      isHearingImpaired: json['isHearingImpaired'] as bool? ?? false,
     );
   }
 }

@@ -22,7 +22,6 @@ import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/series/series_providers.dart';
 import 'package:altcast/features/series/widgets/episode_tile.dart';
 import 'package:altcast/features/series/widgets/season_picker.dart';
-import 'package:altcast/features/movie/widgets/track_preference_row.dart';
 
 class SeriesScreen extends ConsumerStatefulWidget {
   const SeriesScreen({required this.seriesId, super.key});
@@ -99,7 +98,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   }
 }
 
-class _SeriesBody extends ConsumerStatefulWidget {
+class _SeriesBody extends ConsumerWidget {
   const _SeriesBody({
     required this.series,
     required this.seasonsAsync,
@@ -113,33 +112,7 @@ class _SeriesBody extends ConsumerStatefulWidget {
   final ValueChanged<String> onSelectSeason;
 
   @override
-  ConsumerState<_SeriesBody> createState() => _SeriesBodyState();
-}
-
-class _SeriesBodyState extends ConsumerState<_SeriesBody>
-    with TrackPreferenceStateMixin<_SeriesBody> {
-  @override
-  void initState() {
-    super.initState();
-    initTrackPreference(originalLanguage: widget.series.originalLanguage);
-  }
-
-  @override
-  void didUpdateWidget(covariant _SeriesBody oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    refreshTrackPreferenceIfItemChanged(
-      previousItemId: oldWidget.series.id,
-      nextItemId: widget.series.id,
-      originalLanguage: widget.series.originalLanguage,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final series = widget.series;
-    final seasonsAsync = widget.seasonsAsync;
-    final selectedSeasonId = widget.selectedSeasonId;
-    final onSelectSeason = widget.onSelectSeason;
+  Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
     final similarAsync = ref.watch(similarSeriesProvider(series.id));
     final backdrop = repo.backdropUrl(
@@ -183,18 +156,11 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               MediaDetailActions(
-                onPlay: next == null
-                    ? null
-                    : () => _playEpisode(context, next, preference: preference),
+                onPlay: next == null ? null : () => _playEpisode(context, next),
                 playLabel: _playLabel(next),
                 playIcon: PiconsFill.play,
                 onPlayFromStart: next != null && nextHasResume
-                    ? () => _playEpisode(
-                        context,
-                        next,
-                        preference: preference,
-                        fromStart: true,
-                      )
+                    ? () => _playEpisode(context, next, fromStart: true)
                     : null,
                 initialPlayed: series.userData?.played ?? false,
                 onSetPlayed: (v) async {
@@ -214,12 +180,6 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
                   series: series,
                   seasons: seasons,
                 ),
-              ),
-              TrackPreferenceRow(
-                itemId: next?.id ?? series.id,
-                preference: preference,
-                originalLanguageHint: series.originalLanguage,
-                onChanged: updateTrackPreference,
               ),
               DetailOverviewSection(
                 overview: series.overview,
@@ -252,7 +212,6 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody>
           episodesAsync: episodesAsync,
           seriesName: series.name,
           seriesPosterTag: series.imageTag,
-          preference: preference,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -313,7 +272,6 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
     required this.episodesAsync,
     required this.seriesName,
     required this.seriesPosterTag,
-    required this.preference,
   });
 
   final Series series;
@@ -323,7 +281,6 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
   final AsyncValue<List<Episode>> episodesAsync;
   final String seriesName;
   final String? seriesPosterTag;
-  final TrackPreference preference;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -354,7 +311,6 @@ class _SeasonsAndEpisodes extends ConsumerWidget {
               episodesAsync: episodesAsync,
               seriesName: seriesName,
               seriesPosterTag: seriesPosterTag,
-              preference: preference,
             ),
           ],
         );
@@ -381,14 +337,12 @@ class _EpisodeList extends ConsumerWidget {
     required this.episodesAsync,
     required this.seriesName,
     required this.seriesPosterTag,
-    required this.preference,
   });
   final String seriesId;
   final String seasonId;
   final AsyncValue<List<Episode>> episodesAsync;
   final String seriesName;
   final String? seriesPosterTag;
-  final TrackPreference preference;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -410,7 +364,7 @@ class _EpisodeList extends ConsumerWidget {
                 episode: ep,
                 seriesName: seriesName,
                 seriesPosterTag: seriesPosterTag,
-                onTap: () => _playEpisode(context, ep, preference: preference),
+                onTap: () => _playEpisode(context, ep),
               ),
           ],
         );
@@ -496,19 +450,13 @@ class _SeriesSkeleton extends StatelessWidget {
   }
 }
 
-void _playEpisode(
-  BuildContext context,
-  Episode ep, {
-  TrackPreference preference = const TrackPreference(),
-  bool fromStart = false,
-}) {
+void _playEpisode(BuildContext context, Episode ep, {bool fromStart = false}) {
   final ticks = fromStart ? 0 : (ep.userData?.playbackPositionTicks ?? 0);
   final query = <String, String>{
     if (ticks > 0) 'resumeTicks': '$ticks',
     if (ep.seriesId.isNotEmpty) 'seriesId': ep.seriesId,
     if (ep.parentIndexNumber != null) 'seasonNumber': '${ep.parentIndexNumber}',
     if (ep.indexNumber != null) 'episodeNumber': '${ep.indexNumber}',
-    ...preference.toQuery(),
   };
   final uri = Uri(
     path: '/play/${ep.id}',

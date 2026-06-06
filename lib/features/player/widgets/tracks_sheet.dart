@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/data/jellyfin/models/media_stream.dart';
 import 'package:altcast/data/jellyfin/models/stream_source.dart';
 
 /// Bottom sheet listing the audio and subtitle tracks the [Player] has
@@ -22,6 +23,9 @@ class TracksSheet extends StatelessWidget {
     required this.player,
     required this.sourceListenable,
     required this.selectedExternalSubListenable,
+    required this.onSelectSubtitleOff,
+    required this.onSelectSubtitleStream,
+    required this.onSelectEmbeddedSubtitle,
     required this.onSelectExternalSubtitle,
     required this.onSetSubVisibility,
   });
@@ -36,7 +40,10 @@ class TracksSheet extends StatelessWidget {
   /// Live external-sub selection. Same pattern.
   final ValueListenable<String?> selectedExternalSubListenable;
 
-  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
+  final VoidCallback onSelectSubtitleOff;
+  final ValueChanged<MediaStream> onSelectSubtitleStream;
+  final ValueChanged<SubtitleTrack> onSelectEmbeddedSubtitle;
+  final ValueChanged<ExternalSubtitle> onSelectExternalSubtitle;
   final ValueChanged<bool> onSetSubVisibility;
 
   @override
@@ -61,6 +68,7 @@ class TracksSheet extends StatelessWidget {
                       final current = currentSnap.data ?? player.state.track;
                       final externalSubs =
                           source?.externalSubtitles ?? const [];
+                      final jellyfinSubs = source?.subtitleStreams ?? const [];
                       return SingleChildScrollView(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
@@ -78,8 +86,13 @@ class TracksSheet extends StatelessWidget {
                                 player: player,
                                 tracks: tracks.subtitle,
                                 current: current.subtitle,
+                                jellyfinSubtitles: jellyfinSubs,
                                 externalSubtitles: externalSubs,
                                 selectedExternalSubId: selectedExternalSubId,
+                                onSelectSubtitleOff: onSelectSubtitleOff,
+                                onSelectSubtitleStream: onSelectSubtitleStream,
+                                onSelectEmbeddedSubtitle:
+                                    onSelectEmbeddedSubtitle,
                                 onSelectExternalSubtitle:
                                     onSelectExternalSubtitle,
                                 onSetSubVisibility: onSetSubVisibility,
@@ -151,8 +164,12 @@ class _SubtitleSection extends StatelessWidget {
     required this.player,
     required this.tracks,
     required this.current,
+    required this.jellyfinSubtitles,
     required this.externalSubtitles,
     required this.selectedExternalSubId,
+    required this.onSelectSubtitleOff,
+    required this.onSelectSubtitleStream,
+    required this.onSelectEmbeddedSubtitle,
     required this.onSelectExternalSubtitle,
     required this.onSetSubVisibility,
   });
@@ -160,21 +177,61 @@ class _SubtitleSection extends StatelessWidget {
   final Player player;
   final List<SubtitleTrack> tracks;
   final SubtitleTrack current;
+  final List<MediaStream> jellyfinSubtitles;
   final List<ExternalSubtitle> externalSubtitles;
   final String? selectedExternalSubId;
-  final ValueChanged<ExternalSubtitle?> onSelectExternalSubtitle;
+  final VoidCallback onSelectSubtitleOff;
+  final ValueChanged<MediaStream> onSelectSubtitleStream;
+  final ValueChanged<SubtitleTrack> onSelectEmbeddedSubtitle;
+  final ValueChanged<ExternalSubtitle> onSelectExternalSubtitle;
   final ValueChanged<bool> onSetSubVisibility;
 
   @override
   Widget build(BuildContext context) {
-    final embedded = tracks
-        .where(
-          (t) =>
-              t.id != SubtitleTrack.auto().id && t.id != SubtitleTrack.no().id,
-        )
-        .toList();
+    final jellyfinRows = _jellyfinSubtitleRows(jellyfinSubtitles);
+    final selectedJellyfinIndex = _selectedJellyfinSubtitleIndex(
+      current: current,
+      externalTracks: externalSubtitles,
+      selectedExternalSubId: selectedExternalSubId,
+    );
+    if (jellyfinRows.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHeader(label: 'Subtitles'),
+          _TrackRow(
+            label: 'Off',
+            selected: selectedJellyfinIndex == null,
+            onTap: () {
+              onSelectSubtitleOff();
+              onSetSubVisibility(false);
+              Navigator.of(context).pop();
+            },
+          ),
+          for (final row in jellyfinRows)
+            _TrackRow(
+              label: row.label,
+              selected: selectedJellyfinIndex == row.stream.index,
+              onTap: () {
+                onSelectSubtitleStream(row.stream);
+                Navigator.of(context).pop();
+              },
+            ),
+        ],
+      );
+    }
+
+    final hasCanonicalSubtitles = externalSubtitles.isNotEmpty;
+    final embedded = hasCanonicalSubtitles
+        ? const <SubtitleTrack>[]
+        : tracks
+              .where(
+                (t) =>
+                    t.id != SubtitleTrack.auto().id &&
+                    t.id != SubtitleTrack.no().id,
+              )
+              .toList();
     final filteredExternal = _filterExternalSubtitles(
-      embeddedTracks: embedded,
       externalTracks: externalSubtitles,
     );
     final effectiveExternalSubId =
@@ -203,8 +260,7 @@ class _SubtitleSection extends StatelessWidget {
           label: 'Off',
           selected: isOff,
           onTap: () {
-            onSelectExternalSubtitle(null);
-            player.setSubtitleTrack(SubtitleTrack.no());
+            onSelectSubtitleOff();
             onSetSubVisibility(false);
             Navigator.of(context).pop();
           },
@@ -223,15 +279,14 @@ class _SubtitleSection extends StatelessWidget {
             selected: selectedEmbeddedId != null && t.id == selectedEmbeddedId,
             onTap: () {
               // Picking an embedded track clears any external selection.
-              onSelectExternalSubtitle(null);
-              player.setSubtitleTrack(t);
+              onSelectEmbeddedSubtitle(t);
               onSetSubVisibility(true);
               Navigator.of(context).pop();
             },
           ),
         for (final sub in filteredExternal)
           _TrackRow(
-            label: '${_externalLabel(sub)} (external)',
+            label: _externalLabel(sub),
             selected: hasExternal && sub.id == effectiveExternalSubId,
             onTap: () {
               onSelectExternalSubtitle(sub);
@@ -249,34 +304,137 @@ class _SubtitleSection extends StatelessWidget {
   );
 
   String _externalLabel(ExternalSubtitle sub) {
-    return _trackDisplayLabel(
+    final label = _trackDisplayLabel(
       title: sub.title,
       language: sub.language,
       fallbackId: sub.codec ?? 'subs',
     );
+    final extra = [
+      if (sub.isForced) 'Forced',
+      if (sub.isHearingImpaired) 'SDH',
+    ];
+    if (extra.isEmpty) return label;
+    return '$label · ${extra.join(' · ')}';
+  }
+
+  List<_JellyfinSubtitleRow> _jellyfinSubtitleRows(List<MediaStream> streams) {
+    final labels = [
+      for (final stream in streams) _jellyfinSubtitleLabel(stream),
+    ];
+    final labelCounts = <String, int>{};
+    for (final label in labels) {
+      final key = label.toLowerCase();
+      labelCounts[key] = (labelCounts[key] ?? 0) + 1;
+    }
+
+    return [
+      for (var i = 0; i < streams.length; i++)
+        _JellyfinSubtitleRow(
+          stream: streams[i],
+          label: (labelCounts[labels[i].toLowerCase()] ?? 0) > 1
+              ? '${labels[i]} · Track ${streams[i].index}'
+              : labels[i],
+        ),
+    ];
+  }
+
+  String _jellyfinSubtitleLabel(MediaStream stream) {
+    final descriptor = _subtitleTitleDescriptor(stream);
+    final extras = <String>[
+      if (stream.isForced) 'Forced',
+      if (stream.isHearingImpaired) 'SDH',
+      ?descriptor,
+    ];
+    final mapped =
+        languageDisplay(stream.language) ?? stream.language ?? 'Track';
+    if (extras.isEmpty) return mapped;
+    return '$mapped · ${extras.join(' · ')}';
+  }
+
+  String? _subtitleTitleDescriptor(MediaStream stream) {
+    final raw = (stream.displayTitle ?? stream.title ?? '').trim();
+    if (raw.isEmpty) return null;
+
+    var normalized = raw.toLowerCase();
+    for (final token in [
+      languageDisplay(stream.language),
+      stream.language,
+      stream.codec,
+      'subtitle',
+      'subtitles',
+      'subrip',
+      'default',
+      'external',
+      'utf-8',
+    ]) {
+      final value = token?.trim().toLowerCase();
+      if (value == null || value.isEmpty) continue;
+      normalized = normalized.replaceAll(value, ' ');
+    }
+    normalized = normalized
+        .replaceAll(RegExp(r'[\[\]\(\)\-_/·•]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (normalized.isEmpty) return null;
+    if (normalized == 'sdh') return 'SDH';
+    if (normalized == 'cc') return 'CC';
+    return normalized
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => part.length <= 3 ? part.toUpperCase() : _titleCase(part))
+        .join(' ');
+  }
+
+  String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return '${value[0].toUpperCase()}${value.substring(1)}';
+  }
+
+  int? _selectedJellyfinSubtitleIndex({
+    required SubtitleTrack current,
+    required List<ExternalSubtitle> externalTracks,
+    required String? selectedExternalSubId,
+  }) {
+    if (selectedExternalSubId != null) {
+      for (final subtitle in externalTracks) {
+        if (subtitle.id == selectedExternalSubId) return subtitle.streamIndex;
+      }
+    }
+    if (current.id == SubtitleTrack.no().id ||
+        current.id == SubtitleTrack.auto().id) {
+      return null;
+    }
+    final parsed = int.tryParse(current.id);
+    if (parsed != null) return parsed;
+    final inferredExternalId = _inferExternalSelectionFromCurrent(
+      current: current,
+      externalTracks: externalTracks,
+    );
+    if (inferredExternalId == null) return null;
+    for (final subtitle in externalTracks) {
+      if (subtitle.id == inferredExternalId) return subtitle.streamIndex;
+    }
+    return null;
   }
 
   List<ExternalSubtitle> _filterExternalSubtitles({
-    required List<SubtitleTrack> embeddedTracks,
     required List<ExternalSubtitle> externalTracks,
   }) {
     if (externalTracks.isEmpty) return const [];
 
-    final embeddedKeys = <String>{
-      for (final t in embeddedTracks)
-        ..._trackIdentityKeys(title: t.title, language: t.language),
-    };
     final seenExternalKeys = <String>{};
     final out = <ExternalSubtitle>[];
 
     for (final sub in externalTracks) {
-      final keys = _trackIdentityKeys(title: sub.title, language: sub.language);
-      if (keys.isEmpty) continue;
-      final duplicatesEmbedded = keys.any(embeddedKeys.contains);
-      if (duplicatesEmbedded) continue;
-      final duplicatesExternal = keys.any(seenExternalKeys.contains);
+      final externalKeys = {
+        if (sub.streamIndex != null)
+          'index:${sub.streamIndex}'
+        else
+          'id:${sub.id}',
+      };
+      final duplicatesExternal = externalKeys.any(seenExternalKeys.contains);
       if (duplicatesExternal) continue;
-      seenExternalKeys.addAll(keys);
+      seenExternalKeys.addAll(externalKeys);
       out.add(sub);
     }
     return out;
@@ -291,18 +449,10 @@ class _SubtitleSection extends StatelessWidget {
         current.id == SubtitleTrack.auto().id) {
       return null;
     }
-    final currentKeys = _trackIdentityKeys(
-      title: current.title,
-      language: current.language,
-    );
-    if (currentKeys.isEmpty) return null;
+    final currentTitle = _normalizeTitle(current.title);
+    if (currentTitle == null) return null;
     for (final sub in externalTracks) {
-      final extKeys = _trackIdentityKeys(
-        title: sub.title,
-        language: sub.language,
-      );
-      if (extKeys.isEmpty) continue;
-      if (extKeys.any(currentKeys.contains)) return sub.id;
+      if (_normalizeTitle(sub.title) == currentTitle) return sub.id;
     }
     return null;
   }
@@ -316,14 +466,10 @@ class _SubtitleSection extends StatelessWidget {
     for (final t in embeddedTracks) {
       if (t.id == current.id) return t.id;
     }
-    final currentKeys = _trackIdentityKeys(
-      title: current.title,
-      language: current.language,
-    );
-    if (currentKeys.isNotEmpty) {
+    final currentTitle = _normalizeTitle(current.title);
+    if (currentTitle != null) {
       for (final t in embeddedTracks) {
-        final keys = _trackIdentityKeys(title: t.title, language: t.language);
-        if (keys.any(currentKeys.contains)) return t.id;
+        if (_normalizeTitle(t.title) == currentTitle) return t.id;
       }
     }
     // mpv sometimes reports "auto" as current id while one embedded track is
@@ -334,28 +480,6 @@ class _SubtitleSection extends StatelessWidget {
     return null;
   }
 
-  Set<String> _trackIdentityKeys({
-    required String? title,
-    required String? language,
-  }) {
-    final normalizedLanguage = _normalizeLanguage(language);
-    final normalizedTitle = _normalizeTitle(title);
-    if (normalizedLanguage == null && normalizedTitle == null) return const {};
-    return {
-      if (normalizedLanguage != null) 'lang:$normalizedLanguage',
-      if (normalizedTitle != null) 'title:$normalizedTitle',
-      if (normalizedLanguage != null && normalizedTitle != null)
-        'pair:$normalizedLanguage|$normalizedTitle',
-    };
-  }
-
-  String? _normalizeLanguage(String? language) {
-    final raw = language?.trim().toLowerCase();
-    if (raw == null || raw.isEmpty || raw == 'und') return null;
-    final mapped = languageDisplay(raw)?.trim().toLowerCase();
-    return (mapped == null || mapped.isEmpty) ? raw : mapped;
-  }
-
   String? _normalizeTitle(String? title) {
     final raw = title?.trim().toLowerCase();
     if (raw == null || raw.isEmpty) return null;
@@ -363,6 +487,13 @@ class _SubtitleSection extends StatelessWidget {
     final compact = raw.replaceAll(RegExp(r'[\s\-\._\(\)\[\]]+'), '');
     return compact.isEmpty ? null : compact;
   }
+}
+
+class _JellyfinSubtitleRow {
+  const _JellyfinSubtitleRow({required this.stream, required this.label});
+
+  final MediaStream stream;
+  final String label;
 }
 
 /// Builds a friendly label for an audio/subtitle track.

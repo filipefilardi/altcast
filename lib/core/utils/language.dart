@@ -7,10 +7,27 @@
 /// Intentionally not exhaustive: covers the ~50 most common codes seen on
 /// Jellyfin libraries. Extend if a user reports a gap.
 String? languageDisplay(String? raw) {
-  if (raw == null) return null;
-  final code = raw.trim().toLowerCase();
-  if (code.isEmpty || code == 'und' || code == 'unknown') return null;
+  final code = canonicalLanguageKey(raw);
+  if (code == null) return null;
   return _iso[code];
+}
+
+String? canonicalLanguageKey(String? raw) {
+  if (raw == null) return null;
+  final normalized = raw.trim().toLowerCase().replaceAll('_', '-');
+  final code = normalized.split('-').first;
+  if (code.isEmpty || code == 'und' || code == 'unknown') return null;
+  final display = _iso[code];
+  if (display == null) return code;
+  // Collapse aliases (e.g. `en`/`eng`) onto the first key sharing the display
+  // name, so two codes for the same language compare equal.
+  return _canonicalByDisplay[display] ?? code;
+}
+
+bool languageCodesMatch(String? a, String? b) {
+  final left = canonicalLanguageKey(a);
+  final right = canonicalLanguageKey(b);
+  return left != null && right != null && left == right;
 }
 
 const _iso = <String, String>{
@@ -61,3 +78,13 @@ const _iso = <String, String>{
   'gl': 'Galician', 'glg': 'Galician',
   'eu': 'Basque', 'eus': 'Basque', 'baq': 'Basque',
 };
+
+/// Display name → first `_iso` key that produces it. Lets [canonicalLanguageKey]
+/// resolve aliases without rescanning `_iso` on every call.
+final Map<String, String> _canonicalByDisplay = () {
+  final map = <String, String>{};
+  for (final entry in _iso.entries) {
+    map.putIfAbsent(entry.value, () => entry.key);
+  }
+  return map;
+}();

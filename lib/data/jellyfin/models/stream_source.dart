@@ -1,3 +1,5 @@
+import 'package:altcast/data/jellyfin/models/media_stream.dart';
+
 /// Result of negotiating playback with Jellyfin's `PlaybackInfo` endpoint.
 ///
 /// Two flavours, distinguished by [isTranscoding]:
@@ -13,6 +15,7 @@ class StreamSource {
     this.playSessionId,
     this.mediaSourceId,
     this.externalSubtitles = const [],
+    this.subtitleStreams = const [],
   });
 
   final String url;
@@ -24,6 +27,10 @@ class StreamSource {
   /// from the main stream. media_kit doesn't auto-discover these, so the
   /// player layer has to register each one and surface it in the picker.
   final List<ExternalSubtitle> externalSubtitles;
+
+  /// All subtitle streams from Jellyfin's negotiated media source. This is the
+  /// UI source of truth and mirrors Jellyfin Web's subtitle picker.
+  final List<MediaStream> subtitleStreams;
 
   /// What the scrobbler should report as `PlayMethod` to Jellyfin.
   String get playMethod => isTranscoding ? 'Transcode' : 'DirectStream';
@@ -40,6 +47,8 @@ class ExternalSubtitle {
     this.title,
     this.language,
     this.codec,
+    this.isForced = false,
+    this.isHearingImpaired = false,
   });
 
   /// Stable identifier (we use the absolute URL — unique per source).
@@ -56,4 +65,6 @@ class ExternalSubtitle {
 
   /// `srt` / `vtt` / `ass` / etc. — handy as a last-resort label.
   final String? codec;
+  final bool isForced;
+  final bool isHearingImpaired;
 }
