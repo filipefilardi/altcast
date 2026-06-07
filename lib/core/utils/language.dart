@@ -15,6 +15,8 @@ String? languageDisplay(String? raw) {
 String? canonicalLanguageKey(String? raw) {
   if (raw == null) return null;
   final normalized = raw.trim().toLowerCase().replaceAll('_', '-');
+  final displayMatch = _canonicalByDisplayLower[normalized];
+  if (displayMatch != null) return displayMatch;
   final code = normalized.split('-').first;
   if (code.isEmpty || code == 'und' || code == 'unknown') return null;
   final display = _iso[code];
@@ -88,3 +90,8 @@ final Map<String, String> _canonicalByDisplay = () {
   }
   return map;
 }();
+
+final Map<String, String> _canonicalByDisplayLower = {
+  for (final entry in _canonicalByDisplay.entries)
+    entry.key.toLowerCase(): entry.value,
+};

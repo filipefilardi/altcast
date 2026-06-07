@@ -25,7 +25,6 @@ import 'package:altcast/data/jellyfin/models/stream_source.dart';
 import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
-import 'package:altcast/data/local/title_subtitle_preferences.dart';
 import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
@@ -33,6 +32,7 @@ import 'package:altcast/features/syncplay/syncplay_controller.dart';
 import 'package:altcast/features/syncplay/syncplay_sheet.dart';
 import 'package:altcast/features/player/player_material_theme.dart';
 import 'package:altcast/features/player/scrobbler.dart';
+import 'package:altcast/features/player/subtitle_style.dart';
 import 'package:altcast/features/player/widgets/next_up_card.dart';
 import 'package:altcast/features/player/widgets/playback_error.dart';
 import 'package:altcast/features/player/widgets/skip_chips.dart';
@@ -181,9 +181,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'video-player-keyboard-focus',
   );
-  final ValueNotifier<double?> _keyboardVolumeIndicator =
-      ValueNotifier<double?>(null);
-  Timer? _keyboardVolumeIndicatorTimer;
+  final ValueNotifier<double> _volumeIndicatorLevel = ValueNotifier<double>(
+    1.0,
+  );
+  final ValueNotifier<double> _brightnessIndicatorLevel = ValueNotifier<double>(
+    kDefaultPlayerMaterialTokens.initialBrightness,
+  );
   double _currentVolumeLevel = 1.0;
   double _lastNonZeroVolume = 1.0;
   DateTime? _lastSyncSeekSentAt;
@@ -230,6 +233,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           : const VideoControllerConfiguration(),
     );
     _currentVolumeLevel = (_player.state.volume / 100.0).clamp(0.0, 1.0);
+    _volumeIndicatorLevel.value = _currentVolumeLevel;
     if (_currentVolumeLevel > 0) {
       _lastNonZeroVolume = _currentVolumeLevel;
     }
@@ -396,17 +400,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _attachScrobbler();
       _playerReadyForCastMirror = true;
       await _publishSyncPlayOpenIfNeeded(isPlaying: play);
-
-      // Wait until media_kit has populated the tracks lists. This is more
-      // robust than a fixed delay, especially for slow network streams
-      // or HLS manifests that take a moment to parse.
-      for (int i = 0; i < 20; i++) {
-        if (_player.state.tracks.audio.isNotEmpty ||
-            _player.state.tracks.subtitle.isNotEmpty) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
 
       if (mounted) await _applyTrackPreferences();
       await _resolveNextEpisode();
@@ -740,8 +733,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  /// Applies route overrides, remembered per-title subtitle choices, or global
-  /// playback defaults once media_kit has populated tracks.
+  /// Applies global playback defaults once media_kit has had a chance to
+  /// populate tracks.
   ///
   /// Audio: first track whose `language` matches (case-insensitive).
   /// Subtitle: disabled → turn off. Otherwise prefer a Jellyfin-served match,
@@ -750,11 +743,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final playbackPrefs = ref.read(playbackPreferencesProvider);
     final wantAudio = await _defaultAudioLanguage(playbackPrefs);
     if (wantAudio != null && wantAudio.isNotEmpty) {
+      await _waitForTrackList(
+        isReady: () => _player.state.tracks.audio.isNotEmpty,
+      );
       final tracks = _player.state.tracks.audio;
       final match = tracks.firstWhere(
         (t) =>
-            (t.language ?? '').toLowerCase() == wantAudio.toLowerCase() ||
-            (languageDisplay(t.language) ?? '').toLowerCase() ==
+            languageCodesMatch(t.language, wantAudio) ||
+            languageDisplay(t.language)?.toLowerCase() ==
                 wantAudio.toLowerCase(),
         orElse: () => AudioTrack.auto(),
       );
@@ -774,11 +770,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final wantSubIndex = resolvedSubtitle.index;
     if ((wantSub == null || wantSub.isEmpty) && wantSubIndex == null) return;
 
-    if (wantSubIndex != null) {
-      if (_activateSubtitleStreamIndex(wantSubIndex)) return;
+    for (var attempt = 0; attempt < 25; attempt++) {
+      if (_tryApplyStartupSubtitle(resolvedSubtitle)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
     }
+  }
 
-    if (wantSub == null || wantSub.isEmpty) return;
+  bool _tryApplyStartupSubtitle(_StartupSubtitlePreference resolvedSubtitle) {
+    final wantSub = resolvedSubtitle.language;
+    final wantSubIndex = resolvedSubtitle.index;
+    if (wantSubIndex != null && _activateSubtitleStreamIndex(wantSubIndex)) {
+      return true;
+    }
+    if (wantSub == null || wantSub.isEmpty) return false;
 
     // Prefer Jellyfin-served text subtitles when available: they carry the
     // same stream metadata the detail page used to resolve Default, and they
@@ -794,7 +799,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         ),
       );
       _setSubVisibility(true);
-      return;
+      return true;
     }
 
     // Then embedded tracks reported by media_kit.
@@ -802,16 +807,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       (t) =>
           t.id != SubtitleTrack.auto().id &&
           t.id != SubtitleTrack.no().id &&
-          (languageCodesMatch(t.language, wantSub) ||
-              (languageDisplay(t.language) ?? '').toLowerCase() ==
-                  wantSub.toLowerCase()),
+          _subtitleLanguageMatches(t.language, wantSub),
       orElse: () => SubtitleTrack.no(),
     );
     if (embedded.id != SubtitleTrack.no().id) {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(embedded);
       _setSubVisibility(true);
-      return;
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _waitForTrackList({required bool Function() isReady}) async {
+    for (var i = 0; i < 20; i++) {
+      if (isReady()) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
     }
   }
 
@@ -836,23 +848,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   _StartupSubtitlePreference _resolvedStartupSubtitle(
     PlaybackPreferences prefs,
   ) {
-    final titlePreference = ref.read(
-      titleSubtitlePreferencesProvider,
-    )[widget.itemId];
-    if (titlePreference != null) {
-      switch (titlePreference.mode) {
-        case TitleSubtitleMode.serverDefault:
-          return const _StartupSubtitlePreference();
-        case TitleSubtitleMode.off:
-          return const _StartupSubtitlePreference.disabled();
-        case TitleSubtitleMode.byLanguage:
-          return _StartupSubtitlePreference(
-            language: titlePreference.language,
-            index: titlePreference.streamIndex,
-          );
-      }
-    }
-
     switch (prefs.defaultSubtitleMode) {
       case DefaultSubtitleMode.auto:
         return const _StartupSubtitlePreference();
@@ -864,12 +859,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           return const _StartupSubtitlePreference.disabled();
         }
         final match = _bestSubtitleStreamLanguageMatch(language);
-        if (match == null) {
-          return const _StartupSubtitlePreference.disabled();
-        }
         return _StartupSubtitlePreference(
           language: language,
-          index: match.index,
+          index: match?.index,
         );
     }
   }
@@ -877,7 +869,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   MediaStream? _bestSubtitleStreamLanguageMatch(String language) {
     final matches = [
       for (final stream in _sourceNotifier.value?.subtitleStreams ?? const [])
-        if (languageCodesMatch(stream.language, language)) stream,
+        if (_subtitleLanguageMatches(stream.language, language)) stream,
     ];
     if (matches.isEmpty) return null;
     matches.sort(
@@ -889,12 +881,44 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return matches.first;
   }
 
+  bool _subtitleLanguageMatches(String? a, String? b) {
+    if (languageCodesMatch(a, b)) return true;
+    final left = languageDisplay(a)?.toLowerCase() ?? a?.trim().toLowerCase();
+    final right = languageDisplay(b)?.toLowerCase() ?? b?.trim().toLowerCase();
+    return left != null && left.isNotEmpty && left == right;
+  }
+
   bool _subtitleTrackMatchesStreamIndex(SubtitleTrack track, int index) {
     if (track.id == '$index') return true;
     return int.tryParse(track.id) == index;
   }
 
   bool _activateSubtitleStreamIndex(int streamIndex) {
+    final stream = _subtitleStreamByIndex(streamIndex);
+    if (stream != null) return _activateSubtitleStream(stream);
+
+    return _activateExternalSubtitleStreamIndex(streamIndex);
+  }
+
+  MediaStream? _subtitleStreamByIndex(int streamIndex) {
+    for (final stream in _sourceNotifier.value?.subtitleStreams ?? const []) {
+      if (stream.index == streamIndex) return stream;
+    }
+    return null;
+  }
+
+  bool _activateSubtitleStream(MediaStream stream) {
+    if (_activateExternalSubtitleStreamIndex(stream.index)) return true;
+
+    final embedded = _embeddedSubtitleTrackForStream(stream);
+    if (embedded == null) return false;
+    _selectedExternalSubNotifier.value = null;
+    _player.setSubtitleTrack(embedded);
+    _setSubVisibility(true);
+    return true;
+  }
+
+  bool _activateExternalSubtitleStreamIndex(int streamIndex) {
     final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
     for (final ext in externals) {
       if (ext.streamIndex == streamIndex) {
@@ -906,19 +930,79 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         return true;
       }
     }
+    return false;
+  }
 
-    final embedded = _player.state.tracks.subtitle.firstWhere(
-      (track) =>
-          track.id != SubtitleTrack.auto().id &&
-          track.id != SubtitleTrack.no().id &&
-          _subtitleTrackMatchesStreamIndex(track, streamIndex),
-      orElse: () => SubtitleTrack.no(),
+  SubtitleTrack? _embeddedSubtitleTrackForStream(MediaStream stream) {
+    final embeddedTracks = _player.state.tracks.subtitle
+        .where(
+          (track) =>
+              track.id != SubtitleTrack.auto().id &&
+              track.id != SubtitleTrack.no().id,
+        )
+        .toList(growable: false);
+
+    for (final track in embeddedTracks) {
+      if (_subtitleTrackMatchesStreamIndex(track, stream.index) &&
+          _subtitleTrackMatchesStream(track, stream)) {
+        return track;
+      }
+    }
+
+    final embeddedStreams = _embeddedJellyfinSubtitleStreams();
+    final streamPosition = embeddedStreams.indexWhere(
+      (candidate) => candidate.index == stream.index,
     );
-    if (embedded.id == SubtitleTrack.no().id) return false;
-    _selectedExternalSubNotifier.value = null;
-    _player.setSubtitleTrack(embedded);
-    _setSubVisibility(true);
+    if (streamPosition >= 0 && streamPosition < embeddedTracks.length) {
+      final candidate = embeddedTracks[streamPosition];
+      if (_subtitleTrackMatchesStream(candidate, stream)) return candidate;
+    }
+    return null;
+  }
+
+  List<MediaStream> _embeddedJellyfinSubtitleStreams() {
+    final externalIndexes = {
+      for (final subtitle
+          in _sourceNotifier.value?.externalSubtitles ?? const [])
+        if (subtitle.streamIndex != null) subtitle.streamIndex!,
+    };
+    return [
+      for (final stream in _sourceNotifier.value?.subtitleStreams ?? const [])
+        if (!externalIndexes.contains(stream.index) &&
+            stream.deliveryMethod != 'External' &&
+            !stream.isExternal)
+          stream,
+    ];
+  }
+
+  bool _subtitleTrackMatchesStream(SubtitleTrack track, MediaStream stream) {
+    final streamLanguage = stream.language?.trim();
+    final trackLanguage = track.language?.trim();
+    if (streamLanguage != null &&
+        streamLanguage.isNotEmpty &&
+        trackLanguage != null &&
+        trackLanguage.isNotEmpty &&
+        !_subtitleLanguageMatches(trackLanguage, streamLanguage)) {
+      return false;
+    }
+
+    final streamTitle = _normalizeSubtitleTitle(
+      stream.displayTitle ?? stream.title,
+    );
+    final trackTitle = _normalizeSubtitleTitle(track.title);
+    if (streamTitle != null && trackTitle != null) {
+      return streamTitle == trackTitle ||
+          streamTitle.contains(trackTitle) ||
+          trackTitle.contains(streamTitle);
+    }
     return true;
+  }
+
+  String? _normalizeSubtitleTitle(String? title) {
+    final raw = title?.trim().toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+    final compact = raw.replaceAll(RegExp(r'[\s\-\._\(\)\[\]]+'), '');
+    return compact.isEmpty ? null : compact;
   }
 
   ExternalSubtitle? _bestExternalSubtitleLanguageMatch(String language) {
@@ -926,10 +1010,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       for (final subtitle
           in _sourceNotifier.value?.externalSubtitles ??
               const <ExternalSubtitle>[])
-        if (languageCodesMatch(subtitle.language, language) ||
-            (languageDisplay(subtitle.language) ?? '').toLowerCase() ==
-                language.toLowerCase())
-          subtitle,
+        if (_subtitleLanguageMatches(subtitle.language, language)) subtitle,
     ];
     if (matches.isEmpty) return null;
     const noIndex = 1 << 30;
@@ -966,43 +1047,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _boolPriority(bool value) => value ? 1 : 0;
 
   bool _selectSubtitleStreamForPlayer(MediaStream stream) {
-    if (!_activateSubtitleStreamIndex(stream.index)) return false;
-    _rememberSubtitleForTitle(
-      language: stream.language,
-      streamIndex: stream.index,
-    );
-    return true;
-  }
-
-  void _rememberSubtitleOffForTitle() {
-    unawaited(
-      ref
-          .read(titleSubtitlePreferencesProvider.notifier)
-          .setPreference(widget.itemId, const TitleSubtitlePreference.off()),
-    );
-  }
-
-  /// Persists the active subtitle choice for this title so the next playback
-  /// restores it. No-op when neither a language nor a stream index is known.
-  void _rememberSubtitleForTitle({String? language, int? streamIndex}) {
-    final cleaned = _cleanTrackLanguage(language);
-    if (cleaned == null && streamIndex == null) return;
-    unawaited(
-      ref
-          .read(titleSubtitlePreferencesProvider.notifier)
-          .setPreference(
-            widget.itemId,
-            TitleSubtitlePreference.byLanguage(
-              language: cleaned,
-              streamIndex: streamIndex,
-            ),
-          ),
-    );
-  }
-
-  String? _cleanTrackLanguage(String? language) {
-    final trimmed = language?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+    return _activateSubtitleStream(stream);
   }
 
   /// Wires the scrobbler to media_kit streams. Reports playback to Jellyfin
@@ -1223,6 +1268,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (!_playerReadyForCastMirror || !mounted) return;
     _applyingRemoteCastState = true;
     try {
+      final remoteVolume = session.volumeLevel;
+      if (remoteVolume != null) {
+        final normalized = (remoteVolume.clamp(0, 100) / 100.0).toDouble();
+        _currentVolumeLevel = normalized;
+        _volumeIndicatorLevel.value = normalized;
+        if (normalized > 0) _lastNonZeroVolume = normalized;
+      }
       _volumeBeforeCastMirror ??= _player.state.volume;
       if (_player.state.volume > 0) {
         await _player.setVolume(0);
@@ -1268,6 +1320,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         await _player.pause();
       }
       await _player.setVolume(restoreVolume);
+      final restored = (restoreVolume / 100.0).clamp(0.0, 1.0);
+      _currentVolumeLevel = restored;
+      _volumeIndicatorLevel.value = restored;
+      if (restored > 0) _lastNonZeroVolume = restored;
     } finally {
       _applyingRemoteCastState = false;
     }
@@ -1334,7 +1390,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _progressTimer?.cancel();
     _autoplayTimer?.cancel();
     _castVolumeDebounce?.cancel();
-    _keyboardVolumeIndicatorTimer?.cancel();
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
@@ -1357,7 +1412,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
     _trickplayOverlayNotifier.dispose();
-    _keyboardVolumeIndicator.dispose();
+    _volumeIndicatorLevel.dispose();
+    _brightnessIndicatorLevel.dispose();
     _overlaySnapshots.dispose();
     _controlOverlayNotifier.dispose();
     _keyboardFocusNode.dispose();
@@ -1434,25 +1490,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 );
               },
             ),
-            ValueListenableBuilder<double?>(
-              valueListenable: _keyboardVolumeIndicator,
-              builder: (context, value, _) {
-                if (value == null) return const SizedBox.shrink();
-                return Positioned.fill(
-                  child: IgnorePointer(
-                    child: AltCastVerticalGestureIndicator(
-                      alignment: Alignment.centerRight,
-                      value: value,
-                      tokens: kDefaultPlayerMaterialTokens,
-                      icon: value == 0.0
-                          ? PiconsRegular.speakerSlash
-                          : PiconsRegular.speakerHigh,
-                      activeColor: Colors.white,
-                    ),
-                  ),
-                );
-              },
-            ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
                 right: pad.right + 16,
@@ -1517,12 +1554,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       itemId: widget.itemId,
       sourceListenable: _sourceNotifier,
       trickplayOverlayNotifier: _trickplayOverlayNotifier,
+      volumeLevelListenable: _volumeIndicatorLevel,
+      brightnessLevelListenable: _brightnessIndicatorLevel,
       onClosePlayer: _closePlayer,
       onOpenTracks: _showTracksSheet,
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
       onVolumeChanged: _handlePlayerVolumeChanged,
+      onBrightnessChanged: _handlePlayerBrightnessChanged,
       title: _playerTitle,
     );
     final playbackPrefs = ref.watch(playbackPreferencesProvider);
@@ -1576,21 +1616,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         subtitleHorizontalPadding,
                         subtitleBottomPadding,
                       ),
-                      style: TextStyle(
-                        fontSize: subtitleFontSize,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                        letterSpacing: 0,
-                        backgroundColor: Colors.black26,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 1),
-                            blurRadius: 2,
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                      style: playbackSubtitleTextStyle(subtitleFontSize),
                     ),
                   ),
                 ),
@@ -1640,7 +1666,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           _selectedExternalSubNotifier.value = null;
           _player.setSubtitleTrack(SubtitleTrack.no());
           _setSubVisibility(false);
-          _rememberSubtitleOffForTitle();
         },
         onSelectSubtitleStream: (stream) {
           if (!mounted) return;
@@ -1660,10 +1685,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           _selectedExternalSubNotifier.value = null;
           _player.setSubtitleTrack(track);
           _setSubVisibility(true);
-          _rememberSubtitleForTitle(
-            language: track.language,
-            streamIndex: int.tryParse(track.id),
-          );
         },
         onSelectExternalSubtitle: (sub) {
           if (!mounted) return;
@@ -1676,10 +1697,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
           );
           _setSubVisibility(true);
-          _rememberSubtitleForTitle(
-            language: sub.language,
-            streamIndex: sub.streamIndex,
-          );
         },
       ),
     );
@@ -1965,15 +1982,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _showVolumeIndicator(double value) {
-    _keyboardVolumeIndicator.value = value.clamp(0.0, 1.0);
-    _keyboardVolumeIndicatorTimer?.cancel();
-    _keyboardVolumeIndicatorTimer = Timer(
-      const Duration(milliseconds: 220),
-      () {
-        if (!mounted) return;
-        _keyboardVolumeIndicator.value = null;
-      },
-    );
+    _volumeIndicatorLevel.value = value.clamp(0.0, 1.0);
+  }
+
+  void _handlePlayerBrightnessChanged(double value) {
+    _brightnessIndicatorLevel.value = value.clamp(0.0, 1.0);
   }
 
   void _toggleMuteFromKeyboard() {

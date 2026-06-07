@@ -32,10 +32,10 @@ part 'player_material_theme/helpers.dart';
 part 'player_material_theme/tokens.dart';
 
 const bool _trickplayDebugLogs = true;
-const double kPlayerControlsBottomBarHeight = 96.0;
+const double kPlayerControlsBottomBarHeight = 92.0;
 const double kPlayerControlsBottomBarMargin = 16.0;
 const double kPlayerSeekBarHorizontalMargin = 16.0;
-const double kPlayerSeekBarBottomMargin = 16.0;
+const double kPlayerSeekBarBottomMargin = 4.0;
 const double kTrickplayPreviewLiftFromSafeBottom =
     kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
 const PlayerMaterialTokens kDefaultPlayerMaterialTokens =
@@ -63,12 +63,15 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required String itemId,
   required ValueListenable<StreamSource?> sourceListenable,
   required ValueNotifier<TrickplayOverlayData?> trickplayOverlayNotifier,
+  required ValueListenable<double> volumeLevelListenable,
+  required ValueListenable<double> brightnessLevelListenable,
   required Future<void> Function() onClosePlayer,
   required void Function(BuildContext origin) onOpenTracks,
   required void Function(BuildContext origin) onOpenSettings,
   required void Function(BuildContext origin) onOpenCast,
   required void Function(BuildContext origin) onOpenSyncPlay,
   required void Function(double value) onVolumeChanged,
+  required void Function(double value) onBrightnessChanged,
   required String title,
   PlayerMaterialTokens tokens = kDefaultPlayerMaterialTokens,
 }) {
@@ -99,109 +102,106 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
     initialVolume: (player.state.volume / 100.0).clamp(0.0, 1.0),
     onVolumeChanged: onVolumeChanged,
     initialBrightness: tokens.initialBrightness,
-    onBrightnessChanged: (v) =>
-        unawaited(_applyScreenBrightness(screenBrightness, v)),
+    onBrightnessChanged: (v) {
+      onBrightnessChanged(v);
+      unawaited(_applyScreenBrightness(screenBrightness, v));
+    },
     onBrightnessReset: () =>
         unawaited(_resetScreenBrightness(screenBrightness)),
-    // Volume indicator is rendered by the player screen so gesture + keyboard
-    // volume changes share exactly one overlay implementation.
+    // The persistent side meters live in [AltCastPrimaryControls] so they
+    // follow MaterialVideoControls' own visibility and fade lifecycle.
     volumeIndicatorBuilder: (context, value) => const SizedBox.shrink(),
-    brightnessIndicatorBuilder: (_, value) => AltCastVerticalGestureIndicator(
-      alignment: Alignment.centerLeft,
-      value: value,
-      tokens: tokens,
-      icon: value < tokens.brightnessLowThreshold
-          ? PiconsRegular.sunDim
-          : value < tokens.brightnessHighThreshold
-          ? PiconsRegular.sun
-          : PiconsRegular.sunHorizon,
-      activeColor: Colors.white,
-    ),
+    brightnessIndicatorBuilder: (context, value) => const SizedBox.shrink(),
     seekBarPositionColor: AppColors.primary,
     seekBarThumbColor: AppColors.primary,
     seekBarHeight: tokens.seekBarHeight,
     seekBarThumbSize: tokens.seekBarThumbSize,
     buttonBarButtonColor: Colors.white,
     primaryButtonBar: [
-      const Spacer(),
-      AltCastSeekRelativeButton(
-        delta: Duration.zero - tokens.seekBackwardStep,
-        icon: Icons.replay_10,
-        tokens: tokens,
+      Expanded(
+        child: AltCastPrimaryControls(
+          volumeLevelListenable: volumeLevelListenable,
+          brightnessLevelListenable: brightnessLevelListenable,
+          tokens: tokens,
+        ),
       ),
-      SizedBox(width: tokens.primaryControlGap),
-      AltCastPlayPauseButton(
-        iconSize: tokens.playPausePrimaryIconSize,
-        tokens: tokens,
-      ),
-      SizedBox(width: tokens.primaryControlGap),
-      AltCastSeekRelativeButton(
-        delta: tokens.seekForwardStep,
-        icon: Icons.forward_10,
-        tokens: tokens,
-      ),
-      const Spacer(),
     ],
     topButtonBar: [
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.caretLeft,
-          tooltip: 'Close',
-          tokens: tokens,
-          onPressed: () => unawaited(onClosePlayer()),
-        ),
-      ),
-      SizedBox(width: tokens.topBarButtonGap),
       Expanded(
-        child: AltCastPlayerTitle(title: title, tokens: tokens),
-      ),
-      Builder(
-        builder: (ctx) => Consumer(
-          builder: (_, ref, _) {
-            final active = ref.watch(syncPlayControllerProvider).isActive;
-            return AltCastChromeIconButton(
-              icon: PiconsRegular.usersThree,
-              tooltip: 'SyncPlay',
-              color: active ? AppColors.primary : null,
-              tokens: tokens,
-              onPressed: () => onOpenSyncPlay(ctx),
-            );
-          },
-        ),
-      ),
-      Builder(
-        builder: (ctx) => Consumer(
-          builder: (_, ref, _) {
-            final active = ref.watch(activeRemoteSessionIdProvider) != null;
-            return AltCastChromeIconButton(
-              icon: PiconsRegular.screencast,
-              tooltip: 'Cast',
-              color: active ? AppColors.primary : null,
-              tokens: tokens,
-              onPressed: () => onOpenCast(ctx),
-            );
-          },
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.closedCaptioning,
-          tooltip: 'Audio & subtitles',
-          tokens: tokens,
-          onPressed: () => onOpenTracks(ctx),
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.gear,
-          tooltip: 'Playback settings',
-          tokens: tokens,
-          onPressed: () => onOpenSettings(ctx),
+        child: SizedBox(
+          height: kPlayerControlsBottomBarHeight,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Row(
+              children: [
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.caretLeft,
+                    tooltip: 'Close',
+                    tokens: tokens,
+                    onPressed: () => unawaited(onClosePlayer()),
+                  ),
+                ),
+                SizedBox(width: tokens.topBarButtonGap),
+                Expanded(
+                  child: AltCastPlayerTitle(title: title, tokens: tokens),
+                ),
+                Builder(
+                  builder: (ctx) => Consumer(
+                    builder: (_, ref, _) {
+                      final active = ref
+                          .watch(syncPlayControllerProvider)
+                          .isActive;
+                      return AltCastChromeIconButton(
+                        icon: PiconsRegular.usersThree,
+                        tooltip: 'SyncPlay',
+                        color: active ? AppColors.primary : null,
+                        tokens: tokens,
+                        onPressed: () => onOpenSyncPlay(ctx),
+                      );
+                    },
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => Consumer(
+                    builder: (_, ref, _) {
+                      final active =
+                          ref.watch(activeRemoteSessionIdProvider) != null;
+                      return AltCastChromeIconButton(
+                        icon: PiconsRegular.screencast,
+                        tooltip: 'Cast',
+                        color: active ? AppColors.primary : null,
+                        tokens: tokens,
+                        onPressed: () => onOpenCast(ctx),
+                      );
+                    },
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.closedCaptioning,
+                    tooltip: 'Audio & subtitles',
+                    tokens: tokens,
+                    onPressed: () => onOpenTracks(ctx),
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.gear,
+                    tooltip: 'Playback settings',
+                    tokens: tokens,
+                    onPressed: () => onOpenSettings(ctx),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ],
-    // Bottom controls include seek timestamps, so matching raw margins makes
-    // the top look visually farther. Keep top margin tighter for balance.
+    // media_kit applies one buttonBarHeight to both chrome bars. The bottom
+    // seek/timestamp group needs the tall slot; pin the top row inside it so
+    // that spare vertical space does not push the top chrome toward center.
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     bottomButtonBar: [
       Expanded(
