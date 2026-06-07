@@ -25,7 +25,6 @@ import 'package:altcast/data/jellyfin/models/stream_source.dart';
 import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
-import 'package:altcast/data/local/title_subtitle_preferences.dart';
 import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
@@ -397,17 +396,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _playerReadyForCastMirror = true;
       await _publishSyncPlayOpenIfNeeded(isPlaying: play);
 
-      // Wait until media_kit has populated the tracks lists. This is more
-      // robust than a fixed delay, especially for slow network streams
-      // or HLS manifests that take a moment to parse.
-      for (int i = 0; i < 20; i++) {
-        if (_player.state.tracks.audio.isNotEmpty ||
-            _player.state.tracks.subtitle.isNotEmpty) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-
       if (mounted) await _applyTrackPreferences();
       await _resolveNextEpisode();
       unawaited(_loadIntroSkipper());
@@ -740,8 +728,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  /// Applies route overrides, remembered per-title subtitle choices, or global
-  /// playback defaults once media_kit has populated tracks.
+  /// Applies global playback defaults once media_kit has had a chance to
+  /// populate tracks.
   ///
   /// Audio: first track whose `language` matches (case-insensitive).
   /// Subtitle: disabled → turn off. Otherwise prefer a Jellyfin-served match,
@@ -750,11 +738,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final playbackPrefs = ref.read(playbackPreferencesProvider);
     final wantAudio = await _defaultAudioLanguage(playbackPrefs);
     if (wantAudio != null && wantAudio.isNotEmpty) {
+      await _waitForTrackList(
+        isReady: () => _player.state.tracks.audio.isNotEmpty,
+      );
       final tracks = _player.state.tracks.audio;
       final match = tracks.firstWhere(
         (t) =>
-            (t.language ?? '').toLowerCase() == wantAudio.toLowerCase() ||
-            (languageDisplay(t.language) ?? '').toLowerCase() ==
+            languageCodesMatch(t.language, wantAudio) ||
+            languageDisplay(t.language)?.toLowerCase() ==
                 wantAudio.toLowerCase(),
         orElse: () => AudioTrack.auto(),
       );
@@ -774,12 +765,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     final wantSubIndex = resolvedSubtitle.index;
     if ((wantSub == null || wantSub.isEmpty) && wantSubIndex == null) return;
 
-    if (wantSubIndex != null) {
-      if (_activateSubtitleStreamIndex(wantSubIndex)) return;
-      return;
+    for (var attempt = 0; attempt < 25; attempt++) {
+      if (_tryApplyStartupSubtitle(resolvedSubtitle)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
     }
+  }
 
-    if (wantSub == null || wantSub.isEmpty) return;
+  bool _tryApplyStartupSubtitle(_StartupSubtitlePreference resolvedSubtitle) {
+    final wantSub = resolvedSubtitle.language;
+    final wantSubIndex = resolvedSubtitle.index;
+    if (wantSubIndex != null && _activateSubtitleStreamIndex(wantSubIndex)) {
+      return true;
+    }
+    if (wantSub == null || wantSub.isEmpty) return false;
 
     // Prefer Jellyfin-served text subtitles when available: they carry the
     // same stream metadata the detail page used to resolve Default, and they
@@ -795,7 +794,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         ),
       );
       _setSubVisibility(true);
-      return;
+      return true;
     }
 
     // Then embedded tracks reported by media_kit.
@@ -803,16 +802,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       (t) =>
           t.id != SubtitleTrack.auto().id &&
           t.id != SubtitleTrack.no().id &&
-          (languageCodesMatch(t.language, wantSub) ||
-              (languageDisplay(t.language) ?? '').toLowerCase() ==
-                  wantSub.toLowerCase()),
+          _subtitleLanguageMatches(t.language, wantSub),
       orElse: () => SubtitleTrack.no(),
     );
     if (embedded.id != SubtitleTrack.no().id) {
       _selectedExternalSubNotifier.value = null;
       _player.setSubtitleTrack(embedded);
       _setSubVisibility(true);
-      return;
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _waitForTrackList({required bool Function() isReady}) async {
+    for (var i = 0; i < 20; i++) {
+      if (isReady()) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
     }
   }
 
@@ -837,23 +843,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   _StartupSubtitlePreference _resolvedStartupSubtitle(
     PlaybackPreferences prefs,
   ) {
-    final titlePreference = ref.read(
-      titleSubtitlePreferencesProvider,
-    )[widget.itemId];
-    if (titlePreference != null) {
-      switch (titlePreference.mode) {
-        case TitleSubtitleMode.serverDefault:
-          return const _StartupSubtitlePreference();
-        case TitleSubtitleMode.off:
-          return const _StartupSubtitlePreference.disabled();
-        case TitleSubtitleMode.byLanguage:
-          return _StartupSubtitlePreference(
-            language: titlePreference.language,
-            index: titlePreference.streamIndex,
-          );
-      }
-    }
-
     switch (prefs.defaultSubtitleMode) {
       case DefaultSubtitleMode.auto:
         return const _StartupSubtitlePreference();
@@ -865,12 +854,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           return const _StartupSubtitlePreference.disabled();
         }
         final match = _bestSubtitleStreamLanguageMatch(language);
-        if (match == null) {
-          return const _StartupSubtitlePreference.disabled();
-        }
         return _StartupSubtitlePreference(
           language: language,
-          index: match.index,
+          index: match?.index,
         );
     }
   }
@@ -878,7 +864,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   MediaStream? _bestSubtitleStreamLanguageMatch(String language) {
     final matches = [
       for (final stream in _sourceNotifier.value?.subtitleStreams ?? const [])
-        if (languageCodesMatch(stream.language, language)) stream,
+        if (_subtitleLanguageMatches(stream.language, language)) stream,
     ];
     if (matches.isEmpty) return null;
     matches.sort(
@@ -888,6 +874,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       ),
     );
     return matches.first;
+  }
+
+  bool _subtitleLanguageMatches(String? a, String? b) {
+    if (languageCodesMatch(a, b)) return true;
+    final left = languageDisplay(a)?.toLowerCase() ?? a?.trim().toLowerCase();
+    final right = languageDisplay(b)?.toLowerCase() ?? b?.trim().toLowerCase();
+    return left != null && left.isNotEmpty && left == right;
   }
 
   bool _subtitleTrackMatchesStreamIndex(SubtitleTrack track, int index) {
@@ -984,7 +977,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         streamLanguage.isNotEmpty &&
         trackLanguage != null &&
         trackLanguage.isNotEmpty &&
-        !languageCodesMatch(trackLanguage, streamLanguage)) {
+        !_subtitleLanguageMatches(trackLanguage, streamLanguage)) {
       return false;
     }
 
@@ -1012,10 +1005,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       for (final subtitle
           in _sourceNotifier.value?.externalSubtitles ??
               const <ExternalSubtitle>[])
-        if (languageCodesMatch(subtitle.language, language) ||
-            (languageDisplay(subtitle.language) ?? '').toLowerCase() ==
-                language.toLowerCase())
-          subtitle,
+        if (_subtitleLanguageMatches(subtitle.language, language)) subtitle,
     ];
     if (matches.isEmpty) return null;
     const noIndex = 1 << 30;
@@ -1052,43 +1042,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _boolPriority(bool value) => value ? 1 : 0;
 
   bool _selectSubtitleStreamForPlayer(MediaStream stream) {
-    if (!_activateSubtitleStream(stream)) return false;
-    _rememberSubtitleForTitle(
-      language: stream.language,
-      streamIndex: stream.index,
-    );
-    return true;
-  }
-
-  void _rememberSubtitleOffForTitle() {
-    unawaited(
-      ref
-          .read(titleSubtitlePreferencesProvider.notifier)
-          .setPreference(widget.itemId, const TitleSubtitlePreference.off()),
-    );
-  }
-
-  /// Persists the active subtitle choice for this title so the next playback
-  /// restores it. No-op when neither a language nor a stream index is known.
-  void _rememberSubtitleForTitle({String? language, int? streamIndex}) {
-    final cleaned = _cleanTrackLanguage(language);
-    if (cleaned == null && streamIndex == null) return;
-    unawaited(
-      ref
-          .read(titleSubtitlePreferencesProvider.notifier)
-          .setPreference(
-            widget.itemId,
-            TitleSubtitlePreference.byLanguage(
-              language: cleaned,
-              streamIndex: streamIndex,
-            ),
-          ),
-    );
-  }
-
-  String? _cleanTrackLanguage(String? language) {
-    final trimmed = language?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+    return _activateSubtitleStream(stream);
   }
 
   /// Wires the scrobbler to media_kit streams. Reports playback to Jellyfin
@@ -1726,7 +1680,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           _selectedExternalSubNotifier.value = null;
           _player.setSubtitleTrack(SubtitleTrack.no());
           _setSubVisibility(false);
-          _rememberSubtitleOffForTitle();
         },
         onSelectSubtitleStream: (stream) {
           if (!mounted) return;
@@ -1746,10 +1699,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           _selectedExternalSubNotifier.value = null;
           _player.setSubtitleTrack(track);
           _setSubVisibility(true);
-          _rememberSubtitleForTitle(
-            language: track.language,
-            streamIndex: int.tryParse(track.id),
-          );
         },
         onSelectExternalSubtitle: (sub) {
           if (!mounted) return;
@@ -1762,10 +1711,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             ),
           );
           _setSubVisibility(true);
-          _rememberSubtitleForTitle(
-            language: sub.language,
-            streamIndex: sub.streamIndex,
-          );
         },
       ),
     );
