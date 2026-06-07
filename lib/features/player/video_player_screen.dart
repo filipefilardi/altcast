@@ -32,6 +32,7 @@ import 'package:altcast/features/syncplay/syncplay_controller.dart';
 import 'package:altcast/features/syncplay/syncplay_sheet.dart';
 import 'package:altcast/features/player/player_material_theme.dart';
 import 'package:altcast/features/player/scrobbler.dart';
+import 'package:altcast/features/player/subtitle_style.dart';
 import 'package:altcast/features/player/widgets/next_up_card.dart';
 import 'package:altcast/features/player/widgets/playback_error.dart';
 import 'package:altcast/features/player/widgets/skip_chips.dart';
@@ -1615,21 +1616,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                         subtitleHorizontalPadding,
                         subtitleBottomPadding,
                       ),
-                      style: TextStyle(
-                        fontSize: subtitleFontSize,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                        letterSpacing: 0,
-                        backgroundColor: Colors.black26,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 1),
-                            blurRadius: 2,
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                      style: playbackSubtitleTextStyle(subtitleFontSize),
                     ),
                   ),
                 ),

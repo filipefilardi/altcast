@@ -15,6 +15,7 @@ import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
+import 'package:altcast/features/player/subtitle_style.dart';
 
 final _serverInfoProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((
   ref,
@@ -1134,20 +1135,7 @@ class _SubtitlePreviewCard extends StatelessWidget {
               child: Text(
                 'The subtitle preview updates live while you adjust.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: fontSize,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                  backgroundColor: Colors.black26,
-                  shadows: const [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 2,
-                      color: Colors.black,
-                    ),
-                  ],
-                ),
+                style: playbackSubtitleTextStyle(fontSize),
               ),
             ),
           ],
@@ -1221,20 +1209,7 @@ class _SubtitleFullscreenPreview extends StatelessWidget {
             child: Text(
               'This is how subtitles will appear during playback.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: fontSize,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
-                backgroundColor: Colors.black26,
-                shadows: const [
-                  Shadow(
-                    offset: Offset(0, 1),
-                    blurRadius: 2,
-                    color: Colors.black,
-                  ),
-                ],
-              ),
+              style: playbackSubtitleTextStyle(fontSize),
             ),
           ),
         ],
