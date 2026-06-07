@@ -66,6 +66,11 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clamped = value.clamp(0.0, 1.0);
+    final textShadow = Shadow(
+      color: Colors.black.withValues(alpha: 0.42),
+      blurRadius: 6,
+      offset: const Offset(0, 1),
+    );
     return Align(
       alignment: alignment,
       child: Padding(
@@ -75,110 +80,180 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
         child: SizedBox(
           width: tokens.gestureIndicatorWidth,
           height: tokens.gestureIndicatorHeight,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(
-                alpha: tokens.gestureIndicatorBackgroundAlpha,
-              ),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.white.withValues(
-                  alpha: tokens.gestureIndicatorBorderAlpha,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: tokens.gestureIndicatorInnerPaddingH,
+              vertical: tokens.gestureIndicatorInnerPaddingV,
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  icon,
+                  color: activeColor,
+                  size: tokens.gestureIndicatorIconSize,
+                  shadows: [textShadow],
                 ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: tokens.gestureIndicatorShadowAlpha,
+                SizedBox(height: tokens.gestureIndicatorSpacing),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (_, constraints) {
+                      final knobBottom =
+                          (constraints.maxHeight * clamped) -
+                          (tokens.gestureIndicatorKnobSize / 2);
+                      return Stack(
+                        alignment: Alignment.bottomCenter,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: tokens.gestureIndicatorTrackWidth,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(
+                                alpha: tokens.gestureIndicatorTrackAlpha,
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.36),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: tokens.gestureIndicatorTrackWidth,
+                            height: constraints.maxHeight * clamped,
+                            decoration: BoxDecoration(
+                              color: activeColor,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeColor.withValues(alpha: 0.32),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            bottom: knobBottom,
+                            child: SizedBox.square(
+                              dimension: tokens.gestureIndicatorKnobSize,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: activeColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: tokens
+                                            .gestureIndicatorKnobShadowAlpha,
+                                      ),
+                                      blurRadius:
+                                          tokens.gestureIndicatorKnobShadowBlur,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                  blurRadius: tokens.gestureIndicatorShadowBlur,
-                  offset: const Offset(0, 8),
+                ),
+                SizedBox(height: tokens.gestureIndicatorSpacing),
+                Text(
+                  '${(clamped * 100).round()}%',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: tokens.gestureIndicatorLabelSize,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                    shadows: [textShadow],
+                  ),
                 ),
               ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: tokens.gestureIndicatorInnerPaddingH,
-                vertical: tokens.gestureIndicatorInnerPaddingV,
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    icon,
-                    color: activeColor,
-                    size: tokens.gestureIndicatorIconSize,
-                  ),
-                  SizedBox(height: tokens.gestureIndicatorSpacing),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (_, constraints) {
-                        final knobBottom =
-                            (constraints.maxHeight * clamped) -
-                            (tokens.gestureIndicatorKnobSize / 2);
-                        return Stack(
-                          alignment: Alignment.bottomCenter,
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: tokens.gestureIndicatorTrackWidth,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(
-                                  alpha: tokens.gestureIndicatorTrackAlpha,
-                                ),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            Container(
-                              width: tokens.gestureIndicatorTrackWidth,
-                              height: constraints.maxHeight * clamped,
-                              decoration: BoxDecoration(
-                                color: activeColor,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: knobBottom,
-                              child: SizedBox.square(
-                                dimension: tokens.gestureIndicatorKnobSize,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: activeColor,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: tokens
-                                              .gestureIndicatorKnobShadowAlpha,
-                                        ),
-                                        blurRadius: tokens
-                                            .gestureIndicatorKnobShadowBlur,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  SizedBox(height: tokens.gestureIndicatorSpacing),
-                  Text(
-                    '${(clamped * 100).round()}%',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: tokens.gestureIndicatorLabelSize,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class AltCastPrimaryControls extends StatelessWidget {
+  const AltCastPrimaryControls({
+    super.key,
+    required this.volumeLevelListenable,
+    required this.brightnessLevelListenable,
+    this.tokens = kDefaultPlayerMaterialTokens,
+  });
+
+  final ValueListenable<double> volumeLevelListenable;
+  final ValueListenable<double> brightnessLevelListenable;
+  final PlayerMaterialTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ValueListenableBuilder<double>(
+          valueListenable: brightnessLevelListenable,
+          builder: (context, value, _) {
+            return AltCastVerticalGestureIndicator(
+              alignment: Alignment.centerLeft,
+              value: value,
+              tokens: tokens,
+              icon: value < tokens.brightnessLowThreshold
+                  ? PiconsRegular.sunDim
+                  : value < tokens.brightnessHighThreshold
+                  ? PiconsRegular.sun
+                  : PiconsRegular.sunHorizon,
+              activeColor: Colors.white,
+            );
+          },
+        ),
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AltCastSeekRelativeButton(
+                delta: Duration.zero - tokens.seekBackwardStep,
+                icon: Icons.replay_10,
+                tokens: tokens,
+              ),
+              SizedBox(width: tokens.primaryControlGap),
+              AltCastPlayPauseButton(
+                iconSize: tokens.playPausePrimaryIconSize,
+                tokens: tokens,
+              ),
+              SizedBox(width: tokens.primaryControlGap),
+              AltCastSeekRelativeButton(
+                delta: tokens.seekForwardStep,
+                icon: Icons.forward_10,
+                tokens: tokens,
+              ),
+            ],
+          ),
+        ),
+        ValueListenableBuilder<double>(
+          valueListenable: volumeLevelListenable,
+          builder: (context, value, _) {
+            return AltCastVerticalGestureIndicator(
+              alignment: Alignment.centerRight,
+              value: value,
+              tokens: tokens,
+              icon: value == 0.0
+                  ? PiconsRegular.speakerSlash
+                  : value < 0.5
+                  ? PiconsRegular.speakerLow
+                  : PiconsRegular.speakerHigh,
+              activeColor: Colors.white,
+            );
+          },
+        ),
+      ],
     );
   }
 }

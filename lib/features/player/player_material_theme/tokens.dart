@@ -28,25 +28,21 @@ class PlayerMaterialTokens {
     this.primaryControlGap = 128.0,
 
     // Vertical gesture indicator layout.
-    this.gestureIndicatorWidth = 54.0,
-    this.gestureIndicatorHeight = 164.0,
-    this.gestureIndicatorHorizontalPadding = 34.0,
-    this.gestureIndicatorInnerPaddingH = 10.0,
-    this.gestureIndicatorInnerPaddingV = 12.0,
-    this.gestureIndicatorIconSize = 22.0,
-    this.gestureIndicatorSpacing = 10.0,
-    this.gestureIndicatorTrackWidth = 4.0,
-    this.gestureIndicatorKnobSize = 12.0,
+    this.gestureIndicatorWidth = 46.0,
+    this.gestureIndicatorHeight = 152.0,
+    this.gestureIndicatorHorizontalPadding = 16.0,
+    this.gestureIndicatorInnerPaddingH = 9.0,
+    this.gestureIndicatorInnerPaddingV = 11.0,
+    this.gestureIndicatorIconSize = 20.0,
+    this.gestureIndicatorSpacing = 8.0,
+    this.gestureIndicatorTrackWidth = 3.0,
+    this.gestureIndicatorKnobSize = 10.0,
     this.gestureIndicatorKnobOffset = 10.0,
     this.gestureIndicatorLabelSize = 11.0,
 
     // Vertical gesture indicator colors/elevation.
-    this.gestureIndicatorBackgroundAlpha = 0.58,
-    this.gestureIndicatorBorderAlpha = 0.14,
-    this.gestureIndicatorShadowAlpha = 0.36,
-    this.gestureIndicatorKnobShadowAlpha = 0.34,
-    this.gestureIndicatorTrackAlpha = 0.22,
-    this.gestureIndicatorShadowBlur = 18.0,
+    this.gestureIndicatorKnobShadowAlpha = 0.28,
+    this.gestureIndicatorTrackAlpha = 0.26,
     this.gestureIndicatorKnobShadowBlur = 8.0,
 
     // Shared title/chrome text styling.
@@ -121,12 +117,8 @@ class PlayerMaterialTokens {
   final double gestureIndicatorLabelSize;
 
   // Vertical gesture indicator colors/elevation.
-  final double gestureIndicatorBackgroundAlpha;
-  final double gestureIndicatorBorderAlpha;
-  final double gestureIndicatorShadowAlpha;
   final double gestureIndicatorKnobShadowAlpha;
   final double gestureIndicatorTrackAlpha;
-  final double gestureIndicatorShadowBlur;
   final double gestureIndicatorKnobShadowBlur;
 
   // Shared title/chrome text styling.

@@ -180,9 +180,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'video-player-keyboard-focus',
   );
-  final ValueNotifier<double?> _keyboardVolumeIndicator =
-      ValueNotifier<double?>(null);
-  Timer? _keyboardVolumeIndicatorTimer;
+  final ValueNotifier<double> _volumeIndicatorLevel = ValueNotifier<double>(
+    1.0,
+  );
+  final ValueNotifier<double> _brightnessIndicatorLevel = ValueNotifier<double>(
+    kDefaultPlayerMaterialTokens.initialBrightness,
+  );
   double _currentVolumeLevel = 1.0;
   double _lastNonZeroVolume = 1.0;
   DateTime? _lastSyncSeekSentAt;
@@ -229,6 +232,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           : const VideoControllerConfiguration(),
     );
     _currentVolumeLevel = (_player.state.volume / 100.0).clamp(0.0, 1.0);
+    _volumeIndicatorLevel.value = _currentVolumeLevel;
     if (_currentVolumeLevel > 0) {
       _lastNonZeroVolume = _currentVolumeLevel;
     }
@@ -1263,6 +1267,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (!_playerReadyForCastMirror || !mounted) return;
     _applyingRemoteCastState = true;
     try {
+      final remoteVolume = session.volumeLevel;
+      if (remoteVolume != null) {
+        final normalized = (remoteVolume.clamp(0, 100) / 100.0).toDouble();
+        _currentVolumeLevel = normalized;
+        _volumeIndicatorLevel.value = normalized;
+        if (normalized > 0) _lastNonZeroVolume = normalized;
+      }
       _volumeBeforeCastMirror ??= _player.state.volume;
       if (_player.state.volume > 0) {
         await _player.setVolume(0);
@@ -1308,6 +1319,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         await _player.pause();
       }
       await _player.setVolume(restoreVolume);
+      final restored = (restoreVolume / 100.0).clamp(0.0, 1.0);
+      _currentVolumeLevel = restored;
+      _volumeIndicatorLevel.value = restored;
+      if (restored > 0) _lastNonZeroVolume = restored;
     } finally {
       _applyingRemoteCastState = false;
     }
@@ -1374,7 +1389,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _progressTimer?.cancel();
     _autoplayTimer?.cancel();
     _castVolumeDebounce?.cancel();
-    _keyboardVolumeIndicatorTimer?.cancel();
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
@@ -1397,7 +1411,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _sourceNotifier.dispose();
     _selectedExternalSubNotifier.dispose();
     _trickplayOverlayNotifier.dispose();
-    _keyboardVolumeIndicator.dispose();
+    _volumeIndicatorLevel.dispose();
+    _brightnessIndicatorLevel.dispose();
     _overlaySnapshots.dispose();
     _controlOverlayNotifier.dispose();
     _keyboardFocusNode.dispose();
@@ -1474,25 +1489,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                 );
               },
             ),
-            ValueListenableBuilder<double?>(
-              valueListenable: _keyboardVolumeIndicator,
-              builder: (context, value, _) {
-                if (value == null) return const SizedBox.shrink();
-                return Positioned.fill(
-                  child: IgnorePointer(
-                    child: AltCastVerticalGestureIndicator(
-                      alignment: Alignment.centerRight,
-                      value: value,
-                      tokens: kDefaultPlayerMaterialTokens,
-                      icon: value == 0.0
-                          ? PiconsRegular.speakerSlash
-                          : PiconsRegular.speakerHigh,
-                      activeColor: Colors.white,
-                    ),
-                  ),
-                );
-              },
-            ),
             if (snap.showSkipIntro || snap.showSkipCredits)
               Positioned(
                 right: pad.right + 16,
@@ -1557,12 +1553,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       itemId: widget.itemId,
       sourceListenable: _sourceNotifier,
       trickplayOverlayNotifier: _trickplayOverlayNotifier,
+      volumeLevelListenable: _volumeIndicatorLevel,
+      brightnessLevelListenable: _brightnessIndicatorLevel,
       onClosePlayer: _closePlayer,
       onOpenTracks: _showTracksSheet,
       onOpenSettings: _togglePlaybackSettings,
       onOpenCast: _showCastSheet,
       onOpenSyncPlay: _showSyncPlaySheet,
       onVolumeChanged: _handlePlayerVolumeChanged,
+      onBrightnessChanged: _handlePlayerBrightnessChanged,
       title: _playerTitle,
     );
     final playbackPrefs = ref.watch(playbackPreferencesProvider);
@@ -1996,15 +1995,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _showVolumeIndicator(double value) {
-    _keyboardVolumeIndicator.value = value.clamp(0.0, 1.0);
-    _keyboardVolumeIndicatorTimer?.cancel();
-    _keyboardVolumeIndicatorTimer = Timer(
-      const Duration(milliseconds: 220),
-      () {
-        if (!mounted) return;
-        _keyboardVolumeIndicator.value = null;
-      },
-    );
+    _volumeIndicatorLevel.value = value.clamp(0.0, 1.0);
+  }
+
+  void _handlePlayerBrightnessChanged(double value) {
+    _brightnessIndicatorLevel.value = value.clamp(0.0, 1.0);
   }
 
   void _toggleMuteFromKeyboard() {
