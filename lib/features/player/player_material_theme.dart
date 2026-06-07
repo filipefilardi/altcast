@@ -32,10 +32,10 @@ part 'player_material_theme/helpers.dart';
 part 'player_material_theme/tokens.dart';
 
 const bool _trickplayDebugLogs = true;
-const double kPlayerControlsBottomBarHeight = 96.0;
+const double kPlayerControlsBottomBarHeight = 92.0;
 const double kPlayerControlsBottomBarMargin = 16.0;
 const double kPlayerSeekBarHorizontalMargin = 16.0;
-const double kPlayerSeekBarBottomMargin = 16.0;
+const double kPlayerSeekBarBottomMargin = 4.0;
 const double kTrickplayPreviewLiftFromSafeBottom =
     kPlayerControlsBottomBarMargin + kPlayerControlsBottomBarHeight - 32.0;
 const PlayerMaterialTokens kDefaultPlayerMaterialTokens =
@@ -143,65 +143,81 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
       const Spacer(),
     ],
     topButtonBar: [
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.caretLeft,
-          tooltip: 'Close',
-          tokens: tokens,
-          onPressed: () => unawaited(onClosePlayer()),
-        ),
-      ),
-      SizedBox(width: tokens.topBarButtonGap),
       Expanded(
-        child: AltCastPlayerTitle(title: title, tokens: tokens),
-      ),
-      Builder(
-        builder: (ctx) => Consumer(
-          builder: (_, ref, _) {
-            final active = ref.watch(syncPlayControllerProvider).isActive;
-            return AltCastChromeIconButton(
-              icon: PiconsRegular.usersThree,
-              tooltip: 'SyncPlay',
-              color: active ? AppColors.primary : null,
-              tokens: tokens,
-              onPressed: () => onOpenSyncPlay(ctx),
-            );
-          },
-        ),
-      ),
-      Builder(
-        builder: (ctx) => Consumer(
-          builder: (_, ref, _) {
-            final active = ref.watch(activeRemoteSessionIdProvider) != null;
-            return AltCastChromeIconButton(
-              icon: PiconsRegular.screencast,
-              tooltip: 'Cast',
-              color: active ? AppColors.primary : null,
-              tokens: tokens,
-              onPressed: () => onOpenCast(ctx),
-            );
-          },
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.closedCaptioning,
-          tooltip: 'Audio & subtitles',
-          tokens: tokens,
-          onPressed: () => onOpenTracks(ctx),
-        ),
-      ),
-      Builder(
-        builder: (ctx) => AltCastChromeIconButton(
-          icon: PiconsRegular.gear,
-          tooltip: 'Playback settings',
-          tokens: tokens,
-          onPressed: () => onOpenSettings(ctx),
+        child: SizedBox(
+          height: kPlayerControlsBottomBarHeight,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Row(
+              children: [
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.caretLeft,
+                    tooltip: 'Close',
+                    tokens: tokens,
+                    onPressed: () => unawaited(onClosePlayer()),
+                  ),
+                ),
+                SizedBox(width: tokens.topBarButtonGap),
+                Expanded(
+                  child: AltCastPlayerTitle(title: title, tokens: tokens),
+                ),
+                Builder(
+                  builder: (ctx) => Consumer(
+                    builder: (_, ref, _) {
+                      final active = ref
+                          .watch(syncPlayControllerProvider)
+                          .isActive;
+                      return AltCastChromeIconButton(
+                        icon: PiconsRegular.usersThree,
+                        tooltip: 'SyncPlay',
+                        color: active ? AppColors.primary : null,
+                        tokens: tokens,
+                        onPressed: () => onOpenSyncPlay(ctx),
+                      );
+                    },
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => Consumer(
+                    builder: (_, ref, _) {
+                      final active =
+                          ref.watch(activeRemoteSessionIdProvider) != null;
+                      return AltCastChromeIconButton(
+                        icon: PiconsRegular.screencast,
+                        tooltip: 'Cast',
+                        color: active ? AppColors.primary : null,
+                        tokens: tokens,
+                        onPressed: () => onOpenCast(ctx),
+                      );
+                    },
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.closedCaptioning,
+                    tooltip: 'Audio & subtitles',
+                    tokens: tokens,
+                    onPressed: () => onOpenTracks(ctx),
+                  ),
+                ),
+                Builder(
+                  builder: (ctx) => AltCastChromeIconButton(
+                    icon: PiconsRegular.gear,
+                    tooltip: 'Playback settings',
+                    tokens: tokens,
+                    onPressed: () => onOpenSettings(ctx),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ],
-    // Bottom controls include seek timestamps, so matching raw margins makes
-    // the top look visually farther. Keep top margin tighter for balance.
+    // media_kit applies one buttonBarHeight to both chrome bars. The bottom
+    // seek/timestamp group needs the tall slot; pin the top row inside it so
+    // that spare vertical space does not push the top chrome toward center.
     topButtonBarMargin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     bottomButtonBar: [
       Expanded(
