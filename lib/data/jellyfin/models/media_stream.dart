@@ -10,6 +10,8 @@ class MediaStream {
     this.displayTitle,
     this.language,
     this.codec,
+    this.isExternal = false,
+    this.deliveryMethod,
     this.isForced = false,
     this.isHearingImpaired = false,
   });
@@ -26,6 +28,8 @@ class MediaStream {
   /// ISO 639-1/2/3 code. Pass through `languageDisplay` before showing.
   final String? language;
   final String? codec;
+  final bool isExternal;
+  final String? deliveryMethod;
   final bool isForced;
   final bool isHearingImpaired;
 
@@ -36,6 +40,8 @@ class MediaStream {
       displayTitle: json['DisplayTitle'] as String?,
       language: json['Language'] as String?,
       codec: (json['Codec'] as String?)?.toLowerCase(),
+      isExternal: json['IsExternal'] as bool? ?? false,
+      deliveryMethod: json['DeliveryMethod'] as String?,
       isForced: json['IsForced'] as bool? ?? false,
       isHearingImpaired: json['IsHearingImpaired'] as bool? ?? false,
     );

@@ -776,6 +776,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     if (wantSubIndex != null) {
       if (_activateSubtitleStreamIndex(wantSubIndex)) return;
+      return;
     }
 
     if (wantSub == null || wantSub.isEmpty) return;
@@ -895,6 +896,31 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   bool _activateSubtitleStreamIndex(int streamIndex) {
+    final stream = _subtitleStreamByIndex(streamIndex);
+    if (stream != null) return _activateSubtitleStream(stream);
+
+    return _activateExternalSubtitleStreamIndex(streamIndex);
+  }
+
+  MediaStream? _subtitleStreamByIndex(int streamIndex) {
+    for (final stream in _sourceNotifier.value?.subtitleStreams ?? const []) {
+      if (stream.index == streamIndex) return stream;
+    }
+    return null;
+  }
+
+  bool _activateSubtitleStream(MediaStream stream) {
+    if (_activateExternalSubtitleStreamIndex(stream.index)) return true;
+
+    final embedded = _embeddedSubtitleTrackForStream(stream);
+    if (embedded == null) return false;
+    _selectedExternalSubNotifier.value = null;
+    _player.setSubtitleTrack(embedded);
+    _setSubVisibility(true);
+    return true;
+  }
+
+  bool _activateExternalSubtitleStreamIndex(int streamIndex) {
     final externals = _sourceNotifier.value?.externalSubtitles ?? const [];
     for (final ext in externals) {
       if (ext.streamIndex == streamIndex) {
@@ -906,19 +932,79 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         return true;
       }
     }
+    return false;
+  }
 
-    final embedded = _player.state.tracks.subtitle.firstWhere(
-      (track) =>
-          track.id != SubtitleTrack.auto().id &&
-          track.id != SubtitleTrack.no().id &&
-          _subtitleTrackMatchesStreamIndex(track, streamIndex),
-      orElse: () => SubtitleTrack.no(),
+  SubtitleTrack? _embeddedSubtitleTrackForStream(MediaStream stream) {
+    final embeddedTracks = _player.state.tracks.subtitle
+        .where(
+          (track) =>
+              track.id != SubtitleTrack.auto().id &&
+              track.id != SubtitleTrack.no().id,
+        )
+        .toList(growable: false);
+
+    for (final track in embeddedTracks) {
+      if (_subtitleTrackMatchesStreamIndex(track, stream.index) &&
+          _subtitleTrackMatchesStream(track, stream)) {
+        return track;
+      }
+    }
+
+    final embeddedStreams = _embeddedJellyfinSubtitleStreams();
+    final streamPosition = embeddedStreams.indexWhere(
+      (candidate) => candidate.index == stream.index,
     );
-    if (embedded.id == SubtitleTrack.no().id) return false;
-    _selectedExternalSubNotifier.value = null;
-    _player.setSubtitleTrack(embedded);
-    _setSubVisibility(true);
+    if (streamPosition >= 0 && streamPosition < embeddedTracks.length) {
+      final candidate = embeddedTracks[streamPosition];
+      if (_subtitleTrackMatchesStream(candidate, stream)) return candidate;
+    }
+    return null;
+  }
+
+  List<MediaStream> _embeddedJellyfinSubtitleStreams() {
+    final externalIndexes = {
+      for (final subtitle
+          in _sourceNotifier.value?.externalSubtitles ?? const [])
+        if (subtitle.streamIndex != null) subtitle.streamIndex!,
+    };
+    return [
+      for (final stream in _sourceNotifier.value?.subtitleStreams ?? const [])
+        if (!externalIndexes.contains(stream.index) &&
+            stream.deliveryMethod != 'External' &&
+            !stream.isExternal)
+          stream,
+    ];
+  }
+
+  bool _subtitleTrackMatchesStream(SubtitleTrack track, MediaStream stream) {
+    final streamLanguage = stream.language?.trim();
+    final trackLanguage = track.language?.trim();
+    if (streamLanguage != null &&
+        streamLanguage.isNotEmpty &&
+        trackLanguage != null &&
+        trackLanguage.isNotEmpty &&
+        !languageCodesMatch(trackLanguage, streamLanguage)) {
+      return false;
+    }
+
+    final streamTitle = _normalizeSubtitleTitle(
+      stream.displayTitle ?? stream.title,
+    );
+    final trackTitle = _normalizeSubtitleTitle(track.title);
+    if (streamTitle != null && trackTitle != null) {
+      return streamTitle == trackTitle ||
+          streamTitle.contains(trackTitle) ||
+          trackTitle.contains(streamTitle);
+    }
     return true;
+  }
+
+  String? _normalizeSubtitleTitle(String? title) {
+    final raw = title?.trim().toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+    final compact = raw.replaceAll(RegExp(r'[\s\-\._\(\)\[\]]+'), '');
+    return compact.isEmpty ? null : compact;
   }
 
   ExternalSubtitle? _bestExternalSubtitleLanguageMatch(String language) {
@@ -966,7 +1052,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _boolPriority(bool value) => value ? 1 : 0;
 
   bool _selectSubtitleStreamForPlayer(MediaStream stream) {
-    if (!_activateSubtitleStreamIndex(stream.index)) return false;
+    if (!_activateSubtitleStream(stream)) return false;
     _rememberSubtitleForTitle(
       language: stream.language,
       streamIndex: stream.index,

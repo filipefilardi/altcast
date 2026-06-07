@@ -191,6 +191,8 @@ class _SubtitleSection extends StatelessWidget {
     final jellyfinRows = _jellyfinSubtitleRows(jellyfinSubtitles);
     final selectedJellyfinIndex = _selectedJellyfinSubtitleIndex(
       current: current,
+      tracks: tracks,
+      jellyfinSubtitles: jellyfinSubtitles,
       externalTracks: externalSubtitles,
       selectedExternalSubId: selectedExternalSubId,
     );
@@ -392,6 +394,8 @@ class _SubtitleSection extends StatelessWidget {
 
   int? _selectedJellyfinSubtitleIndex({
     required SubtitleTrack current,
+    required List<SubtitleTrack> tracks,
+    required List<MediaStream> jellyfinSubtitles,
     required List<ExternalSubtitle> externalTracks,
     required String? selectedExternalSubId,
   }) {
@@ -405,7 +409,21 @@ class _SubtitleSection extends StatelessWidget {
       return null;
     }
     final parsed = int.tryParse(current.id);
-    if (parsed != null) return parsed;
+    if (parsed != null) {
+      for (final stream in jellyfinSubtitles) {
+        if (stream.index == parsed && _trackMatchesStream(current, stream)) {
+          return parsed;
+        }
+      }
+    }
+    final embeddedIndex = _selectedEmbeddedJellyfinIndex(
+      current: current,
+      tracks: tracks,
+      jellyfinSubtitles: jellyfinSubtitles,
+      externalTracks: externalTracks,
+    );
+    if (embeddedIndex != null) return embeddedIndex;
+
     final inferredExternalId = _inferExternalSelectionFromCurrent(
       current: current,
       externalTracks: externalTracks,
@@ -415,6 +433,61 @@ class _SubtitleSection extends StatelessWidget {
       if (subtitle.id == inferredExternalId) return subtitle.streamIndex;
     }
     return null;
+  }
+
+  int? _selectedEmbeddedJellyfinIndex({
+    required SubtitleTrack current,
+    required List<SubtitleTrack> tracks,
+    required List<MediaStream> jellyfinSubtitles,
+    required List<ExternalSubtitle> externalTracks,
+  }) {
+    final realTracks = tracks
+        .where(
+          (track) =>
+              track.id != SubtitleTrack.auto().id &&
+              track.id != SubtitleTrack.no().id,
+        )
+        .toList(growable: false);
+    final trackPosition = realTracks.indexWhere(
+      (track) => track.id == current.id,
+    );
+    if (trackPosition < 0) return null;
+
+    final externalIndexes = {
+      for (final subtitle in externalTracks)
+        if (subtitle.streamIndex != null) subtitle.streamIndex!,
+    };
+    final embeddedStreams = [
+      for (final stream in jellyfinSubtitles)
+        if (!externalIndexes.contains(stream.index) &&
+            stream.deliveryMethod != 'External' &&
+            !stream.isExternal)
+          stream,
+    ];
+    if (trackPosition >= embeddedStreams.length) return null;
+    final stream = embeddedStreams[trackPosition];
+    return _trackMatchesStream(current, stream) ? stream.index : null;
+  }
+
+  bool _trackMatchesStream(SubtitleTrack track, MediaStream stream) {
+    final streamLanguage = stream.language?.trim();
+    final trackLanguage = track.language?.trim();
+    if (streamLanguage != null &&
+        streamLanguage.isNotEmpty &&
+        trackLanguage != null &&
+        trackLanguage.isNotEmpty &&
+        !languageCodesMatch(trackLanguage, streamLanguage)) {
+      return false;
+    }
+
+    final streamTitle = _normalizeTitle(stream.displayTitle ?? stream.title);
+    final trackTitle = _normalizeTitle(track.title);
+    if (streamTitle != null && trackTitle != null) {
+      return streamTitle == trackTitle ||
+          streamTitle.contains(trackTitle) ||
+          trackTitle.contains(streamTitle);
+    }
+    return true;
   }
 
   List<ExternalSubtitle> _filterExternalSubtitles({
