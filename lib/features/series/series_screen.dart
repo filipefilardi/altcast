@@ -18,6 +18,7 @@ import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/jellyfin/models/series.dart';
 import 'package:altcast/features/downloads/widgets/download_button.dart';
 import 'package:altcast/features/favorites/favorites_providers.dart';
+import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/series/series_providers.dart';
@@ -167,6 +168,7 @@ class _SeriesBody extends ConsumerWidget {
                 onSetPlayed: (v) async {
                   await repo.setPlayed(series.id, played: v);
                   ref.invalidate(seriesProvider(series.id));
+                  invalidateHomeShelves(ref);
                 },
                 initialFavorite: series.userData?.isFavorite ?? false,
                 onSetFavorite: (v) async {

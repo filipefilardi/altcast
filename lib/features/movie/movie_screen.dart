@@ -16,6 +16,7 @@ import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/movie.dart';
 import 'package:altcast/features/downloads/widgets/download_button.dart';
 import 'package:altcast/features/favorites/favorites_providers.dart';
+import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
 import 'package:altcast/features/remote/remote_sessions_sheet.dart';
 import 'package:altcast/features/movie/movie_providers.dart';
@@ -114,6 +115,7 @@ class _MovieBody extends ConsumerWidget {
                 onSetPlayed: (v) async {
                   await repo.setPlayed(movie.id, played: v);
                   ref.invalidate(movieProvider(movie.id));
+                  invalidateHomeShelves(ref);
                 },
                 initialFavorite: movie.userData?.isFavorite ?? false,
                 onSetFavorite: (v) async {
