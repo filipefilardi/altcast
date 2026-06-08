@@ -3,6 +3,7 @@ import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
@@ -24,6 +25,9 @@ class PosterCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(jellyfinRepositoryProvider);
     final url = repo.posterUrl(item.id, item.imageTag);
+    final played = item.userData?.played ?? false;
+    final progress = item.userData?.progress ?? 0;
+    final inProgress = !played && progress > 0;
 
     return SizedBox(
       width: width,
@@ -51,15 +55,62 @@ class PosterCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: ColoredBox(
                       color: AppColors.surfaceElevated,
-                      child: LocalOrNetworkImage(
-                        source: url,
-                        errorBuilder: (_) => const Center(
-                          child: Icon(
-                            PiconsRegular.televisionSimple,
-                            color: AppColors.textTertiary,
-                            size: 28,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          LocalOrNetworkImage(
+                            source: url,
+                            errorBuilder: (_) => const Center(
+                              child: Icon(
+                                PiconsRegular.televisionSimple,
+                                color: AppColors.textTertiary,
+                                size: 28,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (inProgress)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                height: 4,
+                                color: AppColors.background.withValues(
+                                  alpha: 0.55,
+                                ),
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: progress.clamp(0, 1).toDouble(),
+                                  child: const DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: AppGradients.accentHorizontal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (played)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.background.withValues(
+                                    alpha: 0.74,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    PiconsRegular.check,
+                                    color: AppColors.success,
+                                    size: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

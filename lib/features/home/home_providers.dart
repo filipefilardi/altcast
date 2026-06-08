@@ -24,3 +24,17 @@ final recommendedMoviesProvider = FutureProvider.autoDispose<List<BrowseItem>>((
 ) {
   return ref.watch(jellyfinRepositoryProvider).recommendedMovies();
 });
+
+void invalidateHomeShelves(WidgetRef ref) {
+  ref.invalidate(continueWatchingProvider);
+  ref.invalidate(recentMoviesProvider);
+  ref.invalidate(recentShowsProvider);
+  ref.invalidate(recommendedMoviesProvider);
+}
+
+void invalidateHomeShelvesFromContainer(ProviderContainer container) {
+  container.invalidate(continueWatchingProvider);
+  container.invalidate(recentMoviesProvider);
+  container.invalidate(recentShowsProvider);
+  container.invalidate(recommendedMoviesProvider);
+}

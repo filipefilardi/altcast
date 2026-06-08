@@ -15,6 +15,8 @@ class MediaDetailActions extends StatelessWidget {
     required this.playLabel,
     required this.initialPlayed,
     required this.onSetPlayed,
+    required this.initialFavorite,
+    required this.onSetFavorite,
     required this.downloadAction,
     this.playIcon = PiconsFill.play,
     this.onPlayFromStart,
@@ -28,6 +30,8 @@ class MediaDetailActions extends StatelessWidget {
   final VoidCallback? onPlayFromStart;
   final bool initialPlayed;
   final Future<void> Function(bool) onSetPlayed;
+  final bool initialFavorite;
+  final Future<void> Function(bool) onSetFavorite;
   final VoidCallback? onCast;
   final bool castActive;
   final Widget downloadAction;
@@ -44,7 +48,12 @@ class MediaDetailActions extends StatelessWidget {
             tooltip: 'Play from start',
             onPressed: onPlayFromStart,
           ),
-        UserDataActions(initialPlayed: initialPlayed, onSetPlayed: onSetPlayed),
+        UserDataActions(
+          initialPlayed: initialPlayed,
+          onSetPlayed: onSetPlayed,
+          initialFavorite: initialFavorite,
+          onSetFavorite: onSetFavorite,
+        ),
         if (onCast != null)
           IconButton(
             iconSize: 22,

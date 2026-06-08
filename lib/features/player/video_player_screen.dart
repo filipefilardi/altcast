@@ -722,7 +722,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   void _refreshContinueWatching() {
-    _providerContainer.invalidate(continueWatchingProvider);
+    invalidateHomeShelvesFromContainer(_providerContainer);
   }
 
   Future<void> _closeActiveEncoding(StreamSource? src) async {

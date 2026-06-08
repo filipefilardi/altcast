@@ -193,7 +193,8 @@ class JellyfinRepository {
   }
 
   /// Personalized movie picks from Jellyfin's recommendations endpoint.
-  /// The API returns grouped categories; we flatten them into one shelf.
+  /// The API returns grouped categories; we flatten them into one shelf and
+  /// hide already-watched items so they don't occupy recommendation slots.
   Future<List<BrowseItem>> recommendedMovies({
     int limit = 20,
     int categoryLimit = 5,
@@ -223,6 +224,7 @@ class JellyfinRepository {
       for (final raw in categoryItems) {
         final item = BrowseItem.fromJson(raw);
         if (item.kind != MediaKind.movie) continue;
+        if (item.userData?.played ?? false) continue;
         if (!seenIds.add(item.id)) continue;
         items.add(item);
         if (items.length >= limit) return items;
@@ -376,6 +378,44 @@ class JellyfinRepository {
       startIndex: startIndex,
       limit: limit,
       filter: filter,
+    );
+  }
+
+  Future<LibraryPage> favoriteItems({
+    int startIndex = 0,
+    int limit = 30,
+    String itemTypes = 'Movie,Series',
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': itemTypes,
+        'Recursive': true,
+        'StartIndex': startIndex,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+        'Filters': 'IsFavorite',
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+      },
+    );
+    final data = res.data ?? const <String, dynamic>{};
+    final items = ((data['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+    final resolvedItems = itemTypes == 'Series'
+        ? await _resolveSeriesSeasonCounts(items)
+        : items;
+    return LibraryPage(
+      items: resolvedItems,
+      startIndex: startIndex,
+      limit: limit,
+      totalRecordCount:
+          data['TotalRecordCount'] as int? ?? resolvedItems.length,
+      fetchedItemCount: items.length,
     );
   }
 
