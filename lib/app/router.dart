@@ -6,6 +6,7 @@ import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/collection/collection_screen.dart';
 import 'package:altcast/features/auth/login_screen.dart';
 import 'package:altcast/features/downloads/downloads_screen.dart';
+import 'package:altcast/features/favorites/favorites_screen.dart';
 import 'package:altcast/features/home/home_screen.dart';
 import 'package:altcast/features/library/library_screen.dart';
 import 'package:altcast/features/library/library_browse_screen.dart';
@@ -57,6 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
+      GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
       GoRoute(
         path: '/movie/:id',
         builder: (_, st) => MovieScreen(movieId: st.pathParameters['id']!),

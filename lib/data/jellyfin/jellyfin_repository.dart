@@ -379,6 +379,44 @@ class JellyfinRepository {
     );
   }
 
+  Future<LibraryPage> favoriteItems({
+    int startIndex = 0,
+    int limit = 30,
+    String itemTypes = 'Movie,Series',
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': itemTypes,
+        'Recursive': true,
+        'StartIndex': startIndex,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear,ChildCount',
+        'EnableImages': true,
+        'Filters': 'IsFavorite',
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+      },
+    );
+    final data = res.data ?? const <String, dynamic>{};
+    final items = ((data['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+    final resolvedItems = itemTypes == 'Series'
+        ? await _resolveSeriesSeasonCounts(items)
+        : items;
+    return LibraryPage(
+      items: resolvedItems,
+      startIndex: startIndex,
+      limit: limit,
+      totalRecordCount:
+          data['TotalRecordCount'] as int? ?? resolvedItems.length,
+      fetchedItemCount: items.length,
+    );
+  }
+
   Future<List<String>> getGenres({required String itemType}) async {
     final s = _session;
     final res = await _api.dio.get<Map<String, dynamic>>(

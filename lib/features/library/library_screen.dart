@@ -32,7 +32,12 @@ class LibraryScreen extends ConsumerWidget {
             subtitle: _downloadsSubtitle(downloads),
             onTap: () => context.push('/downloads'),
           ),
-          // Placeholder for future entries — Movies / Shows / Collections.
+          _LibraryTile(
+            icon: PiconsRegular.heart,
+            label: 'Favorites',
+            subtitle: 'Movies and shows you saved',
+            onTap: () => context.push('/favorites'),
+          ),
           _LibraryTile(
             icon: PiconsRegular.televisionSimple,
             label: 'Movies',
