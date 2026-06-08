@@ -193,7 +193,8 @@ class JellyfinRepository {
   }
 
   /// Personalized movie picks from Jellyfin's recommendations endpoint.
-  /// The API returns grouped categories; we flatten them into one shelf.
+  /// The API returns grouped categories; we flatten them into one shelf and
+  /// hide already-watched items so they don't occupy recommendation slots.
   Future<List<BrowseItem>> recommendedMovies({
     int limit = 20,
     int categoryLimit = 5,
@@ -223,6 +224,7 @@ class JellyfinRepository {
       for (final raw in categoryItems) {
         final item = BrowseItem.fromJson(raw);
         if (item.kind != MediaKind.movie) continue;
+        if (item.userData?.played ?? false) continue;
         if (!seenIds.add(item.id)) continue;
         items.add(item);
         if (items.length >= limit) return items;
