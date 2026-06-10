@@ -1,5 +1,56 @@
 part of '../player_material_theme.dart';
 
+enum AltCastControlPanelEdge { top, bottom }
+
+class AltCastControlPanelOverlay extends StatelessWidget {
+  const AltCastControlPanelOverlay({
+    super.key,
+    required this.edge,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final AltCastControlPanelEdge edge;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTop = edge == AltCastControlPanelEdge.top;
+    final colors = isTop
+        ? <Color>[
+            Colors.black.withValues(alpha: 0.72),
+            Colors.black.withValues(alpha: 0.38),
+            Colors.black.withValues(alpha: 0.0),
+          ]
+        : <Color>[
+            Colors.black.withValues(alpha: 0.0),
+            Colors.black.withValues(alpha: 0.42),
+            Colors.black.withValues(alpha: 0.82),
+          ];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.54, 1.0],
+                  colors: colors,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Padding(padding: padding, child: child),
+      ],
+    );
+  }
+}
+
 class AltCastSeekRelativeButton extends ConsumerWidget {
   const AltCastSeekRelativeButton({
     super.key,

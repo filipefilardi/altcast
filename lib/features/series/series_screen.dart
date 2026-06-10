@@ -374,6 +374,16 @@ class _EpisodeList extends ConsumerWidget {
                 seriesName: seriesName,
                 seriesPosterTag: seriesPosterTag,
                 onTap: () => _playEpisode(context, ep),
+                onSetPlayed: (played) async {
+                  await ref
+                      .read(jellyfinRepositoryProvider)
+                      .setPlayed(ep.id, played: played);
+                  ref.invalidate(
+                    episodesProvider((seriesId: seriesId, seasonId: seasonId)),
+                  );
+                  ref.invalidate(seriesProvider(seriesId));
+                  invalidateHomeShelves(ref);
+                },
               ),
           ],
         );

@@ -194,7 +194,7 @@ class JellyfinRepository {
 
   /// Personalized movie picks from Jellyfin's recommendations endpoint.
   /// The API returns grouped categories; we flatten them into one shelf and
-  /// hide already-watched items so they don't occupy recommendation slots.
+  /// place already-watched items after unwatched picks.
   Future<List<BrowseItem>> recommendedMovies({
     int limit = 20,
     int categoryLimit = 5,
@@ -216,7 +216,8 @@ class JellyfinRepository {
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
     final seenIds = <String>{};
-    final items = <BrowseItem>[];
+    final unwatchedItems = <BrowseItem>[];
+    final watchedItems = <BrowseItem>[];
 
     for (final category in categories) {
       final categoryItems = ((category['Items'] as List?) ?? const [])
@@ -224,14 +225,16 @@ class JellyfinRepository {
       for (final raw in categoryItems) {
         final item = BrowseItem.fromJson(raw);
         if (item.kind != MediaKind.movie) continue;
-        if (item.userData?.played ?? false) continue;
         if (!seenIds.add(item.id)) continue;
-        items.add(item);
-        if (items.length >= limit) return items;
+        if (item.userData?.played ?? false) {
+          watchedItems.add(item);
+        } else {
+          unwatchedItems.add(item);
+        }
       }
     }
 
-    return items;
+    return [...unwatchedItems, ...watchedItems].take(limit).toList();
   }
 
   /// Search across movies and series. Returns a single mixed list ordered
