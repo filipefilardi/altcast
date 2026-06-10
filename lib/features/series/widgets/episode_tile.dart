@@ -167,18 +167,20 @@ class _EpisodeTileState extends ConsumerState<EpisodeTile> {
                         Positioned(
                           right: 4,
                           top: 4,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
+                          child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: AppColors.background.withValues(
-                                alpha: 0.7,
+                                alpha: 0.74,
                               ),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              PiconsRegular.check,
-                              size: 14,
-                              color: AppColors.primary,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                PiconsRegular.check,
+                                size: 15,
+                                color: AppColors.success,
+                              ),
                             ),
                           ),
                         ),
