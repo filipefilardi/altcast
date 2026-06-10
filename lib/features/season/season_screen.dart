@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
+import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/series/widgets/episode_tile.dart';
 import 'package:altcast/features/season/season_providers.dart';
 
@@ -68,6 +70,19 @@ class SeasonScreen extends ConsumerWidget {
                       seriesName: season.seriesName ?? 'Series',
                       seriesPosterTag: season.imageTag,
                       onTap: () => context.push('/series/${season.seriesId!}'),
+                      onSetPlayed: (played) async {
+                        await ref
+                            .read(jellyfinRepositoryProvider)
+                            .setPlayed(ep.id, played: played);
+                        ref.invalidate(seasonProvider(seasonId));
+                        ref.invalidate(
+                          seasonEpisodesProvider((
+                            seriesId: season.seriesId!,
+                            seasonId: season.id,
+                          )),
+                        );
+                        invalidateHomeShelves(ref);
+                      },
                     ),
                 ],
               ),
