@@ -172,6 +172,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _playerReadyForCastMirror = false;
   double? _volumeBeforeCastMirror;
   Timer? _castVolumeDebounce;
+  bool _replacingWithPlayerRoute = false;
   DateTime? _lastRemoteCastSeekAt;
   DateTime? _lastRemoteControlSeekSentAt;
   int _lastSyncQueueSerial = 0;
@@ -1250,7 +1251,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     if (remoteItemId != widget.itemId) {
       final position = session.estimatedPosition() ?? Duration.zero;
-      context.pushReplacement(
+      _replaceWithPlayerRoute(
         Uri(
           path: '/play/$remoteItemId',
           queryParameters: {
@@ -1382,7 +1383,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       path: '/play/${next.id}',
       queryParameters: query.isEmpty ? null : query,
     );
-    context.pushReplacement(uri.toString());
+    _replaceWithPlayerRoute(uri.toString());
+  }
+
+  void _replaceWithPlayerRoute(String location) {
+    _replacingWithPlayerRoute = true;
+    _applyPlayerOrientation(landscape: true);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    context.pushReplacement(location);
   }
 
   @override
@@ -1418,9 +1426,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _controlOverlayNotifier.dispose();
     _keyboardFocusNode.dispose();
     unawaited(ScreenBrightness().resetApplicationScreenBrightness());
-    // Restore app default orientation after leaving the landscape-only player.
-    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (!_replacingWithPlayerRoute) {
+      // Restore app default orientation after leaving the landscape-only player.
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     super.dispose();
   }
 
@@ -1765,7 +1777,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
           'syncPlayPlaying': event.isPlaying ? '1' : '0',
         },
       );
-      context.pushReplacement(uri.toString());
+      _replaceWithPlayerRoute(uri.toString());
       return;
     }
     _applyingSyncPlayCommand = true;
