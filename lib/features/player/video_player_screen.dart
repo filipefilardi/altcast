@@ -1432,11 +1432,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         final controlsTheme = MaterialVideoControlsTheme.maybeOf(
           context,
         )?.normal;
-        final controlsBottomMargin =
+        final resolvedControlsBottomMargin =
             controlsTheme?.bottomButtonBarMargin
                 .resolve(Directionality.of(context))
                 .bottom ??
             kPlayerControlsBottomBarMargin;
+        final controlsBottomMargin = resolvedControlsBottomMargin == 0
+            ? kPlayerControlsBottomBarMargin
+            : resolvedControlsBottomMargin;
         final controlsButtonBarHeight =
             controlsTheme?.buttonBarHeight ?? kPlayerControlsBottomBarHeight;
         final seekBarMargin =
