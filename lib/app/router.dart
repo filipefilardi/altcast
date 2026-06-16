@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +21,31 @@ import 'package:altcast/features/season/season_screen.dart';
 import 'package:altcast/features/series/series_screen.dart';
 import 'package:altcast/features/settings/settings_screen.dart';
 import 'package:altcast/features/shell/app_shell.dart';
+
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+String? _pendingNotificationLocation;
+
+void openDownloadNotificationRoute(String? focusItemId) {
+  final focus = focusItemId?.trim();
+  final location = Uri(
+    path: '/downloads',
+    queryParameters: focus == null || focus.isEmpty ? null : {'focus': focus},
+  ).toString();
+  final context = rootNavigatorKey.currentContext;
+  if (context == null) {
+    _pendingNotificationLocation = location;
+    return;
+  }
+  unawaited(context.push(location));
+}
+
+void flushPendingNotificationRoute() {
+  final location = _pendingNotificationLocation;
+  final context = rootNavigatorKey.currentContext;
+  if (location == null || context == null) return;
+  _pendingNotificationLocation = null;
+  unawaited(context.push(location));
+}
 
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(this._ref) {
@@ -44,6 +71,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(listenable.dispose);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: listenable,
     redirect: (context, state) {
@@ -69,7 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, st) =>
             LoginScreen(initialServerUrl: st.uri.queryParameters['serverUrl']),
       ),
-      GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
+      GoRoute(
+        path: '/downloads',
+        builder: (_, st) =>
+            DownloadsScreen(focusItemId: st.uri.queryParameters['focus']),
+      ),
       GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
       GoRoute(
         path: '/movie/:id',

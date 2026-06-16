@@ -24,6 +24,9 @@ class AltCastApp extends ConsumerWidget {
         if (auth is AuthInitial) {
           return const _SplashScreen();
         }
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => flushPendingNotificationRoute(),
+        );
         return child ?? const SizedBox.shrink();
       },
     );

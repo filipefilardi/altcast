@@ -13,7 +13,9 @@ import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
+import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
+import 'package:altcast/data/notifications/app_notifications.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/player/subtitle_style.dart';
 
@@ -56,6 +58,8 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 28),
           ],
           const _DownloadGroup(),
+          const SizedBox(height: 24),
+          const _NotificationGroup(),
           const SizedBox(height: 24),
           const _PlaybackGroup(),
           const SizedBox(height: 24),
@@ -278,6 +282,63 @@ class _DownloadGroup extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _NotificationGroup extends ConsumerWidget {
+  const _NotificationGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(notificationPreferencesProvider);
+    return _SettingsGroup(
+      label: 'Notifications',
+      children: [
+        SwitchListTile(
+          secondary: Icon(
+            prefs.downloadNotifications
+                ? PiconsRegular.bellSimpleRinging
+                : PiconsRegular.bellSimpleSlash,
+          ),
+          title: const Text('Download notifications'),
+          subtitle: const Text(
+            'Alert when downloads finish or need attention.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.downloadNotifications,
+          onChanged: (enabled) =>
+              _setDownloadNotifications(context, ref, enabled),
+          activeThumbColor: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _setDownloadNotifications(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    if (!enabled) {
+      await ref
+          .read(notificationPreferencesProvider.notifier)
+          .setDownloadNotifications(false);
+      return;
+    }
+
+    final allowed = await AppNotifications.requestPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      await ref
+          .read(notificationPreferencesProvider.notifier)
+          .setDownloadNotifications(false);
+      return;
+    }
+
+    await ref
+        .read(notificationPreferencesProvider.notifier)
+        .setDownloadNotifications(true);
   }
 }
 

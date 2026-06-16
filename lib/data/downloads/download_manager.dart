@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:background_downloader/background_downloader.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -14,6 +15,8 @@ import 'package:altcast/data/jellyfin/models/movie.dart';
 import 'package:altcast/data/jellyfin/models/stream_source.dart';
 import 'package:altcast/data/jellyfin/models/trickplay.dart';
 import 'package:altcast/data/local/download_preferences.dart';
+import 'package:altcast/data/local/notification_preferences.dart';
+import 'package:altcast/data/notifications/app_notifications.dart';
 import 'package:altcast/data/downloads/downloaded_item.dart';
 
 class DownloadsState {
@@ -62,12 +65,14 @@ final downloadManagerProvider =
 class DownloadManager extends Notifier<DownloadsState> {
   static const int _maxAutoRetries = 4;
   static const Duration _baseRetryDelay = Duration(seconds: 3);
+  static const Duration _nativeTaskPollInterval = Duration(seconds: 1);
+  static const String _nativeTaskPrefix = 'altcast-download-';
   final List<_QueueEntry> _queue = [];
   final Map<String, _QueueEntry> _paused = {};
   final Map<String, int> _retryAttempts = {};
   final Set<String> _userCancelled = <String>{};
   bool _draining = false;
-  CancelToken? _activeCancel;
+  DownloadTask? _activeDownloadTask;
   String? _activeItemId;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
 
@@ -76,7 +81,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     _bootstrap();
     ref.onDispose(() {
       _netSub?.cancel();
-      _activeCancel?.cancel('Disposed');
+      final task = _activeDownloadTask;
+      if (task != null) FileDownloader().cancel(task);
     });
     return const DownloadsState();
   }
@@ -218,7 +224,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     _userCancelled.add(itemId);
     _queue.removeWhere((e) => e.itemId == itemId);
     if (_activeItemId == itemId) {
-      _activeCancel?.cancel('Cancelled by user');
+      final task = _activeDownloadTask;
+      if (task != null) await FileDownloader().cancel(task);
     }
     final newProgress = Map<String, DownloadProgress>.from(state.progress)
       ..remove(itemId);
@@ -238,7 +245,11 @@ class DownloadManager extends Notifier<DownloadsState> {
     if (idx < 0) return;
     _paused[itemId] = _queue.removeAt(idx);
     if (_activeItemId == itemId) {
-      _activeCancel?.cancel('Paused by user');
+      final task = _activeDownloadTask;
+      if (task != null) {
+        final paused = await FileDownloader().pause(task);
+        if (!paused) await FileDownloader().cancel(task);
+      }
     }
     state = state.copyWith(
       queueLength: _queue.length,
@@ -309,7 +320,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     } else {
       _userCancelled.clear();
     }
-    _activeCancel?.cancel('Cleared by user');
+    final task = _activeDownloadTask;
+    if (task != null) await FileDownloader().cancel(task);
 
     final dir = await _downloadsDir();
     for (final item in state.items.values) {
@@ -368,81 +380,111 @@ class DownloadManager extends Notifier<DownloadsState> {
     final repo = ref.read(jellyfinRepositoryProvider);
     final sidecarSubs = await _resolveExternalSubs(entry.itemId);
     final dir = await _downloadsDir();
-    final tempPath = '${dir.path}/${entry.itemId}.partial';
     final finalPath = '${dir.path}/${entry.itemId}.video';
-    final tempFile = File(tempPath);
-    final existingBytes = tempFile.existsSync() ? await tempFile.length() : 0;
     final url = await _resolveDownloadUrl(repo, entry.itemId);
 
-    _activeCancel = CancelToken();
+    final task = DownloadTask(
+      taskId: _nativeTaskId(entry.itemId),
+      url: url,
+      filename: '${entry.itemId}.video',
+      directory: dir.path,
+      baseDirectory: BaseDirectory.root,
+      displayName: entry.displayLabel,
+      metaData: entry.itemId,
+      updates: Updates.statusAndProgress,
+      requiresWiFi: ref.read(downloadPreferencesProvider).wifiOnlyDownloads,
+      retries: _maxAutoRetries,
+      allowPause: true,
+      priority: 3,
+    );
+
+    _activeDownloadTask = task;
     _activeItemId = entry.itemId;
 
     try {
+      if (File(finalPath).existsSync()) {
+        return _finishDownloadedVideo(
+          entry: entry,
+          finalPath: finalPath,
+          sidecarSubs: sidecarSubs,
+          dir: dir,
+        );
+      }
+
+      await _configureNotificationsForTask(task);
       await _guardDownloadNetwork();
       await _guardFreeSpace(minBytes: 200 * 1024 * 1024);
       await _watchNetworkPolicy();
 
-      await Dio().download(
-        url,
-        tempPath,
-        cancelToken: _activeCancel,
-        options: Options(
-          followRedirects: true,
-          headers: existingBytes > 0 ? {'Range': 'bytes=$existingBytes-'} : {},
-        ),
-        deleteOnError: false,
-        onReceiveProgress: (received, total) {
-          final downloaded = existingBytes + received;
-          final expected = total > 0 ? existingBytes + total : null;
-          final existing = state.progress[entry.itemId];
-          if (existing == null) return;
-          state = state.copyWith(
-            progress: {
-              ...state.progress,
-              entry.itemId: existing.copyWithBytes(
-                downloaded: downloaded,
-                total: expected,
-              ),
-            },
-          );
-        },
-      );
-
-      try {
-        await tempFile.rename(finalPath);
-      } catch (_) {
-        await tempFile.copy(finalPath);
-        await tempFile.delete();
+      final activeTask = await FileDownloader().taskForId(task.taskId);
+      final TaskStatusUpdate result;
+      if (activeTask is DownloadTask) {
+        _activeDownloadTask = activeTask;
+        await _configureNotificationsForTask(activeTask);
+        result = await _waitForExistingNativeTask(
+          entry: entry,
+          task: activeTask,
+          finalPath: finalPath,
+        );
+      } else {
+        result = await FileDownloader().download(
+          task,
+          onStatus: (status) => _handleNativeDownloadStatus(entry, status),
+          onProgress: (progress) {
+            _handleNativeDownloadProgress(entry, progress);
+          },
+        );
       }
 
-      final downloadedSubs = await _downloadExternalSubs(
-        itemId: entry.itemId,
-        subs: sidecarSubs,
-        dir: dir,
-      );
-      final offlineTrickplay = await _downloadOfflineTrickplay(
-        itemId: entry.itemId,
-        dir: dir,
-      );
-      final skipper = await _resolveIntroSkipperTimestamps(entry.itemId);
-      final downloaded = entry.toDownloadedItem(
-        filePath: finalPath,
-        introSkipper: skipper,
-        externalSubtitles: downloadedSubs,
-        offlineTrickplay: offlineTrickplay,
-      );
-      final newItems = {...state.items, downloaded.id: downloaded};
-      final newProgress = Map<String, DownloadProgress>.from(state.progress)
-        ..remove(entry.itemId);
-      state = state.copyWith(items: newItems, progress: newProgress);
-      await _persist();
-      _retryAttempts.remove(entry.itemId);
-      _userCancelled.remove(entry.itemId);
+      switch (result.status) {
+        case TaskStatus.complete:
+          break;
+        case TaskStatus.paused:
+          _paused.putIfAbsent(entry.itemId, () => entry);
+          return const _DownloadOutcome.paused();
+        case TaskStatus.canceled:
+          _userCancelled.remove(entry.itemId);
+          return const _DownloadOutcome.cancelled();
+        case TaskStatus.notFound:
+          const message = 'Server returned HTTP 404.';
+          state = state.copyWith(
+            progress: Map<String, DownloadProgress>.from(state.progress)
+              ..remove(entry.itemId),
+            failures: {
+              ...state.failures,
+              entry.itemId: entry.toFailure(message),
+            },
+          );
+          await _showDownloadFailedNotification(entry, message);
+          return const _DownloadOutcome.failed();
+        case TaskStatus.failed:
+          throw result;
+        case TaskStatus.enqueued:
+        case TaskStatus.running:
+        case TaskStatus.waitingToRetry:
+          throw result;
+      }
 
-      _maybeAutoDownloadNext(entry);
-      return const _DownloadOutcome.success();
+      final taskPath = await task.filePath();
+      if (taskPath != finalPath) {
+        final downloadedFile = File(taskPath);
+        if (downloadedFile.existsSync()) {
+          try {
+            await downloadedFile.rename(finalPath);
+          } catch (_) {
+            await downloadedFile.copy(finalPath);
+            await downloadedFile.delete();
+          }
+        }
+      }
+
+      return _finishDownloadedVideo(
+        entry: entry,
+        finalPath: finalPath,
+        sidecarSubs: sidecarSubs,
+        dir: dir,
+      );
     } catch (e) {
-      final wasCancelled = e is DioException && CancelToken.isCancel(e);
       final paused = _paused.containsKey(entry.itemId);
       final cancelledByUser = _userCancelled.remove(entry.itemId);
       final newProgress = Map<String, DownloadProgress>.from(state.progress);
@@ -453,7 +495,7 @@ class DownloadManager extends Notifier<DownloadsState> {
         state = state.copyWith(progress: newProgress);
         return const _DownloadOutcome.paused();
       }
-      if (wasCancelled && cancelledByUser) {
+      if (cancelledByUser) {
         state = state.copyWith(progress: newProgress);
         return const _DownloadOutcome.cancelled();
       }
@@ -479,13 +521,117 @@ class DownloadManager extends Notifier<DownloadsState> {
           entry.itemId: entry.toFailure(_downloadFailureMessage(e)),
         },
       );
+      await _showDownloadFailedNotification(entry, _downloadFailureMessage(e));
       return const _DownloadOutcome.failed();
     } finally {
       _activeItemId = null;
-      _activeCancel = null;
+      _activeDownloadTask = null;
       await _netSub?.cancel();
       _netSub = null;
     }
+  }
+
+  String _nativeTaskId(String itemId) => '$_nativeTaskPrefix$itemId';
+
+  Future<TaskStatusUpdate> _waitForExistingNativeTask({
+    required _QueueEntry entry,
+    required DownloadTask task,
+    required String finalPath,
+  }) async {
+    while (true) {
+      if (File(finalPath).existsSync()) {
+        _handleNativeDownloadProgress(entry, 1);
+        return TaskStatusUpdate(task, TaskStatus.complete);
+      }
+
+      final record = await FileDownloader().database.recordForId(task.taskId);
+      if (record != null) {
+        _handleNativeDownloadStatus(entry, record.status);
+        _handleNativeDownloadProgress(entry, record.progress);
+        if (record.status.isFinalState) {
+          return TaskStatusUpdate(
+            task,
+            record.status,
+            record.exception,
+            null,
+            null,
+            record.exception is TaskHttpException
+                ? (record.exception as TaskHttpException).httpResponseCode
+                : null,
+          );
+        }
+      }
+
+      final stillActive = await FileDownloader().taskForId(task.taskId);
+      if (stillActive == null && record == null) {
+        return TaskStatusUpdate(
+          task,
+          TaskStatus.failed,
+          TaskException('Native download task disappeared.'),
+        );
+      }
+
+      await Future<void>.delayed(_nativeTaskPollInterval);
+    }
+  }
+
+  void _handleNativeDownloadStatus(_QueueEntry entry, TaskStatus status) {
+    if (!state.progress.containsKey(entry.itemId)) return;
+    if (status == TaskStatus.enqueued || status == TaskStatus.waitingToRetry) {
+      state = state.copyWith(
+        progress: {...state.progress, entry.itemId: entry.toProgress(-1)},
+      );
+    }
+  }
+
+  void _handleNativeDownloadProgress(_QueueEntry entry, double progress) {
+    if (progress < 0) return;
+    final existing = state.progress[entry.itemId];
+    if (existing == null) return;
+    state = state.copyWith(
+      progress: {
+        ...state.progress,
+        entry.itemId: existing.copyWithFraction(progress),
+      },
+    );
+  }
+
+  Future<_DownloadOutcome> _finishDownloadedVideo({
+    required _QueueEntry entry,
+    required String finalPath,
+    required List<ExternalSubtitle> sidecarSubs,
+    required Directory dir,
+  }) async {
+    final downloadedSubs = await _downloadExternalSubs(
+      itemId: entry.itemId,
+      subs: sidecarSubs,
+      dir: dir,
+    );
+    final offlineTrickplay = await _downloadOfflineTrickplay(
+      itemId: entry.itemId,
+      dir: dir,
+    );
+    final skipper = await _resolveIntroSkipperTimestamps(entry.itemId);
+    final downloaded = entry.toDownloadedItem(
+      filePath: finalPath,
+      introSkipper: skipper,
+      externalSubtitles: downloadedSubs,
+      offlineTrickplay: offlineTrickplay,
+    );
+    final newItems = {...state.items, downloaded.id: downloaded};
+    final newProgress = Map<String, DownloadProgress>.from(state.progress)
+      ..remove(entry.itemId);
+    state = state.copyWith(items: newItems, progress: newProgress);
+    await _persist();
+    _retryAttempts.remove(entry.itemId);
+    _userCancelled.remove(entry.itemId);
+    await FileDownloader().database.deleteRecordWithId(
+      _nativeTaskId(entry.itemId),
+    );
+    await _showDownloadCompleteNotification(entry);
+
+    _maybeAutoDownloadNext(entry);
+    return const _DownloadOutcome.success();
   }
 
   Future<void> _watchNetworkPolicy() async {
@@ -499,9 +645,44 @@ class DownloadManager extends Notifier<DownloadsState> {
           connectivity.contains(ConnectivityResult.ethernet);
       final offline = connectivity.contains(ConnectivityResult.none);
       if (!hasUnmetered || offline) {
-        _activeCancel?.cancel('Network policy changed');
+        final task = _activeDownloadTask;
+        if (task != null) FileDownloader().pause(task);
       }
     });
+  }
+
+  Future<void> _configureNotificationsForTask(DownloadTask task) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+
+    AppNotifications.configureDownloadTaskNotifications(task);
+    final allowed = await AppNotifications.requestPermissions();
+    if (!allowed) return;
+  }
+
+  Future<void> _showDownloadCompleteNotification(_QueueEntry entry) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+    await AppNotifications.showDownloadComplete(
+      itemId: entry.itemId,
+      title: entry.displayLabel,
+    );
+  }
+
+  Future<void> _showDownloadFailedNotification(
+    _QueueEntry entry,
+    String message,
+  ) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+    await AppNotifications.showDownloadFailed(
+      itemId: entry.itemId,
+      title: entry.displayLabel,
+      message: message,
+    );
   }
 
   Future<String> _resolveDownloadUrl(
@@ -735,6 +916,18 @@ class DownloadManager extends Notifier<DownloadsState> {
 
   String _downloadFailureMessage(Object error) {
     if (error is _DownloadBlockedException) return error.message;
+    if (error is TaskStatusUpdate) {
+      final status = error.responseStatusCode;
+      final detail = error.exception?.description.trim();
+      if (status != null && detail != null && detail.isNotEmpty) {
+        return 'Server returned HTTP $status ($detail).';
+      }
+      if (status != null) return 'Server returned HTTP $status.';
+      if (detail != null && detail.isNotEmpty) {
+        return 'Download failed: $detail';
+      }
+      return 'Download failed with status ${error.status.name}.';
+    }
     if (error is DioException) {
       if (error.type == DioExceptionType.connectionTimeout ||
           error.type == DioExceptionType.receiveTimeout ||
@@ -763,6 +956,16 @@ class DownloadManager extends Notifier<DownloadsState> {
 
   bool _shouldAutoRetry(Object error) {
     if (error is _DownloadBlockedException) return true;
+    if (error is TaskStatusUpdate) {
+      if (error.status == TaskStatus.notFound) return false;
+      if (error.status == TaskStatus.failed) {
+        final status = error.responseStatusCode;
+        if (status == null) return true;
+        if (status >= 500) return true;
+        return status == 429 || status == 408 || status == 409;
+      }
+      return error.status == TaskStatus.canceled;
+    }
     if (error is DioException) {
       if (CancelToken.isCancel(error)) return true;
       if (error.type == DioExceptionType.connectionTimeout ||
@@ -958,6 +1161,17 @@ class _QueueEntry {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+
+  String get displayLabel {
+    if (kind != DownloadedItemKind.episode) return name;
+    final show = seriesName == null || seriesName!.isEmpty
+        ? 'Episode'
+        : seriesName!;
+    final season = seasonNumber;
+    final episode = episodeNumber;
+    if (season == null || episode == null) return '$show - $name';
+    return '$show - S$season E${episode.toString().padLeft(2, '0')}';
+  }
 
   Map<String, dynamic> toJson() => {
     'itemId': itemId,
