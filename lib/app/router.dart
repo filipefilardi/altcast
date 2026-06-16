@@ -51,12 +51,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (auth is AuthInitial) return null;
       final loggedIn = auth is AuthAuthenticated;
       final atLogin = state.matchedLocation == '/login';
-      if (!loggedIn && !atLogin) return '/login';
+      if (!loggedIn && !atLogin) {
+        final serverUrl = auth is AuthUnauthenticated ? auth.serverUrl : null;
+        return Uri(
+          path: '/login',
+          queryParameters: serverUrl == null || serverUrl.isEmpty
+              ? null
+              : {'serverUrl': serverUrl},
+        ).toString();
+      }
       if (loggedIn && atLogin) return '/';
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (_, st) =>
+            LoginScreen(initialServerUrl: st.uri.queryParameters['serverUrl']),
+      ),
       GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
       GoRoute(path: '/favorites', builder: (_, _) => const FavoritesScreen()),
       GoRoute(

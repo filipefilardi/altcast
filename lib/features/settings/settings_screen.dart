@@ -60,8 +60,10 @@ class SettingsScreen extends ConsumerWidget {
           const _PlaybackGroup(),
           const SizedBox(height: 24),
           const _AudioSubtitleGroup(),
-          const SizedBox(height: 28),
-          const _SignOutTile(),
+          if (session != null) ...[
+            const SizedBox(height: 28),
+            const _SessionActionsGroup(),
+          ],
           const SizedBox(height: 28),
           const _VersionFooter(),
         ],
@@ -617,8 +619,8 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _SignOutTile extends ConsumerWidget {
-  const _SignOutTile();
+class _SessionActionsGroup extends ConsumerWidget {
+  const _SessionActionsGroup();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -628,34 +630,36 @@ class _SignOutTile extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         leading: const Icon(PiconsRegular.signOut, color: AppColors.error),
-        title: const Text('Sign out', style: TextStyle(color: AppColors.error)),
-        onTap: () async {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (dialogCtx) => AlertDialog(
-              title: const Text('Sign out?'),
-              content: const Text(
-                'You will need to enter your server URL and credentials again to sign back in.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(true),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                  child: const Text('Sign out'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed != true) return;
-          // Auth-state change drives the router redirect; no manual pop needed.
-          await ref.read(authControllerProvider.notifier).logout();
-        },
+        title: const Text('Log out', style: TextStyle(color: AppColors.error)),
+        onTap: () => _confirmLogout(context, ref),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          'This ends the current Jellyfin session and keeps this server ready for the next sign-in.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    // Auth-state change drives the router redirect; no manual pop needed.
+    await ref.read(authControllerProvider.notifier).switchUserOnSameServer();
   }
 }
 

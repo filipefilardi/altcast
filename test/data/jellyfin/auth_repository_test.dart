@@ -35,14 +35,85 @@ void main() {
         );
 
         expect(session.username, 'Alice');
-        // Exactly one key written; its content is the serialized session.
-        expect(storage.store.keys, hasLength(1));
         final stored =
-            jsonDecode(storage.store.values.single) as Map<String, dynamic>;
+            jsonDecode(storage.store['jellyfin_session_v1']!)
+                as Map<String, dynamic>;
         expect(stored['accessToken'], 'tok');
         expect(stored['serverUrl'], 'https://media.example.org');
+
+        final servers =
+            jsonDecode(storage.store['jellyfin_saved_servers_v1']!)
+                as List<dynamic>;
+        expect(servers, hasLength(1));
+        final savedServer = servers.single as Map<String, dynamic>;
+        expect(savedServer['serverUrl'], 'https://media.example.org');
+        expect(savedServer['lastUsername'], 'Alice');
       },
     );
+  });
+
+  group('AuthRepository.savedServers', () {
+    test('returns saved servers newest first', () async {
+      final storage = _FakeSecureStorage();
+      await storage.write(
+        'jellyfin_saved_servers_v1',
+        jsonEncode([
+          {
+            'serverUrl': 'https://old.example',
+            'serverName': 'Old',
+            'updatedAt': '2025-01-01T00:00:00.000Z',
+          },
+          {
+            'serverUrl': 'https://new.example',
+            'serverName': 'New',
+            'lastUsername': 'Bob',
+            'updatedAt': '2025-01-02T00:00:00.000Z',
+          },
+        ]),
+      );
+
+      final repo = AuthRepository(api: JellyfinApi(), storage: storage);
+
+      final servers = await repo.savedServers();
+
+      expect(servers.map((server) => server.serverUrl), [
+        'https://new.example',
+        'https://old.example',
+      ]);
+      expect(servers.first.lastUsername, 'Bob');
+    });
+
+    test('drops corrupted saved server payload', () async {
+      final storage = _FakeSecureStorage();
+      await storage.write('jellyfin_saved_servers_v1', '{not json');
+
+      final repo = AuthRepository(api: JellyfinApi(), storage: storage);
+
+      expect(await repo.savedServers(), isEmpty);
+      expect(storage.store.containsKey('jellyfin_saved_servers_v1'), isFalse);
+    });
+  });
+
+  group('AuthRepository.publicServerInfo', () {
+    test('checks public server info, then saves it securely', () async {
+      final storage = _FakeSecureStorage();
+      final api = JellyfinApi(
+        dio: Dio()
+          ..httpClientAdapter = _adapter((opts) {
+            expect(opts.path, endsWith('/System/Info/Public'));
+            return _ok({'ServerName': 'Den', 'Version': '10.10.7'});
+          }),
+      );
+      final repo = AuthRepository(api: api, storage: storage);
+
+      final info = await repo.publicServerInfo('media.example.org');
+
+      expect(info.serverUrl, 'https://media.example.org');
+      final servers = await repo.savedServers();
+      expect(servers, hasLength(1));
+      expect(servers.single.serverName, 'Den');
+      expect(servers.single.version, '10.10.7');
+    });
   });
 
   group('AuthRepository.restore', () {
@@ -111,6 +182,29 @@ void main() {
 
       expect(api.session, isNull);
       expect(storage.store, isEmpty);
+    });
+
+    test('keeps saved server profiles while clearing active session', () async {
+      final storage = _FakeSecureStorage()
+        ..store['jellyfin_session_v1'] = '{"any":"value"}'
+        ..store['jellyfin_saved_servers_v1'] = jsonEncode([
+          {
+            'serverUrl': 'https://x.example',
+            'serverName': 'X',
+            'updatedAt': '2025-01-01T00:00:00.000Z',
+          },
+        ]);
+
+      final api = JellyfinApi(
+        dio: Dio()..httpClientAdapter = _adapter((_) => _ok({})),
+      );
+      api.bind(_dummySession());
+
+      final repo = AuthRepository(api: api, storage: storage);
+      await repo.logout();
+
+      expect(storage.store.containsKey('jellyfin_session_v1'), isFalse);
+      expect(storage.store.containsKey('jellyfin_saved_servers_v1'), isTrue);
     });
   });
 }

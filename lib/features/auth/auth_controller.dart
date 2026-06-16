@@ -24,8 +24,9 @@ class AuthAuthenticated extends AuthState {
 }
 
 class AuthUnauthenticated extends AuthState {
-  const AuthUnauthenticated({this.error});
+  const AuthUnauthenticated({this.error, this.serverUrl});
   final String? error;
+  final String? serverUrl;
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
@@ -59,16 +60,31 @@ class AuthController extends Notifier<AuthState> {
           .login(serverUrl: serverUrl, username: username, password: password);
       state = AuthAuthenticated(session);
     } on JellyfinAuthException catch (e) {
-      state = AuthUnauthenticated(error: e.message);
+      state = AuthUnauthenticated(error: e.message, serverUrl: serverUrl);
     } on DioException catch (e) {
-      state = AuthUnauthenticated(error: userFacingDioMessage(e));
+      state = AuthUnauthenticated(
+        error: userFacingDioMessage(e),
+        serverUrl: serverUrl,
+      );
     } catch (e) {
-      state = AuthUnauthenticated(error: 'Unexpected error: $e');
+      state = AuthUnauthenticated(
+        error: 'Unexpected error: $e',
+        serverUrl: serverUrl,
+      );
     }
   }
 
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = const AuthUnauthenticated();
+  }
+
+  Future<void> switchUserOnSameServer() async {
+    final previous = state;
+    final serverUrl = previous is AuthAuthenticated
+        ? previous.session.serverUrl
+        : null;
+    await ref.read(authRepositoryProvider).logout();
+    state = AuthUnauthenticated(serverUrl: serverUrl);
   }
 }
