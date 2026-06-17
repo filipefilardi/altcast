@@ -9,9 +9,6 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
-    MacNotificationBridge.shared.configure(
-      binaryMessenger: flutterViewController.engine.binaryMessenger
-    )
 
     super.awakeFromNib()
   }

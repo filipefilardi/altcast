@@ -70,6 +70,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   final List<_QueueEntry> _queue = [];
   final Map<String, _QueueEntry> _paused = {};
   final Map<String, int> _retryAttempts = {};
+  final Set<String> _runningNotificationShown = <String>{};
   final Set<String> _userCancelled = <String>{};
   bool _draining = false;
   DownloadTask? _activeDownloadTask;
@@ -222,21 +223,22 @@ class DownloadManager extends Notifier<DownloadsState> {
 
   Future<void> cancel(String itemId) async {
     _userCancelled.add(itemId);
+    _QueueEntry? cancelledEntry;
+    for (final entry in [..._queue, ..._paused.values]) {
+      if (entry.itemId == itemId) {
+        cancelledEntry = entry;
+        break;
+      }
+    }
     _queue.removeWhere((e) => e.itemId == itemId);
     if (_activeItemId == itemId) {
       final task = _activeDownloadTask;
       if (task != null) await FileDownloader().cancel(task);
     }
-    final newProgress = Map<String, DownloadProgress>.from(state.progress)
-      ..remove(itemId);
-    _paused.remove(itemId);
-    _retryAttempts.remove(itemId);
-    state = state.copyWith(
-      progress: newProgress,
-      queueLength: _queue.length,
-      pausedIds: _paused.keys.toSet(),
-    );
-    await _cleanupPartial(itemId);
+    await _forgetCancelledDownload(itemId, updateQueueLength: true);
+    if (cancelledEntry != null) {
+      await _showDownloadCanceledNotification(cancelledEntry);
+    }
     await _persistQueue();
   }
 
@@ -295,6 +297,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     final newItems = Map<String, DownloadedItem>.from(state.items)
       ..remove(itemId);
     _retryAttempts.remove(itemId);
+    _runningNotificationShown.remove(itemId);
     _userCancelled.remove(itemId);
     state = state.copyWith(items: newItems);
     await _persist();
@@ -313,6 +316,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     _queue.clear();
     _paused.clear();
     _retryAttempts.clear();
+    _runningNotificationShown.clear();
     if (_activeItemId != null) {
       _userCancelled
         ..clear()
@@ -416,9 +420,13 @@ class DownloadManager extends Notifier<DownloadsState> {
       await _guardFreeSpace(minBytes: 200 * 1024 * 1024);
       await _watchNetworkPolicy();
 
+      final existingRecord = await FileDownloader().database.recordForId(
+        task.taskId,
+      );
       final activeTask = await FileDownloader().taskForId(task.taskId);
       final TaskStatusUpdate result;
-      if (activeTask is DownloadTask) {
+      if (activeTask is DownloadTask &&
+          _shouldReattachToTask(existingRecord?.status)) {
         _activeDownloadTask = activeTask;
         await _configureNotificationsForTask(activeTask);
         result = await _waitForExistingNativeTask(
@@ -427,12 +435,19 @@ class DownloadManager extends Notifier<DownloadsState> {
           finalPath: finalPath,
         );
       } else {
+        if (activeTask != null ||
+            (existingRecord != null &&
+                !_isReattachableStatus(existingRecord.status))) {
+          await _forgetNativeDownloadState(entry.itemId);
+        }
         result = await FileDownloader().download(
           task,
           onStatus: (status) => _handleNativeDownloadStatus(entry, status),
           onProgress: (progress) {
             _handleNativeDownloadProgress(entry, progress);
           },
+          onElapsedTime: (_) => _markDownloadRunning(entry),
+          elapsedTimeInterval: const Duration(seconds: 1),
         );
       }
 
@@ -441,9 +456,11 @@ class DownloadManager extends Notifier<DownloadsState> {
           break;
         case TaskStatus.paused:
           _paused.putIfAbsent(entry.itemId, () => entry);
+          await _showDownloadPausedNotification(entry);
           return const _DownloadOutcome.paused();
         case TaskStatus.canceled:
-          _userCancelled.remove(entry.itemId);
+          await _forgetCancelledDownload(entry.itemId);
+          await _showDownloadCanceledNotification(entry);
           return const _DownloadOutcome.cancelled();
         case TaskStatus.notFound:
           const message = 'Server returned HTTP 404.';
@@ -455,6 +472,7 @@ class DownloadManager extends Notifier<DownloadsState> {
               entry.itemId: entry.toFailure(message),
             },
           );
+          _runningNotificationShown.remove(entry.itemId);
           await _showDownloadFailedNotification(entry, message);
           return const _DownloadOutcome.failed();
         case TaskStatus.failed:
@@ -493,10 +511,12 @@ class DownloadManager extends Notifier<DownloadsState> {
       }
       if (paused) {
         state = state.copyWith(progress: newProgress);
+        await _showDownloadPausedNotification(entry);
         return const _DownloadOutcome.paused();
       }
       if (cancelledByUser) {
-        state = state.copyWith(progress: newProgress);
+        await _forgetCancelledDownload(entry.itemId);
+        await _showDownloadCanceledNotification(entry);
         return const _DownloadOutcome.cancelled();
       }
 
@@ -521,6 +541,7 @@ class DownloadManager extends Notifier<DownloadsState> {
           entry.itemId: entry.toFailure(_downloadFailureMessage(e)),
         },
       );
+      _runningNotificationShown.remove(entry.itemId);
       await _showDownloadFailedNotification(entry, _downloadFailureMessage(e));
       return const _DownloadOutcome.failed();
     } finally {
@@ -532,6 +553,22 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   String _nativeTaskId(String itemId) => '$_nativeTaskPrefix$itemId';
+
+  bool _isReattachableStatus(TaskStatus status) {
+    return switch (status) {
+      TaskStatus.enqueued ||
+      TaskStatus.running ||
+      TaskStatus.waitingToRetry => true,
+      TaskStatus.complete ||
+      TaskStatus.paused ||
+      TaskStatus.canceled ||
+      TaskStatus.failed ||
+      TaskStatus.notFound => false,
+    };
+  }
+
+  bool _shouldReattachToTask(TaskStatus? status) =>
+      status != null && _isReattachableStatus(status);
 
   Future<TaskStatusUpdate> _waitForExistingNativeTask({
     required _QueueEntry entry,
@@ -579,8 +616,26 @@ class DownloadManager extends Notifier<DownloadsState> {
     if (!state.progress.containsKey(entry.itemId)) return;
     if (status == TaskStatus.enqueued || status == TaskStatus.waitingToRetry) {
       state = state.copyWith(
-        progress: {...state.progress, entry.itemId: entry.toProgress(-1)},
+        progress: {...state.progress, entry.itemId: entry.toProgress(0)},
       );
+    } else if (status == TaskStatus.running) {
+      _markDownloadRunning(entry);
+    }
+  }
+
+  void _markDownloadRunning(_QueueEntry entry) {
+    final existing = state.progress[entry.itemId];
+    if (existing == null) return;
+    if (existing.fraction <= 0) {
+      state = state.copyWith(
+        progress: {
+          ...state.progress,
+          entry.itemId: existing.copyWithFraction(-1),
+        },
+      );
+    }
+    if (_runningNotificationShown.add(entry.itemId)) {
+      unawaited(_showDownloadRunningNotification(entry));
     }
   }
 
@@ -625,9 +680,8 @@ class DownloadManager extends Notifier<DownloadsState> {
     await _persist();
     _retryAttempts.remove(entry.itemId);
     _userCancelled.remove(entry.itemId);
-    await FileDownloader().database.deleteRecordWithId(
-      _nativeTaskId(entry.itemId),
-    );
+    _runningNotificationShown.remove(entry.itemId);
+    await _deleteNativeTaskRecord(entry.itemId);
     await _showDownloadCompleteNotification(entry);
 
     _maybeAutoDownloadNext(entry);
@@ -657,8 +711,9 @@ class DownloadManager extends Notifier<DownloadsState> {
     }
 
     AppNotifications.configureDownloadTaskNotifications(task);
-    final allowed = await AppNotifications.requestPermissions();
-    if (!allowed) return;
+    unawaited(
+      AppNotifications.requestDownloadPermissions().catchError((_) => false),
+    );
   }
 
   Future<void> _showDownloadCompleteNotification(_QueueEntry entry) async {
@@ -666,6 +721,36 @@ class DownloadManager extends Notifier<DownloadsState> {
       return;
     }
     await AppNotifications.showDownloadComplete(
+      itemId: entry.itemId,
+      title: entry.displayLabel,
+    );
+  }
+
+  Future<void> _showDownloadRunningNotification(_QueueEntry entry) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+    await AppNotifications.showDownloadRunning(
+      itemId: entry.itemId,
+      title: entry.displayLabel,
+    );
+  }
+
+  Future<void> _showDownloadPausedNotification(_QueueEntry entry) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+    await AppNotifications.showDownloadPaused(
+      itemId: entry.itemId,
+      title: entry.displayLabel,
+    );
+  }
+
+  Future<void> _showDownloadCanceledNotification(_QueueEntry entry) async {
+    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+      return;
+    }
+    await AppNotifications.showDownloadCanceled(
       itemId: entry.itemId,
       title: entry.displayLabel,
     );
@@ -722,10 +807,46 @@ class DownloadManager extends Notifier<DownloadsState> {
     return f.length();
   }
 
+  Future<void> _forgetCancelledDownload(
+    String itemId, {
+    bool updateQueueLength = false,
+  }) async {
+    final newProgress = Map<String, DownloadProgress>.from(state.progress)
+      ..remove(itemId);
+    _paused.remove(itemId);
+    _retryAttempts.remove(itemId);
+    _userCancelled.remove(itemId);
+    _runningNotificationShown.remove(itemId);
+    state = state.copyWith(
+      progress: newProgress,
+      queueLength: updateQueueLength ? _queue.length : state.queueLength,
+      pausedIds: _paused.keys.toSet(),
+    );
+    await _cleanupPartial(itemId);
+    await _forgetNativeDownloadState(itemId);
+  }
+
   Future<void> _cleanupPartial(String itemId) async {
     final dir = await _downloadsDir();
     final f = File('${dir.path}/$itemId.partial');
     if (f.existsSync()) await f.delete();
+    if (state.items.containsKey(itemId)) return;
+    final video = File('${dir.path}/$itemId.video');
+    if (video.existsSync()) await video.delete();
+  }
+
+  Future<void> _deleteNativeTaskRecord(String itemId) async {
+    try {
+      await FileDownloader().database.deleteRecordWithId(_nativeTaskId(itemId));
+    } catch (_) {}
+  }
+
+  Future<void> _forgetNativeDownloadState(String itemId) async {
+    final taskId = _nativeTaskId(itemId);
+    try {
+      await FileDownloader().cancelTaskWithId(taskId);
+    } catch (_) {}
+    await _deleteNativeTaskRecord(itemId);
   }
 
   Future<void> _deleteDownloadedAssets(DownloadedItem item) async {

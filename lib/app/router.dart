@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,20 @@ void openDownloadNotificationRoute(String? focusItemId) {
     path: '/downloads',
     queryParameters: focus == null || focus.isEmpty ? null : {'focus': focus},
   ).toString();
+  _openNotificationLocation(location);
+}
+
+void openNotificationRoute(String? payload) {
+  final location = _notificationLocation(payload);
+  if (location == null) return;
+  _openNotificationLocation(location);
+}
+
+String? notificationLocationForPayload(String? payload) {
+  return _notificationLocation(payload);
+}
+
+void _openNotificationLocation(String location) {
   final context = rootNavigatorKey.currentContext;
   if (context == null) {
     _pendingNotificationLocation = location;
@@ -45,6 +60,65 @@ void flushPendingNotificationRoute() {
   if (location == null || context == null) return;
   _pendingNotificationLocation = null;
   unawaited(context.push(location));
+}
+
+String? _notificationLocation(String? payload) {
+  final raw = payload?.trim();
+  if (raw == null || raw.isEmpty) return null;
+
+  if (!raw.startsWith('{')) {
+    if (raw.startsWith('download:')) {
+      return _downloadLocation(raw.substring('download:'.length));
+    }
+    if (raw.startsWith('movie:')) {
+      return _itemLocation('/movie', raw.substring('movie:'.length));
+    }
+    if (raw.startsWith('series:')) {
+      return _itemLocation('/series', raw.substring('series:'.length));
+    }
+    if (raw.startsWith('episode:')) {
+      return _itemLocation('/play', raw.substring('episode:'.length));
+    }
+    return _downloadLocation(raw);
+  }
+
+  try {
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    final type = decoded['type'] as String?;
+    final itemId = decoded['itemId'] as String?;
+    final seriesId = decoded['seriesId'] as String?;
+    switch (type) {
+      case 'download':
+        return _downloadLocation(itemId);
+      case 'movie':
+        return _itemLocation('/movie', itemId);
+      case 'series':
+        return _itemLocation('/series', seriesId ?? itemId);
+      case 'episode':
+        if (seriesId != null && seriesId.trim().isNotEmpty) {
+          return _itemLocation('/series', seriesId);
+        }
+        return _itemLocation('/play', itemId);
+      default:
+        return null;
+    }
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _downloadLocation(String? itemId) {
+  final focus = itemId?.trim();
+  return Uri(
+    path: '/downloads',
+    queryParameters: focus == null || focus.isEmpty ? null : {'focus': focus},
+  ).toString();
+}
+
+String? _itemLocation(String prefix, String? itemId) {
+  final id = itemId?.trim();
+  if (id == null || id.isEmpty) return null;
+  return '$prefix/$id';
 }
 
 class _AuthListenable extends ChangeNotifier {

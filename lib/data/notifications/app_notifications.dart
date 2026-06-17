@@ -1,103 +1,136 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'package:altcast/app/router.dart';
+import 'package:altcast/data/downloads/download_runtime.dart';
 
 class AppNotifications {
   AppNotifications._();
 
-  static const _macChannel = MethodChannel('altcast/notifications');
+  static final _localNotifications = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
 
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
-    final downloader = FileDownloader();
-    await downloader.ready;
-    await downloader.configure(
-      androidConfig: [
-        (Config.runInForeground, true),
-        (Config.checkAvailableSpace, 200),
-      ],
-      iOSConfig: [
-        (Config.resourceTimeout, const Duration(hours: 4)),
-        (Config.excludeFromCloudBackup, true),
-      ],
+    await _localNotifications.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('ic_stat_altcast'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestSoundPermission: false,
+          requestBadgePermission: false,
+        ),
+        macOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestSoundPermission: false,
+          requestBadgePermission: false,
+        ),
+      ),
+      onDidReceiveNotificationResponse: _handleLocalNotificationTap,
     );
-    downloader.registerCallbacks(
-      taskNotificationTapCallback: _handleDownloadNotificationTap,
-    );
-    await downloader.start(autoCleanDatabase: true);
-
-    if (Platform.isMacOS) {
-      _macChannel.setMethodCallHandler(_handleMacNotificationCall);
-    }
+    unawaited(_openInitialPayload());
   }
 
   static Future<bool> requestPermissions() async {
-    if (Platform.isMacOS) {
-      try {
-        return await _macChannel.invokeMethod<bool>('requestPermission') ??
-            false;
-      } on PlatformException {
-        return false;
-      } on MissingPluginException {
-        return false;
-      }
+    if (Platform.isAndroid) {
+      return await _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >()
+              ?.requestNotificationsPermission() ??
+          true;
     }
 
-    if (Platform.isAndroid || Platform.isIOS) {
-      final permissions = FileDownloader().permissions;
-      final status = await permissions.status(PermissionType.notifications);
-      if (status == PermissionStatus.granted) return true;
-      return await permissions.request(PermissionType.notifications) ==
-          PermissionStatus.granted;
+    if (Platform.isIOS) {
+      return await _localNotifications
+              .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin
+              >()
+              ?.requestPermissions(alert: true, sound: true) ??
+          false;
+    }
+
+    if (Platform.isMacOS) {
+      return await _localNotifications
+              .resolvePlatformSpecificImplementation<
+                MacOSFlutterLocalNotificationsPlugin
+              >()
+              ?.requestPermissions(alert: true, sound: true) ??
+          false;
     }
 
     return true;
   }
 
+  static Future<bool> requestDownloadPermissions() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      final downloaderAllowed =
+          await DownloadRuntime.requestNotificationPermissions();
+      if (!Platform.isIOS) return downloaderAllowed;
+      final localAllowed = await requestPermissions();
+      return localAllowed;
+    }
+
+    return requestPermissions();
+  }
+
   static void configureDownloadTaskNotifications(DownloadTask task) {
     if (!Platform.isAndroid && !Platform.isIOS) return;
 
-    FileDownloader().configureNotificationForTask(
-      task,
-      running: const TaskNotification(
-        'Downloading {displayName}',
-        '{progress} complete',
-      ),
-      complete: const TaskNotification(
-        '{displayName} is ready offline',
-        'Download finished',
-      ),
-      error: const TaskNotification(
-        "Couldn't download {displayName}",
-        'Open AltCast to retry',
-      ),
-      paused: const TaskNotification(
-        '{displayName} download paused',
-        'Open AltCast to resume',
-      ),
-      canceled: const TaskNotification(
-        '{displayName} download canceled',
-        'Download stopped',
-      ),
-      progressBar: true,
-    );
+    DownloadRuntime.configureTaskNotifications(task);
   }
 
   static Future<void> showDownloadComplete({
     required String itemId,
     required String title,
   }) {
-    return _showMacDownloadNotification(
+    return _showDownloadFallbackNotification(
       itemId: itemId,
       title: '$title is ready offline',
       body: 'Download finished',
+      payload: _payload(type: 'download', itemId: itemId),
+    );
+  }
+
+  static Future<void> showDownloadRunning({
+    required String itemId,
+    required String title,
+  }) {
+    return _showDownloadFallbackNotification(
+      itemId: itemId,
+      title: 'Downloading $title',
+      body: 'Download started',
+      payload: _payload(type: 'download', itemId: itemId),
+    );
+  }
+
+  static Future<void> showDownloadPaused({
+    required String itemId,
+    required String title,
+  }) {
+    return _showDownloadFallbackNotification(
+      itemId: itemId,
+      title: '$title download paused',
+      body: 'Open AltCast to resume',
+      payload: _payload(type: 'download', itemId: itemId),
+    );
+  }
+
+  static Future<void> showDownloadCanceled({
+    required String itemId,
+    required String title,
+  }) {
+    return _showDownloadFallbackNotification(
+      itemId: itemId,
+      title: '$title download canceled',
+      body: 'Download stopped',
+      payload: _payload(type: 'download', itemId: itemId),
     );
   }
 
@@ -106,27 +139,104 @@ class AppNotifications {
     required String title,
     required String message,
   }) {
-    return _showMacDownloadNotification(
+    return _showDownloadFallbackNotification(
       itemId: itemId,
       title: "Couldn't download $title",
       body: message,
+      payload: _payload(type: 'download', itemId: itemId),
     );
   }
 
-  static Future<void> _showMacDownloadNotification({
+  static Future<void> showNewMovie({
+    required String itemId,
+    required String title,
+  }) {
+    return _showLocalNotification(
+      id: _notificationId('movie:$itemId'),
+      title: 'New movie added',
+      body: title,
+      payload: _payload(type: 'movie', itemId: itemId),
+    );
+  }
+
+  static Future<void> showNewEpisode({
+    required String itemId,
+    required String title,
+    required String? seriesId,
+    required String? seriesName,
+    int? seasonNumber,
+    int? episodeNumber,
+    bool watchedSeries = false,
+  }) {
+    final episodeNumberLabel = _episodeNumberLabel(
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+    );
+    final bodyParts = [?episodeNumberLabel, title];
+    return _showLocalNotification(
+      id: _notificationId('episode:$itemId'),
+      title: watchedSeries && seriesName != null
+          ? 'New episode of $seriesName'
+          : 'New episode added',
+      body: bodyParts.join(' - '),
+      payload: _payload(
+        type: 'episode',
+        itemId: itemId,
+        seriesId: seriesId,
+        seasonNumber: seasonNumber,
+        episodeNumber: episodeNumber,
+      ),
+    );
+  }
+
+  static Future<void> _showDownloadFallbackNotification({
     required String itemId,
     required String title,
     required String body,
+    required String payload,
   }) async {
-    if (!Platform.isMacOS) return;
+    if (!Platform.isIOS && !Platform.isMacOS) return;
+    await _showLocalNotification(
+      id: _notificationId(itemId),
+      title: title,
+      body: body,
+      payload: payload,
+    );
+  }
+
+  static Future<void> _showLocalNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  }) async {
+    if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) return;
     final allowed = await requestPermissions();
     if (!allowed) return;
-    await _macChannel.invokeMethod<void>('showNotification', {
-      'id': _notificationId(itemId),
-      'title': title,
-      'body': body,
-      'payload': itemId,
-    });
+    await _localNotifications.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'altcast_notifications',
+          'AltCast notifications',
+          channelDescription: 'Library and download alerts',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          styleInformation: BigTextStyleInformation(body),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+        macOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      ),
+      payload: payload,
+    );
   }
 
   static int _notificationId(String value) {
@@ -137,24 +247,38 @@ class AppNotifications {
     return hash;
   }
 
-  static Future<void> _handleMacNotificationCall(MethodCall call) async {
-    if (call.method != 'notificationTapped') return;
-    final payload = call.arguments as String?;
-    openDownloadNotificationRoute(payload);
+  static void _handleLocalNotificationTap(NotificationResponse response) {
+    openNotificationRoute(response.payload);
   }
 
-  static void _handleDownloadNotificationTap(Task task, NotificationType _) {
-    openDownloadNotificationRoute(_downloadItemIdFromTask(task));
+  static Future<void> _openInitialPayload() async {
+    final details = await _localNotifications.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return;
+    openNotificationRoute(details?.notificationResponse?.payload);
   }
 
-  static String? _downloadItemIdFromTask(Task task) {
-    final metadata = task.metaData.trim();
-    if (metadata.isNotEmpty) return metadata;
-    final filename = task.filename;
-    const suffix = '.video';
-    if (filename.endsWith(suffix)) {
-      return filename.substring(0, filename.length - suffix.length);
+  static String _payload({
+    required String type,
+    required String itemId,
+    String? seriesId,
+    int? seasonNumber,
+    int? episodeNumber,
+  }) {
+    final cleanSeriesId = seriesId?.trim();
+    final payload = <String, Object>{'type': type, 'itemId': itemId};
+    if (cleanSeriesId != null && cleanSeriesId.isNotEmpty) {
+      payload['seriesId'] = cleanSeriesId;
     }
-    return null;
+    if (seasonNumber != null) payload['seasonNumber'] = seasonNumber;
+    if (episodeNumber != null) payload['episodeNumber'] = episodeNumber;
+    return jsonEncode(payload);
+  }
+
+  static String? _episodeNumberLabel({
+    required int? seasonNumber,
+    required int? episodeNumber,
+  }) {
+    if (seasonNumber == null || episodeNumber == null) return null;
+    return 'S$seasonNumber E${episodeNumber.toString().padLeft(2, '0')}';
   }
 }

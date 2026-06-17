@@ -31,6 +31,7 @@ dependencies:
   screen_brightness: ^2.1.10
   web_socket_channel: ^3.0.3
   picons: ^3.0.1
+  flutter_local_notifications: ^22.0.1
 
 
 dev_dependencies:

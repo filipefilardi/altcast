@@ -964,7 +964,7 @@ class _InProgressRow extends ConsumerWidget {
         : (p.downloadedBytes != null ? formatBytes(p.downloadedBytes!) : null);
     final pct = p.fraction > 0
         ? '${(p.fraction * 100).toStringAsFixed(0)}%'
-        : 'Queued';
+        : (p.fraction < 0 ? 'Downloading' : 'Queued');
     final line = bytes != null ? '$pct • $bytes' : pct;
     if (p.episodeLabel != null) return '${p.episodeLabel} • $line';
     return line;
