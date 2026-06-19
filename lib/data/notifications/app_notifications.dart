@@ -80,10 +80,12 @@ class AppNotifications {
     return requestPermissions();
   }
 
-  static void configureDownloadTaskNotifications(DownloadTask task) {
+  static Future<void> configureDownloadTaskNotifications(
+    DownloadTask task,
+  ) async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
 
-    DownloadRuntime.configureTaskNotifications(task);
+    await DownloadRuntime.configureTaskNotifications(task);
   }
 
   static Future<void> showDownloadComplete({

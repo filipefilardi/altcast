@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:altcast/data/downloads/download_runtime.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
 import 'package:altcast/data/jellyfin/models/intro_skipper_timestamps.dart';
@@ -89,6 +90,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _bootstrap() async {
+    await DownloadRuntime.initialize();
     final dir = await _downloadsDir();
     await _restoreManifest(dir);
     await _restoreQueue(dir);
@@ -710,7 +712,7 @@ class DownloadManager extends Notifier<DownloadsState> {
       return;
     }
 
-    AppNotifications.configureDownloadTaskNotifications(task);
+    await AppNotifications.configureDownloadTaskNotifications(task);
     unawaited(
       AppNotifications.requestDownloadPermissions().catchError((_) => false),
     );
