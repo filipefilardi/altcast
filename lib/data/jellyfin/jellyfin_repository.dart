@@ -441,8 +441,17 @@ class JellyfinRepository {
     );
   }
 
-  Future<Set<String>> favoriteSeriesIds({int limit = 200}) async {
+  Future<Set<String>> favoriteSeriesIds({
+    Iterable<String?>? seriesIds,
+    int limit = 200,
+  }) async {
     final s = _session;
+    final requestedIds = seriesIds
+        ?.whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (requestedIds != null && requestedIds.isEmpty) return const {};
+
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items',
       queryParameters: {
@@ -450,11 +459,21 @@ class JellyfinRepository {
         'Recursive': true,
         'Limit': limit,
         'EnableImages': false,
-        'Filters': 'IsFavorite',
+        if (requestedIds == null) 'Filters': 'IsFavorite',
+        if (requestedIds != null) ...{
+          'Ids': requestedIds.join(','),
+          'Fields': 'UserData',
+        },
       },
     );
     return ((res.data?['Items'] as List?) ?? const [])
         .whereType<Map<String, dynamic>>()
+        .where(
+          (item) =>
+              requestedIds == null ||
+              (item['UserData'] as Map<String, dynamic>?)?['IsFavorite'] ==
+                  true,
+        )
         .map((item) => item['Id'] as String?)
         .whereType<String>()
         .where((id) => id.isNotEmpty)

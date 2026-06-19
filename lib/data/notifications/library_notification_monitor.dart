@@ -74,7 +74,11 @@ class LibraryNotificationMonitor extends Notifier<void> {
       final moviesFuture = repo.recentlyAddedMovies(limit: _latestLimit);
       final episodesFuture = repo.recentlyAddedEpisodes(limit: _latestLimit);
       final favoriteSeriesIdsFuture = prefs.newEpisodesForFavoriteSeries
-          ? repo.favoriteSeriesIds()
+          ? episodesFuture.then(
+              (episodes) => repo.favoriteSeriesIds(
+                seriesIds: episodes.map((episode) => episode.seriesId),
+              ),
+            )
           : Future<Set<String>>.value(const <String>{});
 
       final movies = await moviesFuture;
@@ -90,6 +94,12 @@ class LibraryNotificationMonitor extends Notifier<void> {
           'Library notification latest episodes: '
           '${_debugItems(episodes, profile.seenEpisodeIds)}',
         );
+        if (prefs.newEpisodesForFavoriteSeries) {
+          debugPrint(
+            'Library notification favorite series IDs: '
+            '${favoriteSeriesIds.isEmpty ? 'none' : favoriteSeriesIds.join(', ')}',
+          );
+        }
       }
 
       if (profile.initialized &&

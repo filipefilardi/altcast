@@ -78,6 +78,48 @@ void main() {
 
     expect(ids, {'series-1', 'series-2'});
   });
+
+  test(
+    'favoriteSeriesIds checks favorite state for candidate series',
+    () async {
+      final adapter = _RecordingAdapter((options) async {
+        expect(options.path, '/Users/user-1/Items');
+        expect(options.queryParameters['IncludeItemTypes'], 'Series');
+        expect(options.queryParameters['Ids'], 'series-1,series-2');
+        expect(options.queryParameters['Fields'], 'UserData');
+        expect(options.queryParameters, isNot(contains('Filters')));
+        return _jsonResponse({
+          'Items': [
+            {
+              'Id': 'series-1',
+              'UserData': {'IsFavorite': true},
+            },
+            {
+              'Id': 'series-2',
+              'UserData': {'IsFavorite': false},
+            },
+          ],
+          'TotalRecordCount': 2,
+        });
+      });
+      final api = JellyfinApi(dio: Dio()..httpClientAdapter = adapter);
+      api.bind(
+        const JellyfinSession(
+          serverUrl: 'https://media.example.org',
+          accessToken: 'token',
+          userId: 'user-1',
+          serverId: 'server-1',
+          username: 'User',
+        ),
+      );
+
+      final ids = await JellyfinRepository(
+        api,
+      ).favoriteSeriesIds(seriesIds: const ['series-1', 'series-2']);
+
+      expect(ids, {'series-1'});
+    },
+  );
 }
 
 ResponseBody _jsonResponse(Object body) {
