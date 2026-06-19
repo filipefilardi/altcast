@@ -5,12 +5,22 @@ import 'package:altcast/app/router.dart';
 class DownloadRuntime {
   DownloadRuntime._();
 
-  static bool _initialized = false;
+  static Future<void>? _initialization;
 
-  static Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+  static Future<void> initialize() {
+    return _initialization ??= _initializeWithReset();
+  }
 
+  static Future<void> _initializeWithReset() async {
+    try {
+      await _initialize();
+    } catch (error, stackTrace) {
+      _initialization = null;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  static Future<void> _initialize() async {
     final downloader = FileDownloader();
     await downloader.ready;
     await downloader.configure(
@@ -30,6 +40,7 @@ class DownloadRuntime {
   }
 
   static Future<bool> requestNotificationPermissions() async {
+    await initialize();
     final permissions = FileDownloader().permissions;
     final status = await permissions.status(PermissionType.notifications);
     if (status == PermissionStatus.granted) return true;
@@ -37,7 +48,8 @@ class DownloadRuntime {
         PermissionStatus.granted;
   }
 
-  static void configureTaskNotifications(DownloadTask task) {
+  static Future<void> configureTaskNotifications(DownloadTask task) async {
+    await initialize();
     FileDownloader().configureNotificationForTask(
       task,
       running: const TaskNotification(
