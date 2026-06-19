@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +18,7 @@ import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
 import 'package:altcast/data/notifications/app_notifications.dart';
+import 'package:altcast/data/notifications/library_notification_scheduler.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/player/subtitle_style.dart';
 
@@ -296,21 +299,134 @@ class _NotificationGroup extends ConsumerWidget {
       children: [
         SwitchListTile(
           secondary: Icon(
-            prefs.downloadNotifications
+            prefs.notificationsEnabled
                 ? PiconsRegular.bellSimpleRinging
                 : PiconsRegular.bellSimpleSlash,
           ),
+          title: const Text('Notifications'),
+          subtitle: const Text(
+            'Allow AltCast to send notifications.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.notificationsEnabled,
+          onChanged: (enabled) =>
+              _setNotificationsEnabled(context, ref, enabled),
+          activeThumbColor: AppColors.primary,
+        ),
+        SwitchListTile(
+          secondary: const Icon(PiconsRegular.downloadSimple),
           title: const Text('Download notifications'),
           subtitle: const Text(
             'Alert when downloads finish or need attention.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           value: prefs.downloadNotifications,
-          onChanged: (enabled) =>
-              _setDownloadNotifications(context, ref, enabled),
+          onChanged: prefs.notificationsEnabled
+              ? (enabled) => _setDownloadNotifications(context, ref, enabled)
+              : null,
           activeThumbColor: AppColors.primary,
         ),
+        if (LibraryNotificationScheduler.isSupported) ...[
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.heart),
+            title: const Text('New episodes from favorite series'),
+            subtitle: const Text(
+              'Alert when a favorited show gets a new episode.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newEpisodesForFavoriteSeries,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) =>
+                        notifier.setNewEpisodesForFavoriteSeries(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.filmSlate),
+            title: const Text('New movies added'),
+            subtitle: const Text(
+              'Alert when a movie appears in your Jellyfin library.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newLibraryMovies,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) => notifier.setNewLibraryMovies(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.televisionSimple),
+            title: const Text('New episodes added'),
+            subtitle: const Text(
+              'Alert for any new episode added to Jellyfin.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newLibraryEpisodes,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) => notifier.setNewLibraryEpisodes(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          ListTile(
+            leading: const Icon(PiconsRegular.clock),
+            title: const Text('Library check interval'),
+            subtitle: Text(
+              prefs.libraryCheckInterval.label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(
+              PiconsRegular.caretRight,
+              color: AppColors.textSecondary,
+            ),
+            enabled: prefs.notificationsEnabled,
+            onTap: prefs.notificationsEnabled
+                ? () => _showLibraryCheckIntervalSheet(context, ref)
+                : null,
+          ),
+        ],
       ],
+    );
+  }
+
+  Future<void> _setNotificationsEnabled(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    final notifier = ref.read(notificationPreferencesProvider.notifier);
+    if (!enabled) {
+      await notifier.setNotificationsEnabled(false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    final allowed = await AppNotifications.requestDownloadPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      return;
+    }
+
+    await notifier.setNotificationsEnabled(true);
+    await LibraryNotificationScheduler.configure(
+      ref.read(notificationPreferencesProvider),
     );
   }
 
@@ -326,7 +442,7 @@ class _NotificationGroup extends ConsumerWidget {
       return;
     }
 
-    final allowed = await AppNotifications.requestPermissions();
+    final allowed = await AppNotifications.requestDownloadPermissions();
     if (!context.mounted) return;
     if (!allowed) {
       showAppSnackBar(context, "Notifications weren't enabled.");
@@ -339,6 +455,93 @@ class _NotificationGroup extends ConsumerWidget {
     await ref
         .read(notificationPreferencesProvider.notifier)
         .setDownloadNotifications(true);
+  }
+
+  Future<void> _setLibraryNotification(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+    Future<void> Function(NotificationPreferencesNotifier notifier, bool value)
+    persist,
+  ) async {
+    final notifier = ref.read(notificationPreferencesProvider.notifier);
+    if (!enabled) {
+      await persist(notifier, false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    final allowed = await AppNotifications.requestPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      await persist(notifier, false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    await persist(notifier, true);
+    await LibraryNotificationScheduler.configure(
+      ref.read(notificationPreferencesProvider),
+    );
+  }
+
+  Future<void> _showLibraryCheckIntervalSheet(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surfaceElevated,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: LibraryCheckInterval.selectable(includeDebug: kDebugMode)
+              .map((interval) {
+                final selected =
+                    ref
+                        .watch(notificationPreferencesProvider)
+                        .libraryCheckInterval ==
+                    interval;
+                return ListTile(
+                  leading: const Icon(PiconsRegular.clock),
+                  title: Text(interval.label),
+                  trailing: selected
+                      ? const Icon(
+                          PiconsRegular.check,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                  onTap: () async {
+                    final allowed = await AppNotifications.requestPermissions();
+                    if (!context.mounted) return;
+                    if (!allowed) {
+                      showAppSnackBar(
+                        context,
+                        "Notifications weren't enabled.",
+                      );
+                      return;
+                    }
+
+                    await ref
+                        .read(notificationPreferencesProvider.notifier)
+                        .setLibraryCheckInterval(interval);
+                    await LibraryNotificationScheduler.configure(
+                      ref.read(notificationPreferencesProvider),
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                );
+              })
+              .toList(),
+        ),
+      ),
+    );
   }
 }
 

@@ -14,7 +14,7 @@ class AppNotifications {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
 
-  static Future<void> initialize() async {
+  static Future<void> initialize({bool handleLaunchPayload = true}) async {
     if (_initialized) return;
     _initialized = true;
 
@@ -34,7 +34,7 @@ class AppNotifications {
       ),
       onDidReceiveNotificationResponse: _handleLocalNotificationTap,
     );
-    unawaited(_openInitialPayload());
+    if (handleLaunchPayload) unawaited(_openInitialPayload());
   }
 
   static Future<bool> requestPermissions() async {
@@ -166,7 +166,6 @@ class AppNotifications {
     required String? seriesName,
     int? seasonNumber,
     int? episodeNumber,
-    bool watchedSeries = false,
   }) {
     final episodeNumberLabel = _episodeNumberLabel(
       seasonNumber: seasonNumber,
@@ -175,9 +174,9 @@ class AppNotifications {
     final bodyParts = [?episodeNumberLabel, title];
     return _showLocalNotification(
       id: _notificationId('episode:$itemId'),
-      title: watchedSeries && seriesName != null
-          ? 'New episode of $seriesName'
-          : 'New episode added',
+      title: seriesName == null || seriesName.trim().isEmpty
+          ? 'New episode added'
+          : 'New episode of $seriesName',
       body: bodyParts.join(' - '),
       payload: _payload(
         type: 'episode',
@@ -211,8 +210,6 @@ class AppNotifications {
     required String payload,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) return;
-    final allowed = await requestPermissions();
-    if (!allowed) return;
     await _localNotifications.show(
       id: id,
       title: title,

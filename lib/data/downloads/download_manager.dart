@@ -706,7 +706,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _configureNotificationsForTask(DownloadTask task) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
 
@@ -717,7 +717,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _showDownloadCompleteNotification(_QueueEntry entry) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
     await AppNotifications.showDownloadComplete(
@@ -727,7 +727,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _showDownloadRunningNotification(_QueueEntry entry) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
     await AppNotifications.showDownloadRunning(
@@ -737,7 +737,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _showDownloadPausedNotification(_QueueEntry entry) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
     await AppNotifications.showDownloadPaused(
@@ -747,7 +747,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   }
 
   Future<void> _showDownloadCanceledNotification(_QueueEntry entry) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
     await AppNotifications.showDownloadCanceled(
@@ -760,7 +760,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     _QueueEntry entry,
     String message,
   ) async {
-    if (!ref.read(notificationPreferencesProvider).downloadNotifications) {
+    if (!ref.read(notificationPreferencesProvider).shouldNotifyDownloads) {
       return;
     }
     await AppNotifications.showDownloadFailed(

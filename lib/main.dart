@@ -9,6 +9,7 @@ import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/jellyfin/client_metadata.dart';
 import 'package:altcast/data/jellyfin/jellyfin_api.dart';
 import 'package:altcast/data/notifications/app_notifications.dart';
+import 'package:altcast/data/notifications/library_notification_scheduler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,7 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   await DownloadRuntime.initialize();
   await AppNotifications.initialize();
+  await LibraryNotificationScheduler.initialize();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
