@@ -73,6 +73,35 @@ void main() {
     });
   });
 
+  group('JellyfinApi.publicServerInfo', () {
+    test(
+      'GETs public system info and returns normalized server details',
+      () async {
+        final adapter = _RecordingAdapter((options) async {
+          expect(
+            options.uri.toString(),
+            'https://media.example.org/System/Info/Public',
+          );
+          expect(options.method, 'GET');
+          final auth = options.headers['Authorization'] as String;
+          expect(auth, contains('Client="AltCast"'));
+          expect(auth, isNot(contains('Token=')));
+          return _jsonResponse({
+            'ServerName': 'Living Room',
+            'Version': '10.10.7',
+          });
+        });
+        final api = JellyfinApi(dio: Dio()..httpClientAdapter = adapter);
+
+        final info = await api.publicServerInfo('media.example.org/');
+
+        expect(info.serverUrl, 'https://media.example.org');
+        expect(info.serverName, 'Living Room');
+        expect(info.version, '10.10.7');
+      },
+    );
+  });
+
   group('JellyfinApi.authenticate', () {
     test(
       'POSTs username/password to /Users/AuthenticateByName, parses session, binds Authorization',

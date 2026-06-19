@@ -85,6 +85,23 @@ class JellyfinApi {
     return normalized;
   }
 
+  Future<JellyfinPublicServerInfo> publicServerInfo(String serverUrl) async {
+    final base = _normalizeBase(serverUrl);
+    final response = await _dio.get<Map<String, dynamic>>(
+      '$base/System/Info/Public',
+      options: Options(headers: {'Authorization': _authHeader()}),
+    );
+    final data = response.data;
+    if (data == null) {
+      throw const JellyfinAuthException('Empty response from server');
+    }
+    return JellyfinPublicServerInfo(
+      serverUrl: base,
+      serverName: data['ServerName'] as String?,
+      version: data['Version'] as String?,
+    );
+  }
+
   Future<JellyfinSession> authenticate({
     required String serverUrl,
     required String username,
@@ -135,6 +152,18 @@ class JellyfinApi {
       clear();
     }
   }
+}
+
+class JellyfinPublicServerInfo {
+  const JellyfinPublicServerInfo({
+    required this.serverUrl,
+    this.serverName,
+    this.version,
+  });
+
+  final String serverUrl;
+  final String? serverName;
+  final String? version;
 }
 
 class JellyfinAuthException implements Exception {

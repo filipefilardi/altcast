@@ -47,8 +47,21 @@ That's it. Your credentials stay in the device's secure storage, and the app onl
 - Built-in video player with subtitle tracks, audio track selection, and brightness/volume gestures
 - Playback progress reported back to Jellyfin so resume points stay in sync across clients
 - Offline downloads with per-item management and cache control
+- Notifications for download results and newly added media in your Jellyfin library
 - Remote control of other Jellyfin player sessions
 - SyncPlay for synchronized watching across devices
+
+## Notifications
+
+AltCast can keep you informed while the app is in the background:
+
+- Download alerts for completed, failed, paused, and canceled transfers
+- New movie and episode alerts when media is added to your Jellyfin library
+- New episode alerts for series marked as favorites in Jellyfin
+- Configurable library checks: every hour, every 12 hours, daily, every 2 days, every 3 days, or weekly
+- A master notification switch and individual controls for each notification type in Settings
+
+Library notifications are available on Android and iOS. Download notifications are available on Android, iOS, and macOS. Background check timing is managed by the operating system, so checks may not run at the exact selected interval.
 
 ## Get the most out of AltCast
 

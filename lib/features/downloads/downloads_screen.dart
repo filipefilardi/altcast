@@ -11,13 +11,40 @@ import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/downloads/downloaded_item.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 
-class DownloadsScreen extends ConsumerWidget {
-  const DownloadsScreen({super.key});
+class DownloadsScreen extends ConsumerStatefulWidget {
+  const DownloadsScreen({super.key, this.focusItemId});
+
+  final String? focusItemId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DownloadsScreen> createState() => _DownloadsScreenState();
+}
+
+class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
+  final _focusKey = GlobalKey();
+  String? _scrolledFocusItemId;
+  String? _highlightedFocusItemId;
+
+  @override
+  void initState() {
+    super.initState();
+    _highlightedFocusItemId = _normalizedFocusId;
+  }
+
+  @override
+  void didUpdateWidget(covariant DownloadsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusItemId != widget.focusItemId) {
+      _scrolledFocusItemId = null;
+      _highlightedFocusItemId = _normalizedFocusId;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(downloadManagerProvider);
     final grouped = _groupAvailableDownloads(state.items.values);
+    _scheduleFocusScroll(state, grouped);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Downloads'),
@@ -44,14 +71,22 @@ class DownloadsScreen extends ConsumerWidget {
                   const _SectionHeader(title: 'Downloading'),
                   const SizedBox(height: 8),
                   for (final entry in state.progress.values)
-                    _InProgressRow(progress: entry),
+                    _FocusTarget(
+                      focusKey: _focusKey,
+                      focused: _isFocused(entry.itemId),
+                      child: _InProgressRow(progress: entry),
+                    ),
                   const SizedBox(height: 24),
                 ],
                 if (state.failures.isNotEmpty) ...[
                   const _SectionHeader(title: 'Needs Attention'),
                   const SizedBox(height: 8),
                   for (final failure in state.failures.values)
-                    _FailedRow(failure: failure),
+                    _FocusTarget(
+                      focusKey: _focusKey,
+                      focused: _isFocused(failure.itemId),
+                      child: _FailedRow(failure: failure),
+                    ),
                   const SizedBox(height: 24),
                 ],
                 if (state.items.isNotEmpty) ...[
@@ -59,7 +94,11 @@ class DownloadsScreen extends ConsumerWidget {
                     const _SectionHeader(title: 'TV Shows'),
                     const SizedBox(height: 8),
                     for (final group in grouped.seriesGroups)
-                      _SeriesDownloadsCard(group: group),
+                      _FocusTarget(
+                        focusKey: _focusKey,
+                        focused: _isFocusedSeriesGroup(group),
+                        child: _SeriesDownloadsCard(group: group),
+                      ),
                   ],
                   if (grouped.movies.isNotEmpty) ...[
                     if (grouped.seriesGroups.isNotEmpty)
@@ -67,11 +106,106 @@ class DownloadsScreen extends ConsumerWidget {
                     const _SectionHeader(title: 'Movies'),
                     const SizedBox(height: 8),
                     for (final item in grouped.movies)
-                      _DownloadedRow(item: item),
+                      _FocusTarget(
+                        focusKey: _focusKey,
+                        focused: _isFocused(item.id),
+                        child: _DownloadedRow(item: item),
+                      ),
                   ],
                 ],
               ],
             ),
+    );
+  }
+
+  String? get _normalizedFocusId {
+    final id = widget.focusItemId?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
+  }
+
+  bool _isFocused(String itemId) {
+    final focusId = _normalizedFocusId;
+    return focusId != null &&
+        _highlightedFocusItemId == focusId &&
+        itemId == focusId;
+  }
+
+  bool _isFocusedSeriesGroup(_DownloadedSeriesGroup group) {
+    final focusId = _normalizedFocusId;
+    if (focusId == null || _highlightedFocusItemId != focusId) return false;
+    return group.episodes.any((episode) => episode.id == focusId);
+  }
+
+  void _scheduleFocusScroll(
+    DownloadsState state,
+    _GroupedAvailableDownloads grouped,
+  ) {
+    final focusId = _normalizedFocusId;
+    if (focusId == null || _scrolledFocusItemId == focusId) return;
+    if (!state.bootstrapped || !_hasFocusTarget(state, grouped, focusId)) {
+      return;
+    }
+    _scrolledFocusItemId = focusId;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final context = _focusKey.currentContext;
+      if (!mounted || context == null) return;
+      await Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.22,
+      );
+      if (!mounted || _highlightedFocusItemId != focusId) return;
+      Future<void>.delayed(const Duration(milliseconds: 2600), () {
+        if (mounted && _highlightedFocusItemId == focusId) {
+          setState(() => _highlightedFocusItemId = null);
+        }
+      });
+    });
+  }
+
+  bool _hasFocusTarget(
+    DownloadsState state,
+    _GroupedAvailableDownloads grouped,
+    String focusId,
+  ) {
+    return state.progress.containsKey(focusId) ||
+        state.failures.containsKey(focusId) ||
+        grouped.movies.any((item) => item.id == focusId) ||
+        grouped.seriesGroups.any(
+          (group) => group.episodes.any((episode) => episode.id == focusId),
+        );
+  }
+}
+
+class _FocusTarget extends StatelessWidget {
+  const _FocusTarget({
+    required this.focusKey,
+    required this.focused,
+    required this.child,
+  });
+
+  final GlobalKey focusKey;
+  final bool focused;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      key: focused ? focusKey : null,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: focused
+              ? AppColors.primary.withValues(alpha: 0.9)
+              : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -830,7 +964,7 @@ class _InProgressRow extends ConsumerWidget {
         : (p.downloadedBytes != null ? formatBytes(p.downloadedBytes!) : null);
     final pct = p.fraction > 0
         ? '${(p.fraction * 100).toStringAsFixed(0)}%'
-        : 'Queued';
+        : (p.fraction < 0 ? 'Downloading' : 'Queued');
     final line = bytes != null ? '$pct • $bytes' : pct;
     if (p.episodeLabel != null) return '${p.episodeLabel} • $line';
     return line;

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +15,10 @@ import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
+import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
+import 'package:altcast/data/notifications/app_notifications.dart';
+import 'package:altcast/data/notifications/library_notification_scheduler.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/player/subtitle_style.dart';
 
@@ -57,11 +62,15 @@ class SettingsScreen extends ConsumerWidget {
           ],
           const _DownloadGroup(),
           const SizedBox(height: 24),
+          const _NotificationGroup(),
+          const SizedBox(height: 24),
           const _PlaybackGroup(),
           const SizedBox(height: 24),
           const _AudioSubtitleGroup(),
-          const SizedBox(height: 28),
-          const _SignOutTile(),
+          if (session != null) ...[
+            const SizedBox(height: 28),
+            const _SessionActionsGroup(),
+          ],
           const SizedBox(height: 28),
           const _VersionFooter(),
         ],
@@ -273,6 +282,263 @@ class _DownloadGroup extends ConsumerWidget {
               },
             );
           }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationGroup extends ConsumerWidget {
+  const _NotificationGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(notificationPreferencesProvider);
+    return _SettingsGroup(
+      label: 'Notifications',
+      children: [
+        SwitchListTile(
+          secondary: Icon(
+            prefs.notificationsEnabled
+                ? PiconsRegular.bellSimpleRinging
+                : PiconsRegular.bellSimpleSlash,
+          ),
+          title: const Text('Notifications'),
+          subtitle: const Text(
+            'Allow AltCast to send notifications.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.notificationsEnabled,
+          onChanged: (enabled) =>
+              _setNotificationsEnabled(context, ref, enabled),
+          activeThumbColor: AppColors.primary,
+        ),
+        SwitchListTile(
+          secondary: const Icon(PiconsRegular.downloadSimple),
+          title: const Text('Download notifications'),
+          subtitle: const Text(
+            'Alert when downloads finish or need attention.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          value: prefs.downloadNotifications,
+          onChanged: prefs.notificationsEnabled
+              ? (enabled) => _setDownloadNotifications(context, ref, enabled)
+              : null,
+          activeThumbColor: AppColors.primary,
+        ),
+        if (LibraryNotificationScheduler.isSupported) ...[
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.heart),
+            title: const Text('New episodes from favorite series'),
+            subtitle: const Text(
+              'Alert when a favorited show gets a new episode.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newEpisodesForFavoriteSeries,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) =>
+                        notifier.setNewEpisodesForFavoriteSeries(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.filmSlate),
+            title: const Text('New movies added'),
+            subtitle: const Text(
+              'Alert when a movie appears in your Jellyfin library.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newLibraryMovies,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) => notifier.setNewLibraryMovies(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          SwitchListTile(
+            secondary: const Icon(PiconsRegular.televisionSimple),
+            title: const Text('New episodes added'),
+            subtitle: const Text(
+              'Alert for any new episode added to Jellyfin.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            value: prefs.newLibraryEpisodes,
+            onChanged: prefs.notificationsEnabled
+                ? (enabled) => _setLibraryNotification(
+                    context,
+                    ref,
+                    enabled,
+                    (notifier, value) => notifier.setNewLibraryEpisodes(value),
+                  )
+                : null,
+            activeThumbColor: AppColors.primary,
+          ),
+          ListTile(
+            leading: const Icon(PiconsRegular.clock),
+            title: const Text('Library check interval'),
+            subtitle: Text(
+              prefs.libraryCheckInterval.label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(
+              PiconsRegular.caretRight,
+              color: AppColors.textSecondary,
+            ),
+            enabled: prefs.notificationsEnabled,
+            onTap: prefs.notificationsEnabled
+                ? () => _showLibraryCheckIntervalSheet(context, ref)
+                : null,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _setNotificationsEnabled(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    final notifier = ref.read(notificationPreferencesProvider.notifier);
+    if (!enabled) {
+      await notifier.setNotificationsEnabled(false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    final allowed = await AppNotifications.requestDownloadPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      return;
+    }
+
+    await notifier.setNotificationsEnabled(true);
+    await LibraryNotificationScheduler.configure(
+      ref.read(notificationPreferencesProvider),
+    );
+  }
+
+  Future<void> _setDownloadNotifications(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    if (!enabled) {
+      await ref
+          .read(notificationPreferencesProvider.notifier)
+          .setDownloadNotifications(false);
+      return;
+    }
+
+    final allowed = await AppNotifications.requestDownloadPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      await ref
+          .read(notificationPreferencesProvider.notifier)
+          .setDownloadNotifications(false);
+      return;
+    }
+
+    await ref
+        .read(notificationPreferencesProvider.notifier)
+        .setDownloadNotifications(true);
+  }
+
+  Future<void> _setLibraryNotification(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+    Future<void> Function(NotificationPreferencesNotifier notifier, bool value)
+    persist,
+  ) async {
+    final notifier = ref.read(notificationPreferencesProvider.notifier);
+    if (!enabled) {
+      await persist(notifier, false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    final allowed = await AppNotifications.requestPermissions();
+    if (!context.mounted) return;
+    if (!allowed) {
+      showAppSnackBar(context, "Notifications weren't enabled.");
+      await persist(notifier, false);
+      await LibraryNotificationScheduler.configure(
+        ref.read(notificationPreferencesProvider),
+      );
+      return;
+    }
+
+    await persist(notifier, true);
+    await LibraryNotificationScheduler.configure(
+      ref.read(notificationPreferencesProvider),
+    );
+  }
+
+  Future<void> _showLibraryCheckIntervalSheet(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surfaceElevated,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: LibraryCheckInterval.selectable(includeDebug: kDebugMode)
+              .map((interval) {
+                final selected =
+                    ref
+                        .watch(notificationPreferencesProvider)
+                        .libraryCheckInterval ==
+                    interval;
+                return ListTile(
+                  leading: const Icon(PiconsRegular.clock),
+                  title: Text(interval.label),
+                  trailing: selected
+                      ? const Icon(
+                          PiconsRegular.check,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                  onTap: () async {
+                    final allowed = await AppNotifications.requestPermissions();
+                    if (!context.mounted) return;
+                    if (!allowed) {
+                      showAppSnackBar(
+                        context,
+                        "Notifications weren't enabled.",
+                      );
+                      return;
+                    }
+
+                    await ref
+                        .read(notificationPreferencesProvider.notifier)
+                        .setLibraryCheckInterval(interval);
+                    await LibraryNotificationScheduler.configure(
+                      ref.read(notificationPreferencesProvider),
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                );
+              })
+              .toList(),
         ),
       ),
     );
@@ -617,8 +883,8 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _SignOutTile extends ConsumerWidget {
-  const _SignOutTile();
+class _SessionActionsGroup extends ConsumerWidget {
+  const _SessionActionsGroup();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -628,34 +894,36 @@ class _SignOutTile extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         leading: const Icon(PiconsRegular.signOut, color: AppColors.error),
-        title: const Text('Sign out', style: TextStyle(color: AppColors.error)),
-        onTap: () async {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (dialogCtx) => AlertDialog(
-              title: const Text('Sign out?'),
-              content: const Text(
-                'You will need to enter your server URL and credentials again to sign back in.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(true),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                  child: const Text('Sign out'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed != true) return;
-          // Auth-state change drives the router redirect; no manual pop needed.
-          await ref.read(authControllerProvider.notifier).logout();
-        },
+        title: const Text('Log out', style: TextStyle(color: AppColors.error)),
+        onTap: () => _confirmLogout(context, ref),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          'This ends the current Jellyfin session and keeps this server ready for the next sign-in.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    // Auth-state change drives the router redirect; no manual pop needed.
+    await ref.read(authControllerProvider.notifier).switchUserOnSameServer();
   }
 }
 

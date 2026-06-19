@@ -192,6 +192,25 @@ class JellyfinRepository {
         .toList();
   }
 
+  Future<List<BrowseItem>> recentlyAddedEpisodes({int limit = 30}) async {
+    final s = _session;
+    final res = await _api.dio.get<List<dynamic>>(
+      '/Users/${s.userId}/Items/Latest',
+      queryParameters: {
+        'IncludeItemTypes': 'Episode',
+        'GroupItems': false,
+        'Limit': limit,
+        'Fields':
+            'UserData,SeriesId,SeriesName,SeasonId,ParentIndexNumber,IndexNumber,RunTimeTicks',
+        'EnableImages': true,
+      },
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+  }
+
   /// Personalized movie picks from Jellyfin's recommendations endpoint.
   /// The API returns grouped categories; we flatten them into one shelf and
   /// place already-watched items after unwatched picks.
@@ -420,6 +439,45 @@ class JellyfinRepository {
           data['TotalRecordCount'] as int? ?? resolvedItems.length,
       fetchedItemCount: items.length,
     );
+  }
+
+  Future<Set<String>> favoriteSeriesIds({
+    Iterable<String?>? seriesIds,
+    int limit = 200,
+  }) async {
+    final s = _session;
+    final requestedIds = seriesIds
+        ?.whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (requestedIds != null && requestedIds.isEmpty) return const {};
+
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': 'Series',
+        'Recursive': true,
+        'Limit': limit,
+        'EnableImages': false,
+        if (requestedIds == null) 'Filters': 'IsFavorite',
+        if (requestedIds != null) ...{
+          'Ids': requestedIds.join(','),
+          'Fields': 'UserData',
+        },
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .where(
+          (item) =>
+              requestedIds == null ||
+              (item['UserData'] as Map<String, dynamic>?)?['IsFavorite'] ==
+                  true,
+        )
+        .map((item) => item['Id'] as String?)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
   }
 
   Future<List<String>> getGenres({required String itemType}) async {
