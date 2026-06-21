@@ -127,7 +127,7 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
                 IconButton(
                   tooltip: 'Filters',
                   onPressed: _showFilters,
-                  icon: const Icon(PiconsRegular.slidersHorizontal),
+                  icon: const Icon(PiconsRegular.funnelSimple),
                 ),
               ]
             : null,

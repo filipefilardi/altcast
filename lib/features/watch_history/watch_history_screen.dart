@@ -78,7 +78,7 @@ class _WatchHistoryScreenState extends ConsumerState<WatchHistoryScreen> {
             enabled: !_inflight,
             tooltip: 'Filter',
             initialValue: _type,
-            icon: const Icon(PiconsRegular.funnel),
+            icon: const Icon(PiconsRegular.funnelSimple),
             onSelected: (type) {
               if (type == _type) return;
               setState(() => _type = type);
