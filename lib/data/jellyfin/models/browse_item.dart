@@ -175,12 +175,14 @@ class UserData {
     this.isFavorite = false,
     this.playbackPositionTicks = 0,
     this.playedPercentage,
+    this.lastPlayedDate,
   });
 
   final bool played;
   final bool isFavorite;
   final int playbackPositionTicks;
   final double? playedPercentage;
+  final DateTime? lastPlayedDate;
 
   Duration get resumePosition =>
       Duration(microseconds: playbackPositionTicks ~/ 10);
@@ -198,6 +200,9 @@ class UserData {
       isFavorite: json['IsFavorite'] as bool? ?? false,
       playbackPositionTicks: json['PlaybackPositionTicks'] as int? ?? 0,
       playedPercentage: (json['PlayedPercentage'] as num?)?.toDouble(),
+      lastPlayedDate: DateTime.tryParse(
+        json['LastPlayedDate'] as String? ?? '',
+      ),
     );
   }
 }

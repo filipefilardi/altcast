@@ -120,6 +120,89 @@ void main() {
       expect(ids, {'series-1'});
     },
   );
+
+  test('watchHistory requests completed items by latest play date', () async {
+    final adapter = _RecordingAdapter((options) async {
+      expect(options.path, '/Users/user-1/Items');
+      expect(options.queryParameters['IncludeItemTypes'], 'Movie,Episode');
+      expect(options.queryParameters['Filters'], 'IsPlayed');
+      expect(options.queryParameters['SortBy'], 'DatePlayed');
+      expect(options.queryParameters['SortOrder'], 'Descending');
+      expect(options.queryParameters['StartIndex'], 30);
+      expect(options.queryParameters['Limit'], 30);
+      return _jsonResponse({
+        'Items': [
+          {
+            'Id': 'movie-1',
+            'Name': 'Movie',
+            'Type': 'Movie',
+            'UserData': {
+              'Played': true,
+              'LastPlayedDate': '2026-06-21T18:30:00Z',
+            },
+          },
+        ],
+        'TotalRecordCount': 61,
+      });
+    });
+    final api = JellyfinApi(dio: Dio()..httpClientAdapter = adapter);
+    api.bind(
+      const JellyfinSession(
+        serverUrl: 'https://media.example.org',
+        accessToken: 'token',
+        userId: 'user-1',
+        serverId: 'server-1',
+        username: 'User',
+      ),
+    );
+
+    final page = await JellyfinRepository(
+      api,
+    ).watchHistory(startIndex: 30, limit: 30);
+
+    expect(page.items.single.id, 'movie-1');
+    expect(page.items.single.userData?.lastPlayedDate, isNotNull);
+    expect(page.hasMore, isTrue);
+  });
+
+  test(
+    'availableItemIds returns only visible ids in bounded batches',
+    () async {
+      var requestCount = 0;
+      final adapter = _RecordingAdapter((options) async {
+        requestCount++;
+        expect(options.path, '/Users/user-1/Items');
+        expect(options.queryParameters['Recursive'], isTrue);
+        expect(options.queryParameters['EnableImages'], isFalse);
+        final ids = (options.queryParameters['Ids'] as String).split(',');
+        return _jsonResponse({
+          'Items': [
+            for (final id in ids)
+              if (id != 'deleted') {'Id': id},
+          ],
+        });
+      });
+      final api = JellyfinApi(dio: Dio()..httpClientAdapter = adapter);
+      api.bind(
+        const JellyfinSession(
+          serverUrl: 'https://media.example.org',
+          accessToken: 'token',
+          userId: 'user-1',
+          serverId: 'server-1',
+          username: 'User',
+        ),
+      );
+
+      final ids = await JellyfinRepository(api).availableItemIds(const [
+        'movie-1',
+        'deleted',
+        'episode-1',
+      ], batchSize: 2);
+
+      expect(ids, {'movie-1', 'episode-1'});
+      expect(requestCount, 2);
+    },
+  );
 }
 
 ResponseBody _jsonResponse(Object body) {

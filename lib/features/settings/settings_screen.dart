@@ -110,6 +110,16 @@ class _DownloadGroup extends ConsumerWidget {
       label: 'Library',
       children: [
         ListTile(
+          leading: const Icon(PiconsRegular.clock),
+          title: const Text('Watch history'),
+          subtitle: const Text('Movies and episodes you finished.'),
+          trailing: const Icon(
+            PiconsRegular.caretRight,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => context.push('/watch-history'),
+        ),
+        ListTile(
           leading: const Icon(PiconsRegular.downloadSimple),
           title: const Text('Downloads'),
           subtitle: Text(

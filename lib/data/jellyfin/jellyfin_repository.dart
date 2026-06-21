@@ -441,6 +441,80 @@ class JellyfinRepository {
     );
   }
 
+  /// Completed movies and episodes ordered by the current user's latest
+  /// playback date. Jellyfin stores one latest-played timestamp per item,
+  /// rather than a separate event for every rewatch.
+  Future<LibraryPage> watchHistory({
+    int startIndex = 0,
+    int limit = 30,
+    String itemTypes = 'Movie,Episode',
+  }) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': itemTypes,
+        'Recursive': true,
+        'StartIndex': startIndex,
+        'Limit': limit,
+        'Fields':
+            'UserData,ProductionYear,SeriesPrimaryImage,PrimaryImageAspectRatio',
+        'EnableImages': true,
+        'Filters': 'IsPlayed',
+        'SortBy': 'DatePlayed',
+        'SortOrder': 'Descending',
+      },
+    );
+    final data = res.data ?? const <String, dynamic>{};
+    final items = ((data['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .toList();
+    return LibraryPage(
+      items: items,
+      startIndex: startIndex,
+      limit: limit,
+      totalRecordCount: data['TotalRecordCount'] as int? ?? items.length,
+      fetchedItemCount: items.length,
+    );
+  }
+
+  /// Returns the subset of item ids that still exist and are visible to the
+  /// current user. Requests are batched to keep URLs comfortably bounded.
+  Future<Set<String>> availableItemIds(
+    Iterable<String> itemIds, {
+    int batchSize = 75,
+  }) async {
+    if (batchSize <= 0) {
+      throw ArgumentError.value(batchSize, 'batchSize', 'Must be positive');
+    }
+    final ids = itemIds.where((id) => id.trim().isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return <String>{};
+    final s = _session;
+    final available = <String>{};
+    for (var start = 0; start < ids.length; start += batchSize) {
+      final end = (start + batchSize).clamp(0, ids.length);
+      final batch = ids.sublist(start, end);
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/Users/${s.userId}/Items',
+        queryParameters: {
+          'Ids': batch.join(','),
+          'IncludeItemTypes': 'Movie,Episode',
+          'Recursive': true,
+          'EnableImages': false,
+          'EnableTotalRecordCount': false,
+        },
+      );
+      available.addAll(
+        ((res.data?['Items'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map((item) => item['Id'])
+            .whereType<String>(),
+      );
+    }
+    return available;
+  }
+
   Future<Set<String>> favoriteSeriesIds({
     Iterable<String?>? seriesIds,
     int limit = 200,

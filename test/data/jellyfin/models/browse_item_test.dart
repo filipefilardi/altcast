@@ -250,4 +250,16 @@ void main() {
       expect(data.playedPercentage, isNull);
     });
   });
+
+  test('UserData parses the Jellyfin last played date', () {
+    final item = BrowseItem.fromJson({
+      'Id': 'movie-1',
+      'Name': 'Movie',
+      'Type': 'Movie',
+      'UserData': {'Played': true, 'LastPlayedDate': '2026-06-21T18:30:00Z'},
+    });
+
+    expect(item.userData?.played, isTrue);
+    expect(item.userData?.lastPlayedDate, DateTime.utc(2026, 6, 21, 18, 30));
+  });
 }
