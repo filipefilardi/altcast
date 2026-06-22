@@ -70,8 +70,6 @@ void main() {
     expect(summary.topGenres.first.count, 3);
     expect(summary.starPower?.person.name, 'Ada Star');
     expect(summary.starPower?.entries, hasLength(2));
-    expect(summary.longestEpisodeStreak?.seriesName, 'Example Show');
-    expect(summary.longestEpisodeStreak?.entries, hasLength(2));
     expect(summary.monthlyMovies[DateTime.january - 1], 1);
     expect(summary.monthlyEpisodes[DateTime.june - 1], 2);
   });

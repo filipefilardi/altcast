@@ -1781,13 +1781,9 @@ class JellyfinRepository {
 
   /// The first landscape backdrop used by a title's detail hero. Jellyfin
   /// resolves the image index, so this also works when no cache tag is known.
-  String heroBackdropUrl(
-    String itemId, {
-    int imageIndex = 0,
-    int width = 1280,
-  }) {
+  String heroBackdropUrl(String itemId, {int width = 1280}) {
     final s = _session;
-    return '${s.serverUrl}/Items/$itemId/Images/Backdrop/$imageIndex'
+    return '${s.serverUrl}/Items/$itemId/Images/Backdrop/0'
         '?fillWidth=$width&api_key=${s.accessToken}';
   }
 

@@ -209,14 +209,6 @@ class _YearReviewScreenState extends ConsumerState<YearReviewScreen> {
         urls.add(repo.heroBackdropUrl(seriesId));
       }
     }
-    final streak = summary.longestEpisodeStreak;
-    if (streak != null) {
-      final seriesId = streak.entries.first.seriesId;
-      if (seriesId != null && seriesId.isNotEmpty) {
-        urls.add(repo.heroBackdropUrl(seriesId));
-        urls.add(repo.heroBackdropUrl(seriesId, imageIndex: 1));
-      }
-    }
     final person = summary.starPower?.person;
     final personImage = repo.personImageUrl(
       person?.id,
@@ -301,13 +293,6 @@ class _YearReviewScreenState extends ConsumerState<YearReviewScreen> {
       );
     }
 
-    final topSeriesId = summary.topSeries?.entries.first.seriesId;
-    final streakSeriesId = summary.longestEpisodeStreak?.entries.first.seriesId;
-    final streakMatchesTopSeries =
-        topSeriesId != null &&
-        topSeriesId.isNotEmpty &&
-        topSeriesId == streakSeriesId;
-
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
@@ -333,13 +318,6 @@ class _YearReviewScreenState extends ConsumerState<YearReviewScreen> {
                 if (summary.starPower != null)
                   _StarPowerCard(starPower: summary.starPower!),
                 if (summary.starPower != null) const SizedBox(height: 16),
-                if (summary.longestEpisodeStreak != null)
-                  _BingeCard(
-                    streak: summary.longestEpisodeStreak!,
-                    useAlternateBackdrop: streakMatchesTopSeries,
-                  ),
-                if (summary.longestEpisodeStreak != null)
-                  const SizedBox(height: 16),
                 _MonthlyActivityCard(summary: summary),
                 const SizedBox(height: 16),
                 _FirstLastCard(summary: summary),
@@ -351,7 +329,7 @@ class _YearReviewScreenState extends ConsumerState<YearReviewScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Based on synced Jellyfin history. Watch time is estimated from unique completed titles; episode streaks are inferred. Rewatches are not included.',
+                  'Based on synced Jellyfin history. Watch time is estimated from unique completed titles. Rewatches are not included.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textTertiary,
@@ -798,40 +776,6 @@ class _StarPowerCard extends ConsumerWidget {
       onTap: person.id == null || person.id!.isEmpty
           ? null
           : () => context.push('/person/${person.id}'),
-    );
-  }
-}
-
-class _BingeCard extends ConsumerWidget {
-  const _BingeCard({required this.streak, required this.useAlternateBackdrop});
-
-  final EpisodeStreakReview streak;
-  final bool useAlternateBackdrop;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final entry = streak.entries.first;
-    final seriesId = entry.seriesId;
-    final repo = ref.watch(jellyfinRepositoryProvider);
-    return _ArtworkHighlightCard(
-      eyebrow: 'LONGEST EPISODE STREAK',
-      title: '${streak.entries.length} episodes of ${streak.seriesName}',
-      imageSource: seriesId == null || seriesId.isEmpty
-          ? repo.backdropUrl(
-              entry.id,
-              entry.backdropTag,
-              fallbackPrimaryTag: entry.imageTag,
-            )
-          : repo.heroBackdropUrl(
-              seriesId,
-              imageIndex: useAlternateBackdrop ? 1 : 0,
-            ),
-      fallbackImageSource: seriesId == null || seriesId.isEmpty
-          ? null
-          : repo.heroBackdropUrl(seriesId),
-      onTap: seriesId == null || seriesId.isEmpty
-          ? null
-          : () => context.push('/series/$seriesId'),
     );
   }
 }
@@ -1461,7 +1405,6 @@ class _ArtworkHighlightCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.imageSource,
-    this.fallbackImageSource,
     this.imageAlignment = Alignment.center,
     this.portrait = false,
     this.onTap,
@@ -1471,7 +1414,6 @@ class _ArtworkHighlightCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? imageSource;
-  final String? fallbackImageSource;
   final Alignment imageAlignment;
   final bool portrait;
   final VoidCallback? onTap;
@@ -1527,15 +1469,8 @@ class _ArtworkHighlightCard extends StatelessWidget {
                 LocalOrNetworkImage(
                   source: imageSource,
                   alignment: imageAlignment,
-                  errorBuilder: (_) => fallbackImageSource == null
-                      ? const ColoredBox(color: AppColors.surfaceHighlight)
-                      : LocalOrNetworkImage(
-                          source: fallbackImageSource,
-                          alignment: imageAlignment,
-                          errorBuilder: (_) => const ColoredBox(
-                            color: AppColors.surfaceHighlight,
-                          ),
-                        ),
+                  errorBuilder: (_) =>
+                      const ColoredBox(color: AppColors.surfaceHighlight),
                 ),
               DecoratedBox(
                 decoration: BoxDecoration(

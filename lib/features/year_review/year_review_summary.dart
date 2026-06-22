@@ -19,7 +19,6 @@ class YearReviewSummary {
     required this.topGenres,
     this.topSeries,
     this.starPower,
-    this.longestEpisodeStreak,
     this.busiestMonth,
     this.busiestWeekday,
     this.busiestHour,
@@ -42,7 +41,6 @@ class YearReviewSummary {
   final List<GenreReview> topGenres;
   final TopSeriesReview? topSeries;
   final StarPowerReview? starPower;
-  final EpisodeStreakReview? longestEpisodeStreak;
   final int? busiestMonth;
   final int? busiestWeekday;
   final int? busiestHour;
@@ -183,7 +181,6 @@ class YearReviewSummary {
       starPower: star == null
           ? null
           : StarPowerReview(person: star.person, entries: star.entries),
-      longestEpisodeStreak: _longestStreak(seriesEntries.values),
       busiestMonth: busiestMonth,
       busiestWeekday: busiestWeekday,
       busiestHour: busiestHour,
@@ -232,20 +229,6 @@ class StarPowerReview {
   final List<WatchHistoryEntry> entries;
 }
 
-class EpisodeStreakReview {
-  const EpisodeStreakReview({
-    required this.seriesName,
-    required this.entries,
-    required this.startedAt,
-    required this.endedAt,
-  });
-
-  final String seriesName;
-  final List<WatchHistoryEntry> entries;
-  final DateTime startedAt;
-  final DateTime endedAt;
-}
-
 class _NamedCount {
   const _NamedCount(this.name, this.count);
 
@@ -265,33 +248,6 @@ String _workKey(WatchHistoryEntry entry) {
     return 'series:${entry.seriesId ?? entry.seriesName ?? entry.id}';
   }
   return '${entry.kind.name}:${entry.id}';
-}
-
-EpisodeStreakReview? _longestStreak(
-  Iterable<List<WatchHistoryEntry>> groupedEpisodes,
-) {
-  List<WatchHistoryEntry> longest = const [];
-  for (final source in groupedEpisodes) {
-    final episodes = source.where((entry) => entry.watchedAt != null).toList()
-      ..sort((a, b) => a.watchedAt!.compareTo(b.watchedAt!));
-    var current = <WatchHistoryEntry>[];
-    for (final episode in episodes) {
-      final closeToPrevious =
-          current.isNotEmpty &&
-          episode.watchedAt!.difference(current.last.watchedAt!) <=
-              const Duration(hours: 2);
-      if (!closeToPrevious) current = [];
-      current.add(episode);
-      if (current.length > longest.length) longest = [...current];
-    }
-  }
-  if (longest.length < 2) return null;
-  return EpisodeStreakReview(
-    seriesName: longest.first.seriesName ?? 'Unknown series',
-    entries: longest,
-    startedAt: longest.first.watchedAt!,
-    endedAt: longest.last.watchedAt!,
-  );
 }
 
 int _newestFirst(WatchHistoryEntry a, WatchHistoryEntry b) {
