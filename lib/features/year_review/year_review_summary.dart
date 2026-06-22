@@ -100,9 +100,12 @@ class YearReviewSummary {
             : '${person.name.toLowerCase()}:$type';
         if (!peopleSeen.add(key)) continue;
         final current = personEntries[key];
+        final existingEntries = current?.entries ?? const <WatchHistoryEntry>[];
+        final workKey = _workKey(entry);
+        if (existingEntries.any((item) => _workKey(item) == workKey)) continue;
         personEntries[key] = _PersonCount(
           person: current?.person ?? person,
-          entries: [...?current?.entries, entry],
+          entries: [...existingEntries, entry],
         );
       }
 
@@ -255,6 +258,13 @@ class _PersonCount {
 
   final PersonCredit person;
   final List<WatchHistoryEntry> entries;
+}
+
+String _workKey(WatchHistoryEntry entry) {
+  if (entry.kind == MediaKind.episode) {
+    return 'series:${entry.seriesId ?? entry.seriesName ?? entry.id}';
+  }
+  return '${entry.kind.name}:${entry.id}';
 }
 
 EpisodeStreakReview? _longestStreak(
