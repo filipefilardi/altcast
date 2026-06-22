@@ -57,6 +57,11 @@ void main() {
     expect(summary.topSeries?.name, 'Example Show');
     expect(summary.topSeries?.episodeCount, 2);
     expect(summary.busiestMonth, DateTime.june);
+    final expectedLocalTime = DateTime.utc(2026, 6, 10, 20).toLocal();
+    expect(summary.busiestWeekday, expectedLocalTime.weekday);
+    expect(summary.busiestHour, expectedLocalTime.hour);
+    expect(summary.weekdayActivity[expectedLocalTime.weekday - 1], 2);
+    expect(summary.hourlyActivity[expectedLocalTime.hour], 2);
     expect(summary.monthlyActivity[DateTime.june - 1], 2);
     expect(summary.firstWatched?.id, 'movie-1');
     expect(summary.lastWatched?.id, 'episode-2');

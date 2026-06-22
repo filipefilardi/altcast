@@ -13,12 +13,16 @@ class YearReviewSummary {
     required this.monthlyActivity,
     required this.monthlyMovies,
     required this.monthlyEpisodes,
+    required this.weekdayActivity,
+    required this.hourlyActivity,
     required this.estimatedWatchTime,
     required this.topGenres,
     this.topSeries,
     this.starPower,
     this.longestEpisodeStreak,
     this.busiestMonth,
+    this.busiestWeekday,
+    this.busiestHour,
     this.firstWatched,
     this.lastWatched,
   });
@@ -32,12 +36,16 @@ class YearReviewSummary {
   final List<int> monthlyActivity;
   final List<int> monthlyMovies;
   final List<int> monthlyEpisodes;
+  final List<int> weekdayActivity;
+  final List<int> hourlyActivity;
   final Duration estimatedWatchTime;
   final List<GenreReview> topGenres;
   final TopSeriesReview? topSeries;
   final StarPowerReview? starPower;
   final EpisodeStreakReview? longestEpisodeStreak;
   final int? busiestMonth;
+  final int? busiestWeekday;
+  final int? busiestHour;
   final WatchHistoryEntry? firstWatched;
   final WatchHistoryEntry? lastWatched;
 
@@ -56,6 +64,8 @@ class YearReviewSummary {
     final monthlyActivity = List<int>.filled(12, 0);
     final monthlyMovies = List<int>.filled(12, 0);
     final monthlyEpisodes = List<int>.filled(12, 0);
+    final weekdayActivity = List<int>.filled(7, 0);
+    final hourlyActivity = List<int>.filled(24, 0);
     final seriesEntries = <String, List<WatchHistoryEntry>>{};
     final genreCounts = <String, _NamedCount>{};
     final personEntries = <String, _PersonCount>{};
@@ -66,6 +76,8 @@ class YearReviewSummary {
       if (watchedAt != null) {
         final monthIndex = watchedAt.month - 1;
         monthlyActivity[monthIndex]++;
+        weekdayActivity[watchedAt.weekday - 1]++;
+        hourlyActivity[watchedAt.hour]++;
         if (entry.kind == MediaKind.movie) monthlyMovies[monthIndex]++;
         if (entry.kind == MediaKind.episode) monthlyEpisodes[monthIndex]++;
       }
@@ -122,6 +134,9 @@ class YearReviewSummary {
       }
     }
 
+    final busiestWeekday = _highestIndex(weekdayActivity);
+    final busiestHour = _highestIndex(hourlyActivity, zeroBased: true);
+
     final topSeriesEntries = sortedSeries.isEmpty ? null : sortedSeries.first;
     final star = sortedPeople.isEmpty ? null : sortedPeople.first;
     return YearReviewSummary(
@@ -143,6 +158,8 @@ class YearReviewSummary {
       monthlyActivity: monthlyActivity,
       monthlyMovies: monthlyMovies,
       monthlyEpisodes: monthlyEpisodes,
+      weekdayActivity: weekdayActivity,
+      hourlyActivity: hourlyActivity,
       estimatedWatchTime: Duration(microseconds: totalTicks ~/ 10),
       topGenres: sortedGenres
           .take(3)
@@ -165,10 +182,24 @@ class YearReviewSummary {
           : StarPowerReview(person: star.person, entries: star.entries),
       longestEpisodeStreak: _longestStreak(seriesEntries.values),
       busiestMonth: busiestMonth,
+      busiestWeekday: busiestWeekday,
+      busiestHour: busiestHour,
       firstWatched: entries.isEmpty ? null : entries.last,
       lastWatched: entries.isEmpty ? null : entries.first,
     );
   }
+}
+
+int? _highestIndex(List<int> values, {bool zeroBased = false}) {
+  var highest = 0;
+  int? result;
+  for (var index = 0; index < values.length; index++) {
+    if (values[index] > highest) {
+      highest = values[index];
+      result = zeroBased ? index : index + 1;
+    }
+  }
+  return result;
 }
 
 class TopSeriesReview {

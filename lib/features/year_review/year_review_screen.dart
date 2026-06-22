@@ -998,13 +998,109 @@ class _MonthlyActivityCardState extends State<_MonthlyActivityCard> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: Text(
-              '${_monthName(_activeIndex + 1)} • ${summary.monthlyActivity[_activeIndex]} watched — ${summary.monthlyMovies[_activeIndex]} movies, ${summary.monthlyEpisodes[_activeIndex]} episodes',
-              key: ValueKey(_activeIndex),
-              style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: 16),
+          if (summary.busiestWeekday != null &&
+              summary.busiestHour != null) ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 10) / 2;
+                final month = _monthName(_activeIndex + 1).toUpperCase();
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: _RhythmInsight(
+                        label: '$month TOTAL',
+                        value:
+                            '${summary.monthlyActivity[_activeIndex]} watched',
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _RhythmInsight(
+                        label: '$month MIX',
+                        value:
+                            '${summary.monthlyMovies[_activeIndex]} movies / ${summary.monthlyEpisodes[_activeIndex]} episodes',
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _RhythmInsight(
+                        label: 'MOST ACTIVE WEEKDAY',
+                        value: _weekdayName(summary.busiestWeekday!),
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _RhythmInsight(
+                        label: 'COMMON FINISH TIME',
+                        value: _hourRange(summary.busiestHour!),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RhythmInsight extends StatelessWidget {
+  const _RhythmInsight({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 78,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHighlight.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textTertiary,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.7,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: Text(
+                  value,
+                  key: ValueKey(value),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -1582,6 +1678,30 @@ String _monthName(int month) {
     'December',
   ];
   return months[month - 1];
+}
+
+String _weekdayName(int weekday) {
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  return weekdays[weekday - 1];
+}
+
+String _hourRange(int hour) {
+  String label(int value) {
+    final normalized = value % 24;
+    if (normalized == 0) return '12 AM';
+    if (normalized == 12) return '12 PM';
+    return normalized < 12 ? '$normalized AM' : '${normalized - 12} PM';
+  }
+
+  return '${label(hour)}–${label(hour + 1)}';
 }
 
 String _shortDate(DateTime date) {
