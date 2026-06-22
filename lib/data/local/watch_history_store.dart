@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
 
 const _watchHistoryFileName = 'watch_history_v1.json';
 
@@ -102,6 +103,9 @@ class WatchHistoryEntry {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
+    this.runTimeTicks,
+    this.genres = const [],
+    this.people = const [],
     this.watchedAt,
     this.isAvailable = true,
   });
@@ -117,6 +121,9 @@ class WatchHistoryEntry {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+  final int? runTimeTicks;
+  final List<String> genres;
+  final List<PersonCredit> people;
   final DateTime? watchedAt;
   final bool isAvailable;
 
@@ -133,6 +140,11 @@ class WatchHistoryEntry {
       seriesName: item.seriesName,
       seasonNumber: item.seasonNumber,
       episodeNumber: item.episodeNumber,
+      runTimeTicks: item.runTime?.inMicroseconds == null
+          ? null
+          : item.runTime!.inMicroseconds * 10,
+      genres: item.genres,
+      people: item.people,
       watchedAt: item.userData?.lastPlayedDate,
     );
   }
@@ -150,6 +162,9 @@ class WatchHistoryEntry {
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber,
+      runTimeTicks: runTimeTicks,
+      genres: genres,
+      people: people,
       watchedAt: watchedAt,
       isAvailable: isAvailable ?? this.isAvailable,
     );
@@ -168,6 +183,11 @@ class WatchHistoryEntry {
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber,
+      runTime: runTimeTicks == null
+          ? null
+          : Duration(microseconds: runTimeTicks! ~/ 10),
+      genres: genres,
+      people: people,
       userData: UserData(played: true, lastPlayedDate: watchedAt),
     );
   }
@@ -184,6 +204,10 @@ class WatchHistoryEntry {
     if (seriesName != null) 'seriesName': seriesName,
     if (seasonNumber != null) 'seasonNumber': seasonNumber,
     if (episodeNumber != null) 'episodeNumber': episodeNumber,
+    if (runTimeTicks != null) 'runTimeTicks': runTimeTicks,
+    if (genres.isNotEmpty) 'genres': genres,
+    if (people.isNotEmpty)
+      'people': people.map((person) => person.toJson()).toList(growable: false),
     if (watchedAt != null) 'watchedAt': watchedAt!.toIso8601String(),
     'isAvailable': isAvailable,
   };
@@ -204,6 +228,18 @@ class WatchHistoryEntry {
       seriesName: json['seriesName'] as String?,
       seasonNumber: json['seasonNumber'] as int?,
       episodeNumber: json['episodeNumber'] as int?,
+      runTimeTicks: (json['runTimeTicks'] as num?)?.toInt(),
+      genres: ((json['genres'] as List?) ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      people: ((json['people'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (person) =>
+                PersonCredit.fromJson(Map<String, dynamic>.from(person)),
+          )
+          .where((person) => person.name.isNotEmpty)
+          .toList(growable: false),
       watchedAt: DateTime.tryParse(json['watchedAt'] as String? ?? ''),
       isAvailable: json['isAvailable'] as bool? ?? true,
     );

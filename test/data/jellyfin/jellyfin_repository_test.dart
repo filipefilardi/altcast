@@ -130,6 +130,9 @@ void main() {
       expect(options.queryParameters['SortOrder'], 'Descending');
       expect(options.queryParameters['StartIndex'], 30);
       expect(options.queryParameters['Limit'], 30);
+      final fields = options.queryParameters['Fields'] as String;
+      expect(fields, contains('Genres'));
+      expect(fields, contains('People'));
       return _jsonResponse({
         'Items': [
           {

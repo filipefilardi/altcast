@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
 import 'package:altcast/data/local/watch_history_store.dart';
 
 void main() {
@@ -40,6 +41,9 @@ void main() {
       kind: MediaKind.movie,
       watchedAt: DateTime.utc(2026, 6, 21),
       isAvailable: false,
+      runTimeTicks: const Duration(minutes: 120).inMicroseconds * 10,
+      genres: const ['Drama'],
+      people: const [PersonCredit(name: 'Example Actor', type: 'Actor')],
     );
 
     await store.write(firstSession, [entry]);
@@ -47,6 +51,9 @@ void main() {
     final restored = await store.read(firstSession);
     expect(restored.single.name, 'Archived Movie');
     expect(restored.single.isAvailable, isFalse);
+    expect(restored.single.runTimeTicks, entry.runTimeTicks);
+    expect(restored.single.genres, ['Drama']);
+    expect(restored.single.people.single.name, 'Example Actor');
     expect(await store.read(secondSession), isEmpty);
   });
 

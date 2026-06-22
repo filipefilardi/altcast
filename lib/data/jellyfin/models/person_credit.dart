@@ -28,4 +28,12 @@ class PersonCredit {
       primaryImageTag: (json['PrimaryImageTag'] as String?)?.trim(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'Name': name,
+    if (id != null) 'Id': id,
+    if (type != null) 'Type': type,
+    if (role != null) 'Role': role,
+    if (primaryImageTag != null) 'PrimaryImageTag': primaryImageTag,
+  };
 }

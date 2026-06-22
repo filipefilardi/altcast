@@ -19,6 +19,7 @@ import 'package:altcast/features/syncplay/syncplay_sheet.dart';
 import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/home/widgets/continue_watching_hero.dart';
 import 'package:altcast/features/home/widgets/poster_card.dart';
+import 'package:altcast/features/year_review/widgets/year_review_promo_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -88,6 +89,10 @@ class HomeScreen extends ConsumerWidget {
             _HomeHeader(username: username),
             const SizedBox(height: 18),
             const _LibraryNav(),
+            if (DateTime.now().month == DateTime.december) ...[
+              const SizedBox(height: 16),
+              const YearReviewPromoCard(),
+            ],
             const SizedBox(height: 24),
             if (everythingFailed)
               ErrorStateView(

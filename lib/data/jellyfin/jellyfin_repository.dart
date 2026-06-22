@@ -458,7 +458,7 @@ class JellyfinRepository {
         'StartIndex': startIndex,
         'Limit': limit,
         'Fields':
-            'UserData,ProductionYear,SeriesPrimaryImage,PrimaryImageAspectRatio',
+            'UserData,ProductionYear,SeriesPrimaryImage,PrimaryImageAspectRatio,Genres,People',
         'EnableImages': true,
         'Filters': 'IsPlayed',
         'SortBy': 'DatePlayed',
@@ -1777,6 +1777,18 @@ class JellyfinRepository {
         : '';
     return '${s.serverUrl}/Items/$itemId/Images/Primary'
         '?fillWidth=$width$tagParam&api_key=${s.accessToken}';
+  }
+
+  /// The first landscape backdrop used by a title's detail hero. Jellyfin
+  /// resolves the image index, so this also works when no cache tag is known.
+  String heroBackdropUrl(
+    String itemId, {
+    int imageIndex = 0,
+    int width = 1280,
+  }) {
+    final s = _session;
+    return '${s.serverUrl}/Items/$itemId/Images/Backdrop/$imageIndex'
+        '?fillWidth=$width&api_key=${s.accessToken}';
   }
 
   String? personImageUrl(

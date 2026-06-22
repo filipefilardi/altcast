@@ -201,6 +201,22 @@ void main() {
       });
       expect(item.runTime, const Duration(seconds: 60));
     });
+
+    test('extracts genres and people used by the year review', () {
+      final item = BrowseItem.fromJson({
+        'Id': 'x',
+        'Name': 'N',
+        'Type': 'Movie',
+        'Genres': ['Drama', 'Mystery'],
+        'People': [
+          {'Id': 'person-1', 'Name': 'Example Actor', 'Type': 'Actor'},
+        ],
+      });
+
+      expect(item.genres, ['Drama', 'Mystery']);
+      expect(item.people.single.name, 'Example Actor');
+      expect(item.people.single.type, 'Actor');
+    });
   });
 
   group('BrowseItem.copyWithChildCount', () {

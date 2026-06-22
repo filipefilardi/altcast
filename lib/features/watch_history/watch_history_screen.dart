@@ -14,6 +14,7 @@ import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
 import 'package:altcast/data/local/watch_history_store.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
+import 'package:altcast/features/year_review/widgets/year_review_promo_card.dart';
 
 enum _HistoryType {
   all('All', 'Movie,Episode'),
@@ -225,6 +226,8 @@ class _WatchHistoryScreenState extends ConsumerState<WatchHistoryScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
+        const YearReviewPromoCard(),
+        const SizedBox(height: 16),
         for (var i = 0; i < visible.length; i++) ...[
           if (_startsDateGroup(visible, i))
             _DateHeader(date: visible[i].watchedAt!.toLocal()),
