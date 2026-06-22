@@ -51,7 +51,7 @@ jobs:
       should-release: ${{ steps.compute.outputs.should-release }}
       bump: ${{ steps.compute.outputs.bump }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -125,7 +125,7 @@ jobs:
     if: needs.version.outputs.should-release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v5
         with:
@@ -170,7 +170,7 @@ jobs:
     if: needs.version.outputs.should-release == 'true'
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # connectivity_plus 7.1.x references macOS 26 SDK symbols (e.g.
       # NWPath.isUltraConstrained) and requires Xcode 26+ to compile.
@@ -217,7 +217,7 @@ jobs:
     if: needs.version.outputs.should-release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
