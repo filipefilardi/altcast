@@ -995,10 +995,7 @@ class _MonthlyActivityCardState extends State<_MonthlyActivityCard> {
 }
 
 class _RhythmInsight extends StatelessWidget {
-  const _RhythmInsight({
-    required this.label,
-    required this.value,
-  });
+  const _RhythmInsight({required this.label, required this.value});
 
   final String label;
   final String value;
