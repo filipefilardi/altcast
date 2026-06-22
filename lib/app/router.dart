@@ -22,6 +22,8 @@ import 'package:altcast/features/season/season_screen.dart';
 import 'package:altcast/features/series/series_screen.dart';
 import 'package:altcast/features/settings/settings_screen.dart';
 import 'package:altcast/features/shell/app_shell.dart';
+import 'package:altcast/features/watch_history/watch_history_screen.dart';
+import 'package:altcast/features/year_review/year_review_screen.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 String? _pendingNotificationLocation;
@@ -224,6 +226,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(
+        path: '/watch-history',
+        builder: (_, _) => const WatchHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/year-in-review',
+        builder: (_, _) => const YearReviewScreen(),
+      ),
       GoRoute(
         path: '/library/movies',
         builder: (_, st) {

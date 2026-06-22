@@ -59,7 +59,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           PopupMenuButton<_FavoriteType>(
             tooltip: 'Filter',
             initialValue: _type,
-            icon: const Icon(PiconsRegular.funnel),
+            icon: const Icon(PiconsRegular.funnelSimple),
             onSelected: (type) {
               if (type == _type) return;
               setState(() => _type = type);

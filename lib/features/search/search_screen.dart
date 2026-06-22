@@ -73,7 +73,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           IconButton(
             tooltip: 'Filters',
             onPressed: _showFilters,
-            icon: const Icon(PiconsRegular.slidersHorizontal),
+            icon: const Icon(PiconsRegular.funnelSimple),
           ),
         ],
         bottom: PreferredSize(

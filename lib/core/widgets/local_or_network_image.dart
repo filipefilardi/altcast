@@ -13,6 +13,7 @@ class LocalOrNetworkImage extends StatelessWidget {
   const LocalOrNetworkImage({
     required this.source,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.placeholderBuilder,
     this.errorBuilder,
     super.key,
@@ -22,6 +23,7 @@ class LocalOrNetworkImage extends StatelessWidget {
   /// URL. `null` or empty is treated as missing.
   final String? source;
   final BoxFit fit;
+  final Alignment alignment;
   final WidgetBuilder? placeholderBuilder;
   final WidgetBuilder? errorBuilder;
 
@@ -41,6 +43,7 @@ class LocalOrNetworkImage extends StatelessWidget {
         return Image.file(
           File(path),
           fit: fit,
+          alignment: alignment,
           errorBuilder: (ctx, _, _) => _fallback(ctx),
         );
       } catch (_) {
@@ -51,6 +54,7 @@ class LocalOrNetworkImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: src,
       fit: fit,
+      alignment: alignment,
       placeholder: placeholderBuilder == null
           ? null
           : (ctx, _) => placeholderBuilder!(ctx),

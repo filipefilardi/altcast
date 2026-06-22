@@ -201,6 +201,22 @@ void main() {
       });
       expect(item.runTime, const Duration(seconds: 60));
     });
+
+    test('extracts genres and people used by the year review', () {
+      final item = BrowseItem.fromJson({
+        'Id': 'x',
+        'Name': 'N',
+        'Type': 'Movie',
+        'Genres': ['Drama', 'Mystery'],
+        'People': [
+          {'Id': 'person-1', 'Name': 'Example Actor', 'Type': 'Actor'},
+        ],
+      });
+
+      expect(item.genres, ['Drama', 'Mystery']);
+      expect(item.people.single.name, 'Example Actor');
+      expect(item.people.single.type, 'Actor');
+    });
   });
 
   group('BrowseItem.copyWithChildCount', () {
@@ -249,5 +265,17 @@ void main() {
       expect(data.playbackPositionTicks, 0);
       expect(data.playedPercentage, isNull);
     });
+  });
+
+  test('UserData parses the Jellyfin last played date', () {
+    final item = BrowseItem.fromJson({
+      'Id': 'movie-1',
+      'Name': 'Movie',
+      'Type': 'Movie',
+      'UserData': {'Played': true, 'LastPlayedDate': '2026-06-21T18:30:00Z'},
+    });
+
+    expect(item.userData?.played, isTrue);
+    expect(item.userData?.lastPlayedDate, DateTime.utc(2026, 6, 21, 18, 30));
   });
 }

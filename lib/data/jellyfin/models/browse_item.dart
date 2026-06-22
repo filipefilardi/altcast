@@ -1,3 +1,5 @@
+import 'package:altcast/data/jellyfin/models/person_credit.dart';
+
 enum MediaKind { movie, series, season, episode, person, collection }
 
 MediaKind? _kindFromJellyfinType(String? type) {
@@ -40,6 +42,8 @@ class BrowseItem {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
+    this.genres = const [],
+    this.people = const [],
     this.userData,
   });
 
@@ -63,6 +67,8 @@ class BrowseItem {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+  final List<String> genres;
+  final List<PersonCredit> people;
 
   final UserData? userData;
 
@@ -87,6 +93,8 @@ class BrowseItem {
       seriesName: seriesName,
       seasonNumber: seasonNumber,
       episodeNumber: episodeNumber,
+      genres: genres,
+      people: people,
       userData: userData,
     );
   }
@@ -121,6 +129,17 @@ class BrowseItem {
       seriesName: json['SeriesName'] as String?,
       seasonNumber: season,
       episodeNumber: episode,
+      genres: ((json['Genres'] as List?) ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      people: ((json['People'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (person) =>
+                PersonCredit.fromJson(Map<String, dynamic>.from(person)),
+          )
+          .where((person) => person.name.isNotEmpty)
+          .toList(growable: false),
       userData: json['UserData'] is Map<String, dynamic>
           ? UserData.fromJson(json['UserData'] as Map<String, dynamic>)
           : null,
@@ -175,12 +194,14 @@ class UserData {
     this.isFavorite = false,
     this.playbackPositionTicks = 0,
     this.playedPercentage,
+    this.lastPlayedDate,
   });
 
   final bool played;
   final bool isFavorite;
   final int playbackPositionTicks;
   final double? playedPercentage;
+  final DateTime? lastPlayedDate;
 
   Duration get resumePosition =>
       Duration(microseconds: playbackPositionTicks ~/ 10);
@@ -198,6 +219,9 @@ class UserData {
       isFavorite: json['IsFavorite'] as bool? ?? false,
       playbackPositionTicks: json['PlaybackPositionTicks'] as int? ?? 0,
       playedPercentage: (json['PlayedPercentage'] as num?)?.toDouble(),
+      lastPlayedDate: DateTime.tryParse(
+        json['LastPlayedDate'] as String? ?? '',
+      ),
     );
   }
 }
