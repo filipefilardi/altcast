@@ -10,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
+import 'package:altcast/core/platform/android_background_settings.dart';
 import 'package:altcast/core/utils/language.dart';
 import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
@@ -63,6 +64,10 @@ class SettingsScreen extends ConsumerWidget {
           const _DownloadGroup(),
           const SizedBox(height: 24),
           const _NotificationGroup(),
+          if (AndroidBackgroundSettings.isSupported) ...[
+            const SizedBox(height: 24),
+            const _BackgroundActivityGroup(),
+          ],
           const SizedBox(height: 24),
           const _PlaybackGroup(),
           const SizedBox(height: 24),
@@ -552,6 +557,38 @@ class _NotificationGroup extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _BackgroundActivityGroup extends StatelessWidget {
+  const _BackgroundActivityGroup();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsGroup(
+      label: 'Background activity',
+      children: [
+        ListTile(
+          leading: const Icon(PiconsRegular.batteryWarning),
+          title: const Text('Battery optimization'),
+          subtitle: const Text(
+            'Set AltCast to Unrestricted to make background notifications to work',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: const Icon(
+            PiconsRegular.caretRight,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _openBatterySettings(context),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openBatterySettings(BuildContext context) async {
+    final opened = await AndroidBackgroundSettings.openBatterySettings();
+    if (!context.mounted || opened) return;
+    showAppSnackBar(context, "Couldn't open Android settings.");
   }
 }
 

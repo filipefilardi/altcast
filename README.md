@@ -63,6 +63,8 @@ AltCast can keep you informed while the app is in the background:
 
 Library notifications are available on Android and iOS. Download notifications are available on Android, iOS, and macOS. Background check timing is managed by the operating system, so checks may not run at the exact selected interval.
 
+On Android, some manufacturers aggressively throttle apps in the background. If new media alerts arrive late or only after opening AltCast, open **Settings → Background activity → Battery optimization** in AltCast and allow unrestricted background activity for the app. On Samsung devices, adding AltCast to **Never auto sleeping apps** can also help.
+
 ## Get the most out of AltCast
 
 AltCast works great on a plain Jellyfin install, but one server-side plugin unlocks a smoother viewing experience:
