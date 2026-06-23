@@ -43,7 +43,7 @@ enum LibraryCheckInterval {
 
 class NotificationPreferences {
   const NotificationPreferences({
-    this.notificationsEnabled = true,
+    this.notificationsEnabled = false,
     this.downloadNotifications = true,
     this.newEpisodesForFavoriteSeries = true,
     this.newLibraryMovies = false,
@@ -102,7 +102,7 @@ class NotificationPreferences {
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
     return NotificationPreferences(
-      notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
+      notificationsEnabled: json['notificationsEnabled'] as bool? ?? false,
       downloadNotifications: json['downloadNotifications'] as bool? ?? true,
       newEpisodesForFavoriteSeries:
           json['newEpisodesForFavoriteSeries'] as bool? ??
