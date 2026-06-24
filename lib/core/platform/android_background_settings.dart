@@ -11,6 +11,20 @@ class AndroidBackgroundSettings {
 
   static bool get isSupported => Platform.isAndroid;
 
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    if (!isSupported) return false;
+    try {
+      return await _channel.invokeMethod<bool>(
+            'isIgnoringBatteryOptimizations',
+          ) ??
+          false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   static Future<bool> openBatterySettings() async {
     if (!isSupported) return false;
     try {

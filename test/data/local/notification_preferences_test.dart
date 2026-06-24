@@ -8,6 +8,8 @@ void main() {
       const prefs = NotificationPreferences();
 
       expect(prefs.notificationsEnabled, isFalse);
+      expect(prefs.downloadNotifications, isFalse);
+      expect(prefs.anyLibraryNotifications, isFalse);
       expect(prefs.libraryCheckInterval, LibraryCheckInterval.oneHour);
       expect(prefs.shouldCheckLibraryInBackground, isFalse);
       expect(prefs.isRestored, isFalse);
@@ -44,7 +46,11 @@ void main() {
     });
 
     test('master switch gates download and library notifications', () {
-      const prefs = NotificationPreferences(notificationsEnabled: false);
+      const prefs = NotificationPreferences(
+        notificationsEnabled: false,
+        downloadNotifications: true,
+        newLibraryMovies: true,
+      );
 
       expect(prefs.downloadNotifications, isTrue);
       expect(prefs.anyLibraryNotifications, isTrue);
