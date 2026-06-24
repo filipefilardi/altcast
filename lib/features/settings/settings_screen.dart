@@ -166,8 +166,10 @@ class _DownloadGroup extends ConsumerWidget {
               activeThumbColor: AppColors.primary,
             ),
             SwitchListTile(
-              title: const Text('Auto-download next'),
-              subtitle: const Text('New episodes arrive while you watch'),
+              title: const Text('Keep one next episode ready'),
+              subtitle: const Text(
+                'After an episode download finishes, queue the next one.',
+              ),
               value: prefs.autoDownloadNextEpisode,
               onChanged: notifier.setAutoDownloadNextEpisode,
               activeThumbColor: AppColors.primary,

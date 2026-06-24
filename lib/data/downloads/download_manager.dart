@@ -169,11 +169,13 @@ class DownloadManager extends Notifier<DownloadsState> {
     Episode episode, {
     required String seriesName,
     String? seriesPosterTag,
+    bool autoQueuedNext = false,
   }) async {
     final entry = _QueueEntry.episode(
       episode,
       seriesName: seriesName,
       seriesPosterTag: seriesPosterTag,
+      autoQueuedNext: autoQueuedNext,
     );
     return _enqueueEntries([entry]) > 0;
   }
@@ -1117,6 +1119,7 @@ class DownloadManager extends Notifier<DownloadsState> {
     final prefs = ref.read(downloadPreferencesProvider);
     if (!prefs.autoDownloadNextEpisode) return;
     if (entry.kind != DownloadedItemKind.episode) return;
+    if (entry.autoQueuedNext) return;
 
     final seriesId = entry.seriesId;
     final seasonNum = entry.seasonNumber;
@@ -1136,6 +1139,7 @@ class DownloadManager extends Notifier<DownloadsState> {
           next,
           seriesName: entry.seriesName ?? 'Series',
           seriesPosterTag: entry.imageTag,
+          autoQueuedNext: true,
         );
       }
     } catch (_) {}
@@ -1206,6 +1210,7 @@ class _QueueEntry {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
+    this.autoQueuedNext = false,
   });
 
   factory _QueueEntry.movie(Movie m) {
@@ -1225,6 +1230,7 @@ class _QueueEntry {
     Episode e, {
     required String seriesName,
     String? seriesPosterTag,
+    bool autoQueuedNext = false,
   }) {
     return _QueueEntry._(
       itemId: e.id,
@@ -1238,6 +1244,7 @@ class _QueueEntry {
       seriesName: seriesName,
       seasonNumber: e.parentIndexNumber,
       episodeNumber: e.indexNumber,
+      autoQueuedNext: autoQueuedNext,
     );
   }
 
@@ -1253,6 +1260,7 @@ class _QueueEntry {
       seriesName: f.seriesName,
       seasonNumber: f.seasonNumber,
       episodeNumber: f.episodeNumber,
+      autoQueuedNext: f.autoQueuedNext,
     );
   }
 
@@ -1271,6 +1279,7 @@ class _QueueEntry {
       seriesName: json['seriesName'] as String?,
       seasonNumber: json['seasonNumber'] as int?,
       episodeNumber: json['episodeNumber'] as int?,
+      autoQueuedNext: json['autoQueuedNext'] as bool? ?? false,
     );
   }
 
@@ -1284,6 +1293,7 @@ class _QueueEntry {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
+  final bool autoQueuedNext;
 
   String get displayLabel {
     if (kind != DownloadedItemKind.episode) return name;
@@ -1307,6 +1317,7 @@ class _QueueEntry {
     if (seriesName != null) 'seriesName': seriesName,
     if (seasonNumber != null) 'seasonNumber': seasonNumber,
     if (episodeNumber != null) 'episodeNumber': episodeNumber,
+    if (autoQueuedNext) 'autoQueuedNext': true,
   };
 
   DownloadedItem toDownloadedItem({
@@ -1372,6 +1383,7 @@ class _QueueEntry {
     seriesName: seriesName,
     seasonNumber: seasonNumber,
     episodeNumber: episodeNumber,
+    autoQueuedNext: autoQueuedNext,
   );
 }
 
