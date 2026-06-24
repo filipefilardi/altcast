@@ -1616,7 +1616,14 @@ class _SettingsGroup extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           opacity: 0.22,
           borderOpacity: 0.16,
-          child: Column(children: tiles),
+          child: ListTileTheme(
+            data: ListTileThemeData(
+              titleTextStyle: Theme.of(context).textTheme.titleMedium,
+              subtitleTextStyle: Theme.of(context).textTheme.bodyMedium,
+              iconColor: AppColors.textSecondary,
+            ),
+            child: Column(children: tiles),
+          ),
         ),
       ],
     );
