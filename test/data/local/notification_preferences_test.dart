@@ -4,12 +4,12 @@ import 'package:altcast/data/local/notification_preferences.dart';
 
 void main() {
   group('NotificationPreferences', () {
-    test('defaults to notifications off with hourly mobile library checks', () {
+    test('defaults to notifications gated by the master switch', () {
       const prefs = NotificationPreferences();
 
       expect(prefs.notificationsEnabled, isFalse);
-      expect(prefs.downloadNotifications, isFalse);
-      expect(prefs.anyLibraryNotifications, isFalse);
+      expect(prefs.downloadNotifications, isTrue);
+      expect(prefs.anyLibraryNotifications, isTrue);
       expect(prefs.libraryCheckInterval, LibraryCheckInterval.oneHour);
       expect(prefs.shouldCheckLibraryInBackground, isFalse);
       expect(prefs.isRestored, isFalse);
