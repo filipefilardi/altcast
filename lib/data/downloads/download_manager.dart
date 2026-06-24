@@ -307,6 +307,18 @@ class DownloadManager extends Notifier<DownloadsState> {
     await _persist();
   }
 
+  Future<bool> maybeDeleteWatchedDownload(String itemId) async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!prefs.removeWatchedDownloads) return false;
+    if (!state.items.containsKey(itemId)) return false;
+    try {
+      await delete(itemId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> deleteAll() async {
     final itemIdSet = <String>{
       ...state.items.keys,

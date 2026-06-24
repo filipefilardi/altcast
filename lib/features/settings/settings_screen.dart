@@ -174,6 +174,15 @@ class _DownloadGroup extends ConsumerWidget {
               onChanged: notifier.setAutoDownloadNextEpisode,
               activeThumbColor: AppColors.primary,
             ),
+            SwitchListTile(
+              title: const Text('Remove watched downloads'),
+              subtitle: const Text(
+                'Free up space after downloaded videos are marked watched.',
+              ),
+              value: prefs.removeWatchedDownloads,
+              onChanged: notifier.setRemoveWatchedDownloads,
+              activeThumbColor: AppColors.primary,
+            ),
             ListTile(
               title: const Text('Offline video quality'),
               subtitle: Text(

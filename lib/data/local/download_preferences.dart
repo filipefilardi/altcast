@@ -25,18 +25,21 @@ enum OfflineVideoQuality {
 class DownloadPreferences {
   const DownloadPreferences({
     this.autoDownloadNextEpisode = false,
+    this.removeWatchedDownloads = false,
     this.wifiOnlyDownloads = true,
     this.downloadLocation = DownloadLocation.internal,
     this.offlineVideoQuality = OfflineVideoQuality.original,
   });
 
   final bool autoDownloadNextEpisode;
+  final bool removeWatchedDownloads;
   final bool wifiOnlyDownloads;
   final DownloadLocation downloadLocation;
   final OfflineVideoQuality offlineVideoQuality;
 
   DownloadPreferences copyWith({
     bool? autoDownloadNextEpisode,
+    bool? removeWatchedDownloads,
     bool? wifiOnlyDownloads,
     DownloadLocation? downloadLocation,
     OfflineVideoQuality? offlineVideoQuality,
@@ -44,6 +47,8 @@ class DownloadPreferences {
     return DownloadPreferences(
       autoDownloadNextEpisode:
           autoDownloadNextEpisode ?? this.autoDownloadNextEpisode,
+      removeWatchedDownloads:
+          removeWatchedDownloads ?? this.removeWatchedDownloads,
       wifiOnlyDownloads: wifiOnlyDownloads ?? this.wifiOnlyDownloads,
       downloadLocation: downloadLocation ?? this.downloadLocation,
       offlineVideoQuality: offlineVideoQuality ?? this.offlineVideoQuality,
@@ -52,6 +57,7 @@ class DownloadPreferences {
 
   Map<String, dynamic> toJson() => {
     'autoDownloadNextEpisode': autoDownloadNextEpisode,
+    'removeWatchedDownloads': removeWatchedDownloads,
     'wifiOnlyDownloads': wifiOnlyDownloads,
     'downloadLocation': downloadLocation.name,
     'offlineVideoQuality': offlineVideoQuality.name,
@@ -71,6 +77,7 @@ class DownloadPreferences {
     return DownloadPreferences(
       autoDownloadNextEpisode:
           json['autoDownloadNextEpisode'] as bool? ?? false,
+      removeWatchedDownloads: json['removeWatchedDownloads'] as bool? ?? false,
       wifiOnlyDownloads: json['wifiOnlyDownloads'] as bool? ?? true,
       downloadLocation: location,
       offlineVideoQuality: quality,
@@ -101,6 +108,11 @@ class DownloadPreferencesNotifier extends Notifier<DownloadPreferences> {
 
   Future<void> setAutoDownloadNextEpisode(bool enabled) async {
     state = state.copyWith(autoDownloadNextEpisode: enabled);
+    await _persist();
+  }
+
+  Future<void> setRemoveWatchedDownloads(bool enabled) async {
+    state = state.copyWith(removeWatchedDownloads: enabled);
     await _persist();
   }
 

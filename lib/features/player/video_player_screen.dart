@@ -1102,6 +1102,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (completed) {
         _cancelAutoplay();
         _stopScrobblerAndRefreshContinueWatching();
+        unawaited(
+          ref
+              .read(downloadManagerProvider.notifier)
+              .maybeDeleteWatchedDownload(widget.itemId),
+        );
         if (_nextEpisode != null) {
           final autoplay = ref
               .read(playbackPreferencesProvider)

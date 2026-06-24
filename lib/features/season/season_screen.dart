@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/features/home/home_providers.dart';
 import 'package:altcast/features/series/widgets/episode_tile.dart';
@@ -77,6 +78,11 @@ class SeasonScreen extends ConsumerWidget {
                           await ref
                               .read(jellyfinRepositoryProvider)
                               .setPlayed(ep.id, played: played);
+                          if (played) {
+                            await ref
+                                .read(downloadManagerProvider.notifier)
+                                .maybeDeleteWatchedDownload(ep.id);
+                          }
                           ref.invalidate(seasonProvider(seasonId));
                           ref.invalidate(
                             seasonEpisodesProvider((

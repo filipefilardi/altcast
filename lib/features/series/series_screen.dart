@@ -12,6 +12,7 @@ import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/genre_chips.dart';
 import 'package:altcast/core/widgets/media_detail_actions.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/episode.dart';
@@ -378,6 +379,11 @@ class _EpisodeList extends ConsumerWidget {
                   await ref
                       .read(jellyfinRepositoryProvider)
                       .setPlayed(ep.id, played: played);
+                  if (played) {
+                    await ref
+                        .read(downloadManagerProvider.notifier)
+                        .maybeDeleteWatchedDownload(ep.id);
+                  }
                   ref.invalidate(
                     episodesProvider((seriesId: seriesId, seasonId: seasonId)),
                   );

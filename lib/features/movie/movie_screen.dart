@@ -11,6 +11,7 @@ import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/genre_chips.dart';
 import 'package:altcast/core/widgets/media_detail_actions.dart';
 import 'package:altcast/core/widgets/meta_pill_row.dart';
+import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/movie.dart';
@@ -114,6 +115,11 @@ class _MovieBody extends ConsumerWidget {
                 initialPlayed: movie.userData?.played ?? false,
                 onSetPlayed: (v) async {
                   await repo.setPlayed(movie.id, played: v);
+                  if (v) {
+                    await ref
+                        .read(downloadManagerProvider.notifier)
+                        .maybeDeleteWatchedDownload(movie.id);
+                  }
                   ref.invalidate(movieProvider(movie.id));
                   invalidateHomeShelves(ref);
                 },
