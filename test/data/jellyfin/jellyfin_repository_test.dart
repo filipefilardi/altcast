@@ -79,6 +79,44 @@ void main() {
     expect(ids, {'series-1', 'series-2'});
   });
 
+  test('favoriteSeries requests favorite shows for download sync', () async {
+    final adapter = _RecordingAdapter((options) async {
+      expect(options.path, '/Users/user-1/Items');
+      expect(options.queryParameters['IncludeItemTypes'], 'Series');
+      expect(options.queryParameters['Filters'], 'IsFavorite');
+      expect(options.queryParameters['Recursive'], isTrue);
+      expect(options.queryParameters['EnableImages'], isTrue);
+      return _jsonResponse({
+        'Items': [
+          {
+            'Id': 'series-1',
+            'Name': 'Favorite Show',
+            'Type': 'Series',
+            'ImageTags': {'Primary': 'poster-tag'},
+          },
+        ],
+        'TotalRecordCount': 1,
+      });
+    });
+    final api = JellyfinApi(dio: Dio()..httpClientAdapter = adapter);
+    api.bind(
+      const JellyfinSession(
+        serverUrl: 'https://media.example.org',
+        accessToken: 'token',
+        userId: 'user-1',
+        serverId: 'server-1',
+        username: 'User',
+      ),
+    );
+
+    final shows = await JellyfinRepository(api).favoriteSeries();
+
+    expect(shows, hasLength(1));
+    expect(shows.single.id, 'series-1');
+    expect(shows.single.name, 'Favorite Show');
+    expect(shows.single.imageTag, 'poster-tag');
+  });
+
   test(
     'favoriteSeriesIds checks favorite state for candidate series',
     () async {

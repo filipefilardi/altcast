@@ -24,29 +24,29 @@ enum OfflineVideoQuality {
 
 class DownloadPreferences {
   const DownloadPreferences({
-    this.autoDownloadNextEpisode = false,
+    this.keepFavoriteShowsReady = false,
     this.removeWatchedDownloads = false,
     this.wifiOnlyDownloads = true,
     this.downloadLocation = DownloadLocation.internal,
     this.offlineVideoQuality = OfflineVideoQuality.original,
   });
 
-  final bool autoDownloadNextEpisode;
+  final bool keepFavoriteShowsReady;
   final bool removeWatchedDownloads;
   final bool wifiOnlyDownloads;
   final DownloadLocation downloadLocation;
   final OfflineVideoQuality offlineVideoQuality;
 
   DownloadPreferences copyWith({
-    bool? autoDownloadNextEpisode,
+    bool? keepFavoriteShowsReady,
     bool? removeWatchedDownloads,
     bool? wifiOnlyDownloads,
     DownloadLocation? downloadLocation,
     OfflineVideoQuality? offlineVideoQuality,
   }) {
     return DownloadPreferences(
-      autoDownloadNextEpisode:
-          autoDownloadNextEpisode ?? this.autoDownloadNextEpisode,
+      keepFavoriteShowsReady:
+          keepFavoriteShowsReady ?? this.keepFavoriteShowsReady,
       removeWatchedDownloads:
           removeWatchedDownloads ?? this.removeWatchedDownloads,
       wifiOnlyDownloads: wifiOnlyDownloads ?? this.wifiOnlyDownloads,
@@ -56,7 +56,7 @@ class DownloadPreferences {
   }
 
   Map<String, dynamic> toJson() => {
-    'autoDownloadNextEpisode': autoDownloadNextEpisode,
+    'keepFavoriteShowsReady': keepFavoriteShowsReady,
     'removeWatchedDownloads': removeWatchedDownloads,
     'wifiOnlyDownloads': wifiOnlyDownloads,
     'downloadLocation': downloadLocation.name,
@@ -75,13 +75,26 @@ class DownloadPreferences {
       orElse: () => OfflineVideoQuality.original,
     );
     return DownloadPreferences(
-      autoDownloadNextEpisode:
-          json['autoDownloadNextEpisode'] as bool? ?? false,
+      keepFavoriteShowsReady:
+          json['keepFavoriteShowsReady'] as bool? ??
+          json['autoDownloadNextEpisode'] as bool? ??
+          false,
       removeWatchedDownloads: json['removeWatchedDownloads'] as bool? ?? false,
       wifiOnlyDownloads: json['wifiOnlyDownloads'] as bool? ?? true,
       downloadLocation: location,
       offlineVideoQuality: quality,
     );
+  }
+
+  static Future<DownloadPreferences> load(SecureStorage storage) async {
+    final raw = await storage.read(_downloadPrefsKey);
+    if (raw == null) return const DownloadPreferences();
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      return DownloadPreferences.fromJson(data);
+    } catch (_) {
+      return const DownloadPreferences();
+    }
   }
 }
 
@@ -98,16 +111,11 @@ class DownloadPreferencesNotifier extends Notifier<DownloadPreferences> {
   }
 
   Future<void> _restore() async {
-    final raw = await ref.read(secureStorageProvider).read(_downloadPrefsKey);
-    if (raw == null) return;
-    try {
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      state = DownloadPreferences.fromJson(data);
-    } catch (_) {}
+    state = await DownloadPreferences.load(ref.read(secureStorageProvider));
   }
 
-  Future<void> setAutoDownloadNextEpisode(bool enabled) async {
-    state = state.copyWith(autoDownloadNextEpisode: enabled);
+  Future<void> setKeepFavoriteShowsReady(bool enabled) async {
+    state = state.copyWith(keepFavoriteShowsReady: enabled);
     await _persist();
   }
 

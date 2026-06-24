@@ -7,7 +7,7 @@ void main() {
     test('defaults to conservative automatic download behavior', () {
       const prefs = DownloadPreferences();
 
-      expect(prefs.autoDownloadNextEpisode, isFalse);
+      expect(prefs.keepFavoriteShowsReady, isFalse);
       expect(prefs.removeWatchedDownloads, isFalse);
       expect(prefs.wifiOnlyDownloads, isTrue);
     });
@@ -18,7 +18,15 @@ void main() {
       final restored = DownloadPreferences.fromJson(prefs.toJson());
 
       expect(restored.removeWatchedDownloads, isTrue);
-      expect(restored.autoDownloadNextEpisode, isFalse);
+      expect(restored.keepFavoriteShowsReady, isFalse);
+    });
+
+    test('migrates auto-download next to keep favorites ready', () {
+      final restored = DownloadPreferences.fromJson(const {
+        'autoDownloadNextEpisode': true,
+      });
+
+      expect(restored.keepFavoriteShowsReady, isTrue);
     });
   });
 }

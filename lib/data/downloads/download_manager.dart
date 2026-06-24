@@ -74,6 +74,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   final Set<String> _runningNotificationShown = <String>{};
   final Set<String> _userCancelled = <String>{};
   bool _draining = false;
+  Future<int>? _favoriteShowsSync;
   DownloadTask? _activeDownloadTask;
   String? _activeItemId;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
@@ -169,13 +170,11 @@ class DownloadManager extends Notifier<DownloadsState> {
     Episode episode, {
     required String seriesName,
     String? seriesPosterTag,
-    bool autoQueuedNext = false,
   }) async {
     final entry = _QueueEntry.episode(
       episode,
       seriesName: seriesName,
       seriesPosterTag: seriesPosterTag,
-      autoQueuedNext: autoQueuedNext,
     );
     return _enqueueEntries([entry]) > 0;
   }
@@ -317,6 +316,51 @@ class DownloadManager extends Notifier<DownloadsState> {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<int> syncFavoriteShowsReady({
+    int favoriteLimit = 200,
+    bool force = false,
+  }) {
+    final running = _favoriteShowsSync;
+    if (running != null) return running;
+
+    final future = _syncFavoriteShowsReady(
+      favoriteLimit: favoriteLimit,
+      force: force,
+    );
+    _favoriteShowsSync = future.whenComplete(() => _favoriteShowsSync = null);
+    return _favoriteShowsSync!;
+  }
+
+  Future<int> _syncFavoriteShowsReady({
+    required int favoriteLimit,
+    required bool force,
+  }) async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!force && !prefs.keepFavoriteShowsReady) return 0;
+
+    final repo = ref.read(jellyfinRepositoryProvider);
+    final favoriteShows = await repo.favoriteSeries(limit: favoriteLimit);
+    var queued = 0;
+
+    for (final show in favoriteShows) {
+      final seasons = await repo.getSeasons(show.id);
+      for (final season in seasons) {
+        final episodes = await repo.getEpisodes(show.id, season.id);
+        final unwatched = episodes
+            .where((episode) => !(episode.userData?.played ?? false))
+            .toList(growable: false);
+        if (unwatched.isEmpty) continue;
+        queued += await enqueueEpisodes(
+          unwatched,
+          seriesName: show.name,
+          seriesPosterTag: show.imageTag,
+        );
+      }
+    }
+
+    return queued;
   }
 
   Future<void> deleteAll() async {
@@ -700,7 +744,6 @@ class DownloadManager extends Notifier<DownloadsState> {
     await _deleteNativeTaskRecord(entry.itemId);
     await _showDownloadCompleteNotification(entry);
 
-    _maybeAutoDownloadNext(entry);
     return const _DownloadOutcome.success();
   }
 
@@ -1127,36 +1170,6 @@ class DownloadManager extends Notifier<DownloadsState> {
     return Duration(seconds: clamped);
   }
 
-  Future<void> _maybeAutoDownloadNext(_QueueEntry entry) async {
-    final prefs = ref.read(downloadPreferencesProvider);
-    if (!prefs.autoDownloadNextEpisode) return;
-    if (entry.kind != DownloadedItemKind.episode) return;
-    if (entry.autoQueuedNext) return;
-
-    final seriesId = entry.seriesId;
-    final seasonNum = entry.seasonNumber;
-    final episodeNum = entry.episodeNumber;
-    if (seriesId == null || seasonNum == null || episodeNum == null) return;
-
-    try {
-      final repo = ref.read(jellyfinRepositoryProvider);
-      final next = await repo.getNextEpisode(
-        seriesId: seriesId,
-        seasonNumber: seasonNum,
-        episodeNumber: episodeNum,
-      );
-
-      if (next != null) {
-        await enqueueEpisode(
-          next,
-          seriesName: entry.seriesName ?? 'Series',
-          seriesPosterTag: entry.imageTag,
-          autoQueuedNext: true,
-        );
-      }
-    } catch (_) {}
-  }
-
   Future<void> _persist() async {
     final dir = await _downloadsDir();
     final manifest = File('${dir.path}/manifest.json');
@@ -1222,7 +1235,6 @@ class _QueueEntry {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
-    this.autoQueuedNext = false,
   });
 
   factory _QueueEntry.movie(Movie m) {
@@ -1242,7 +1254,6 @@ class _QueueEntry {
     Episode e, {
     required String seriesName,
     String? seriesPosterTag,
-    bool autoQueuedNext = false,
   }) {
     return _QueueEntry._(
       itemId: e.id,
@@ -1256,7 +1267,6 @@ class _QueueEntry {
       seriesName: seriesName,
       seasonNumber: e.parentIndexNumber,
       episodeNumber: e.indexNumber,
-      autoQueuedNext: autoQueuedNext,
     );
   }
 
@@ -1272,7 +1282,6 @@ class _QueueEntry {
       seriesName: f.seriesName,
       seasonNumber: f.seasonNumber,
       episodeNumber: f.episodeNumber,
-      autoQueuedNext: f.autoQueuedNext,
     );
   }
 
@@ -1291,7 +1300,6 @@ class _QueueEntry {
       seriesName: json['seriesName'] as String?,
       seasonNumber: json['seasonNumber'] as int?,
       episodeNumber: json['episodeNumber'] as int?,
-      autoQueuedNext: json['autoQueuedNext'] as bool? ?? false,
     );
   }
 
@@ -1305,7 +1313,6 @@ class _QueueEntry {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
-  final bool autoQueuedNext;
 
   String get displayLabel {
     if (kind != DownloadedItemKind.episode) return name;
@@ -1329,7 +1336,6 @@ class _QueueEntry {
     if (seriesName != null) 'seriesName': seriesName,
     if (seasonNumber != null) 'seasonNumber': seasonNumber,
     if (episodeNumber != null) 'episodeNumber': episodeNumber,
-    if (autoQueuedNext) 'autoQueuedNext': true,
   };
 
   DownloadedItem toDownloadedItem({
@@ -1395,7 +1401,6 @@ class _QueueEntry {
     seriesName: seriesName,
     seasonNumber: seasonNumber,
     episodeNumber: episodeNumber,
-    autoQueuedNext: autoQueuedNext,
   );
 }
 

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/theme/app_theme.dart';
+import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/onboarding_preferences.dart';
 import 'package:altcast/data/notifications/library_notification_scheduler.dart';
@@ -21,9 +22,13 @@ class AltCastApp extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
     final onboarding = ref.watch(onboardingPreferencesProvider);
     final notificationPreferences = ref.watch(notificationPreferencesProvider);
+    final downloadPreferences = ref.watch(downloadPreferencesProvider);
     if (notificationPreferences.isRestored) {
       unawaited(
-        LibraryNotificationScheduler.configure(notificationPreferences),
+        LibraryNotificationScheduler.configure(
+          notificationPreferences,
+          downloadPreferences: downloadPreferences,
+        ),
       );
     }
 

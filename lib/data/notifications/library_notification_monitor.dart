@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/data/jellyfin/models/jellyfin_session.dart';
+import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/library_activity_state.dart';
 import 'package:altcast/data/local/notification_preferences.dart';
+import 'package:altcast/data/local/secure_storage.dart';
 import 'package:altcast/data/notifications/app_notifications.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 
@@ -59,7 +62,11 @@ class LibraryNotificationMonitor extends Notifier<void> {
 
     final NotificationPreferences prefs =
         preferences ?? ref.read(notificationPreferencesProvider);
-    if (!prefs.anyLibraryNotifications) return;
+    final downloadPrefs = await DownloadPreferences.load(
+      ref.read(secureStorageProvider),
+    );
+    final shouldKeepFavoritesReady = downloadPrefs.keepFavoriteShowsReady;
+    if (!prefs.anyLibraryNotifications && !shouldKeepFavoritesReady) return;
 
     final activeSession = session ?? _authenticatedSession();
     if (activeSession == null) return;
@@ -84,6 +91,11 @@ class LibraryNotificationMonitor extends Notifier<void> {
       final movies = await moviesFuture;
       final episodes = await episodesFuture;
       final favoriteSeriesIds = await favoriteSeriesIdsFuture;
+      final favoriteSyncFuture = shouldKeepFavoritesReady
+          ? ref
+                .read(downloadManagerProvider.notifier)
+                .syncFavoriteShowsReady(force: true)
+          : Future<int>.value(0);
 
       if (kDebugMode) {
         debugPrint(
@@ -107,6 +119,7 @@ class LibraryNotificationMonitor extends Notifier<void> {
         debugPrint(
           'Library notification snapshot migrated to individual episode IDs',
         );
+        await favoriteSyncFuture;
         await store.writeProfile(
           activeSession,
           profile
@@ -124,6 +137,7 @@ class LibraryNotificationMonitor extends Notifier<void> {
           'Library notification baseline created: '
           '${movies.length} movies, ${episodes.length} episodes',
         );
+        await favoriteSyncFuture;
         await store.writeProfile(
           activeSession,
           profile
@@ -149,6 +163,7 @@ class LibraryNotificationMonitor extends Notifier<void> {
       );
 
       if (newMovies.isEmpty && newEpisodes.isEmpty) {
+        await favoriteSyncFuture;
         await store.writeProfile(
           activeSession,
           profile.mergeSeen(
@@ -165,6 +180,7 @@ class LibraryNotificationMonitor extends Notifier<void> {
         newMovies: newMovies,
         newEpisodes: newEpisodes,
       );
+      await favoriteSyncFuture;
       debugPrint('Library notifications posted: $notificationCount');
 
       await store.writeProfile(

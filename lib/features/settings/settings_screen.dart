@@ -166,12 +166,21 @@ class _DownloadGroup extends ConsumerWidget {
               activeThumbColor: AppColors.primary,
             ),
             SwitchListTile(
-              title: const Text('Keep one next episode ready'),
+              title: const Text('Keep favorites ready'),
               subtitle: const Text(
-                'After an episode download finishes, queue the next one.',
+                'Download unwatched episodes from favorite shows.',
               ),
-              value: prefs.autoDownloadNextEpisode,
-              onChanged: notifier.setAutoDownloadNextEpisode,
+              value: prefs.keepFavoriteShowsReady,
+              onChanged: (enabled) async {
+                await notifier.setKeepFavoriteShowsReady(enabled);
+                if (enabled) {
+                  unawaited(
+                    ref
+                        .read(downloadManagerProvider.notifier)
+                        .syncFavoriteShowsReady(),
+                  );
+                }
+              },
               activeThumbColor: AppColors.primary,
             ),
             SwitchListTile(

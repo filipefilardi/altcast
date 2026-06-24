@@ -263,7 +263,6 @@ class DownloadFailure {
     this.seriesName,
     this.seasonNumber,
     this.episodeNumber,
-    this.autoQueuedNext = false,
   });
 
   final String itemId;
@@ -277,7 +276,6 @@ class DownloadFailure {
   final String? seriesName;
   final int? seasonNumber;
   final int? episodeNumber;
-  final bool autoQueuedNext;
 
   String? get episodeLabel {
     if (kind != DownloadedItemKind.episode) return null;
