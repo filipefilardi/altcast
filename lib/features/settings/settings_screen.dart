@@ -218,22 +218,9 @@ class _DownloadGroup extends ConsumerWidget {
                 onTap: () => _showLocationPicker(context, ref),
               ),
             ListTile(
-              title: Text(
-                'Delete all downloads',
-                style: TextStyle(
-                  color: hasDownloads
-                      ? AppColors.error
-                      : AppColors.textTertiary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              subtitle: Text(
+              title: const Text('Delete all downloads'),
+              subtitle: const Text(
                 'Remove all offline videos and queued downloads from this device.',
-                style: TextStyle(
-                  color: hasDownloads
-                      ? AppColors.error.withValues(alpha: 0.72)
-                      : AppColors.textTertiary,
-                ),
               ),
               enabled: hasDownloads,
               onTap: hasDownloads
