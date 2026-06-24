@@ -159,13 +159,6 @@ class _DownloadGroup extends ConsumerWidget {
           label: 'Offline Downloads',
           children: [
             SwitchListTile(
-              title: const Text('Wi-Fi only downloads'),
-              subtitle: const Text('Avoid downloading videos on mobile data.'),
-              value: prefs.wifiOnlyDownloads,
-              onChanged: notifier.setWifiOnlyDownloads,
-              activeThumbColor: AppColors.primary,
-            ),
-            SwitchListTile(
               title: const Text('Keep favorites ready'),
               subtitle: const Text(
                 'Download unwatched episodes from favorite shows.',
@@ -190,6 +183,13 @@ class _DownloadGroup extends ConsumerWidget {
               ),
               value: prefs.removeWatchedDownloads,
               onChanged: notifier.setRemoveWatchedDownloads,
+              activeThumbColor: AppColors.primary,
+            ),
+            SwitchListTile(
+              title: const Text('Wi-Fi only downloads'),
+              subtitle: const Text('Avoid downloading videos on mobile data.'),
+              value: prefs.wifiOnlyDownloads,
+              onChanged: notifier.setWifiOnlyDownloads,
               activeThumbColor: AppColors.primary,
             ),
             ListTile(
