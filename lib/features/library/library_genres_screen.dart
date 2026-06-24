@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/utils/dio_error_message.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/genre_chips.dart';
@@ -40,54 +41,56 @@ class LibraryGenresScreen extends ConsumerWidget {
       ]);
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Genres')),
-      body: RefreshIndicator(
-        onRefresh: refresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          children: [
-            if (allFailed)
-              ErrorStateView(
-                title: "Couldn't load genres",
-                message: userFacingNetworkMessage(
-                  movieGenres.error ?? showGenres.error ?? Exception(),
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Genres')),
+        body: RefreshIndicator(
+          onRefresh: refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            children: [
+              if (allFailed)
+                ErrorStateView(
+                  title: "Couldn't load genres",
+                  message: userFacingNetworkMessage(
+                    movieGenres.error ?? showGenres.error ?? Exception(),
+                  ),
+                  onRetry: refresh,
+                )
+              else if (allEmpty)
+                const EmptyState(
+                  icon: Icons.category_outlined,
+                  title: 'No genres found',
+                  message: 'No movie or TV genres are available right now.',
+                )
+              else ...[
+                _GenreSection(
+                  title: 'Movie Genres',
+                  genresState: movieGenres,
+                  onRetry: () => ref.invalidate(_movieGenresProvider),
+                  onTapGenre: (genre) => context.push(
+                    Uri(
+                      path: '/library/movies',
+                      queryParameters: {'genre': genre},
+                    ).toString(),
+                  ),
                 ),
-                onRetry: refresh,
-              )
-            else if (allEmpty)
-              const EmptyState(
-                icon: Icons.category_outlined,
-                title: 'No genres found',
-                message: 'No movie or TV genres are available right now.',
-              )
-            else ...[
-              _GenreSection(
-                title: 'Movie Genres',
-                genresState: movieGenres,
-                onRetry: () => ref.invalidate(_movieGenresProvider),
-                onTapGenre: (genre) => context.push(
-                  Uri(
-                    path: '/library/movies',
-                    queryParameters: {'genre': genre},
-                  ).toString(),
+                const SizedBox(height: 24),
+                _GenreSection(
+                  title: 'TV Genres',
+                  genresState: showGenres,
+                  onRetry: () => ref.invalidate(_showGenresProvider),
+                  onTapGenre: (genre) => context.push(
+                    Uri(
+                      path: '/library/shows',
+                      queryParameters: {'genre': genre},
+                    ).toString(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              _GenreSection(
-                title: 'TV Genres',
-                genresState: showGenres,
-                onRetry: () => ref.invalidate(_showGenresProvider),
-                onTapGenre: (genre) => context.push(
-                  Uri(
-                    path: '/library/shows',
-                    queryParameters: {'genre': genre},
-                  ).toString(),
-                ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

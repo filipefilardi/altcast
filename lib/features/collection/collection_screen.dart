@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -30,26 +31,28 @@ class CollectionScreen extends ConsumerWidget {
       await ref.read(collectionItemsProvider(collectionId).future);
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title == null || title!.isEmpty ? 'Collection' : title!),
-        leading: BackButton(onPressed: () => context.pop()),
-      ),
-      body: RefreshIndicator(
-        onRefresh: refresh,
-        child: itemsAsync.when(
-          data: (items) => _CollectionBody(items: items),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => ListView(
-            children: [
-              const SizedBox(height: 120),
-              ErrorStateView(
-                title: "Couldn't load collection",
-                message: e.toString(),
-                onRetry: () =>
-                    ref.invalidate(collectionItemsProvider(collectionId)),
-              ),
-            ],
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title == null || title!.isEmpty ? 'Collection' : title!),
+          leading: BackButton(onPressed: () => context.pop()),
+        ),
+        body: RefreshIndicator(
+          onRefresh: refresh,
+          child: itemsAsync.when(
+            data: (items) => _CollectionBody(items: items),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => ListView(
+              children: [
+                const SizedBox(height: 120),
+                ErrorStateView(
+                  title: "Couldn't load collection",
+                  message: e.toString(),
+                  onRetry: () =>
+                      ref.invalidate(collectionItemsProvider(collectionId)),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import 'package:picons/picons.dart';
 
 import 'package:altcast/core/utils/dio_error_message.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -51,32 +52,34 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   Widget build(BuildContext context) {
     ref.listen<int>(favoritesRevisionProvider, (_, _) => _reload());
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Favorites'),
-        leading: BackButton(onPressed: () => context.pop()),
-        actions: [
-          PopupMenuButton<_FavoriteType>(
-            tooltip: 'Filter',
-            initialValue: _type,
-            icon: const Icon(PiconsRegular.funnelSimple),
-            onSelected: (type) {
-              if (type == _type) return;
-              setState(() => _type = type);
-              _reload();
-            },
-            itemBuilder: (context) => [
-              for (final type in _FavoriteType.values)
-                PopupMenuItem(value: type, child: Text(type.label)),
-            ],
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Favorites'),
+          leading: BackButton(onPressed: () => context.pop()),
+          actions: [
+            PopupMenuButton<_FavoriteType>(
+              tooltip: 'Filter',
+              initialValue: _type,
+              icon: const Icon(PiconsRegular.funnelSimple),
+              onSelected: (type) {
+                if (type == _type) return;
+                setState(() => _type = type);
+                _reload();
+              },
+              itemBuilder: (context) => [
+                for (final type in _FavoriteType.values)
+                  PopupMenuItem(value: type, child: Text(type.label)),
+              ],
+            ),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _reload,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: _buildBody(context),
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _reload,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: _buildBody(context),
         ),
       ),
     );

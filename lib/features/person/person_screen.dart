@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/expandable_text.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
@@ -24,53 +25,55 @@ class PersonScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final personAsync = ref.watch(personProvider(personId));
     final itemsAsync = ref.watch(personItemsProvider(personId));
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => context.pop()),
-        title: personAsync.maybeWhen(
-          data: (p) => Text(p.name),
-          orElse: () => const Text('Cast & Crew'),
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: () => context.pop()),
+          title: personAsync.maybeWhen(
+            data: (p) => Text(p.name),
+            orElse: () => const Text('Cast & Crew'),
+          ),
         ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(personProvider(personId));
-          ref.invalidate(personItemsProvider(personId));
-          await Future.wait([
-            ref.read(personProvider(personId).future),
-            ref
-                .read(personItemsProvider(personId).future)
-                .catchError((_) => <BrowseItem>[]),
-          ]);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            personAsync.when(
-              data: (person) => _PersonHeader(person: person),
-              loading: () => const _PersonHeaderSkeleton(),
-              error: (e, _) => ErrorStateView(
-                title: "Couldn't load person",
-                message: e.toString(),
-                onRetry: () => ref.invalidate(personProvider(personId)),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(personProvider(personId));
+            ref.invalidate(personItemsProvider(personId));
+            await Future.wait([
+              ref.read(personProvider(personId).future),
+              ref
+                  .read(personItemsProvider(personId).future)
+                  .catchError((_) => <BrowseItem>[]),
+            ]);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            children: [
+              personAsync.when(
+                data: (person) => _PersonHeader(person: person),
+                loading: () => const _PersonHeaderSkeleton(),
+                error: (e, _) => ErrorStateView(
+                  title: "Couldn't load person",
+                  message: e.toString(),
+                  onRetry: () => ref.invalidate(personProvider(personId)),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'FILMS & SHOWS',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 12),
-            itemsAsync.when(
-              data: (items) => _WorksGrid(items: items),
-              loading: () => const _WorksSkeleton(),
-              error: (_, _) => ErrorStateView(
-                title: "Couldn't load works",
-                onRetry: () => ref.invalidate(personItemsProvider(personId)),
+              const SizedBox(height: 24),
+              Text(
+                'FILMS & SHOWS',
+                style: Theme.of(context).textTheme.labelLarge,
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              itemsAsync.when(
+                data: (items) => _WorksGrid(items: items),
+                loading: () => const _WorksSkeleton(),
+                error: (_, _) => ErrorStateView(
+                  title: "Couldn't load works",
+                  onRetry: () => ref.invalidate(personItemsProvider(personId)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

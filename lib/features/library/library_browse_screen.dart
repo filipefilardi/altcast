@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/utils/dio_error_message.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/filter_chips_row.dart';
@@ -118,25 +119,27 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        leading: BackButton(onPressed: () => context.pop()),
-        actions: _filtersEnabled
-            ? [
-                IconButton(
-                  tooltip: 'Filters',
-                  onPressed: _showFilters,
-                  icon: const Icon(PiconsRegular.funnelSimple),
-                ),
-              ]
-            : null,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _reload,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: _buildBody(context),
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+          leading: BackButton(onPressed: () => context.pop()),
+          actions: _filtersEnabled
+              ? [
+                  IconButton(
+                    tooltip: 'Filters',
+                    onPressed: _showFilters,
+                    icon: const Icon(PiconsRegular.funnelSimple),
+                  ),
+                ]
+              : null,
+        ),
+        body: RefreshIndicator(
+          onRefresh: _reload,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: _buildBody(context),
+          ),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/format.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
@@ -45,76 +46,81 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
     final state = ref.watch(downloadManagerProvider);
     final grouped = _groupAvailableDownloads(state.items.values);
     _scheduleFocusScroll(state, grouped);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Downloads'),
-        leading: BackButton(onPressed: () => context.pop()),
-      ),
-      body: !state.bootstrapped
-          ? const Center(child: CircularProgressIndicator())
-          : state.items.isEmpty &&
-                state.progress.isEmpty &&
-                state.failures.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: EmptyState(
-                icon: PiconsRegular.downloadSimple,
-                title: 'Nothing downloaded yet',
-                message:
-                    'Tap the download icon on a movie or episode to keep it offline.',
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Downloads'),
+          leading: BackButton(onPressed: () => context.pop()),
+        ),
+        body: !state.bootstrapped
+            ? const Center(child: CircularProgressIndicator())
+            : state.items.isEmpty &&
+                  state.progress.isEmpty &&
+                  state.failures.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: EmptyState(
+                  icon: PiconsRegular.downloadSimple,
+                  title: 'Nothing downloaded yet',
+                  message:
+                      'Tap the download icon on a movie or episode to keep it offline.',
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                children: [
+                  if (state.progress.isNotEmpty) ...[
+                    const _SectionHeader(title: 'Downloading'),
+                    const SizedBox(height: 8),
+                    for (final entry in state.progress.values)
+                      _FocusTarget(
+                        focusKey: _focusKey,
+                        focused: _isFocused(entry.itemId),
+                        child: _InProgressRow(progress: entry),
+                      ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (state.failures.isNotEmpty) ...[
+                    const _SectionHeader(title: 'Needs Attention'),
+                    const SizedBox(height: 8),
+                    for (final failure in state.failures.values)
+                      _FocusTarget(
+                        focusKey: _focusKey,
+                        focused: _isFocused(failure.itemId),
+                        child: _FailedRow(failure: failure),
+                      ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (state.items.isNotEmpty) ...[
+                    if (grouped.seriesGroups.isNotEmpty) ...[
+                      const _SectionHeader(title: 'TV Shows'),
+                      const SizedBox(height: 8),
+                      for (final group in grouped.seriesGroups)
+                        _FocusTarget(
+                          focusKey: _focusKey,
+                          focused: _isFocusedSeriesGroup(group),
+                          child: _SeriesDownloadsCard(group: group),
+                        ),
+                    ],
+                    if (grouped.movies.isNotEmpty) ...[
+                      if (grouped.seriesGroups.isNotEmpty)
+                        const SizedBox(height: 16),
+                      const _SectionHeader(title: 'Movies'),
+                      const SizedBox(height: 8),
+                      for (final item in grouped.movies)
+                        _FocusTarget(
+                          focusKey: _focusKey,
+                          focused: _isFocused(item.id),
+                          child: _DownloadedRow(item: item),
+                        ),
+                    ],
+                  ],
+                ],
               ),
-            )
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              children: [
-                if (state.progress.isNotEmpty) ...[
-                  const _SectionHeader(title: 'Downloading'),
-                  const SizedBox(height: 8),
-                  for (final entry in state.progress.values)
-                    _FocusTarget(
-                      focusKey: _focusKey,
-                      focused: _isFocused(entry.itemId),
-                      child: _InProgressRow(progress: entry),
-                    ),
-                  const SizedBox(height: 24),
-                ],
-                if (state.failures.isNotEmpty) ...[
-                  const _SectionHeader(title: 'Needs Attention'),
-                  const SizedBox(height: 8),
-                  for (final failure in state.failures.values)
-                    _FocusTarget(
-                      focusKey: _focusKey,
-                      focused: _isFocused(failure.itemId),
-                      child: _FailedRow(failure: failure),
-                    ),
-                  const SizedBox(height: 24),
-                ],
-                if (state.items.isNotEmpty) ...[
-                  if (grouped.seriesGroups.isNotEmpty) ...[
-                    const _SectionHeader(title: 'TV Shows'),
-                    const SizedBox(height: 8),
-                    for (final group in grouped.seriesGroups)
-                      _FocusTarget(
-                        focusKey: _focusKey,
-                        focused: _isFocusedSeriesGroup(group),
-                        child: _SeriesDownloadsCard(group: group),
-                      ),
-                  ],
-                  if (grouped.movies.isNotEmpty) ...[
-                    if (grouped.seriesGroups.isNotEmpty)
-                      const SizedBox(height: 16),
-                    const _SectionHeader(title: 'Movies'),
-                    const SizedBox(height: 8),
-                    for (final item in grouped.movies)
-                      _FocusTarget(
-                        focusKey: _focusKey,
-                        focused: _isFocused(item.id),
-                        child: _DownloadedRow(item: item),
-                      ),
-                  ],
-                ],
-              ],
-            ),
+      ),
     );
   }
 
@@ -512,31 +518,36 @@ class _SeriesDownloadsScreen extends ConsumerWidget {
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(seriesTitle)),
-      body: group == null
-          ? const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: EmptyState(
-                icon: PiconsRegular.televisionSimple,
-                title: 'No downloaded episodes',
-                message: 'This show currently has no offline episodes.',
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              children: [
-                for (final seasonGroup in _groupEpisodesBySeason(
-                  group.episodes,
-                )) ...[
-                  _SectionHeader(title: seasonGroup.label),
-                  const SizedBox(height: 8),
-                  for (final episode in seasonGroup.episodes)
-                    _SeriesEpisodeRow(item: episode),
-                  const SizedBox(height: 12),
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(title: Text(seriesTitle)),
+        body: group == null
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: EmptyState(
+                  icon: PiconsRegular.televisionSimple,
+                  title: 'No downloaded episodes',
+                  message: 'This show currently has no offline episodes.',
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                children: [
+                  for (final seasonGroup in _groupEpisodesBySeason(
+                    group.episodes,
+                  )) ...[
+                    _SectionHeader(title: seasonGroup.label),
+                    const SizedBox(height: 8),
+                    for (final episode in seasonGroup.episodes)
+                      _SeriesEpisodeRow(item: episode),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-              ],
-            ),
+              ),
+      ),
     );
   }
 }

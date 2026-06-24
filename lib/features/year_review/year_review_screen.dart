@@ -9,6 +9,7 @@ import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
@@ -63,37 +64,39 @@ class _YearReviewScreenState extends ConsumerState<YearReviewScreen> {
     final year = _selectedYear ?? DateTime.now().year;
     final summary = YearReviewSummary.fromEntries(_entries, year);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Year in review'),
-        leading: BackButton(onPressed: () => context.pop()),
-        actions: [
-          PopupMenuButton<int>(
-            tooltip: 'Choose year',
-            initialValue: year,
-            onSelected: (value) => setState(() => _selectedYear = value),
-            itemBuilder: (_) => [
-              for (final value in _years)
-                PopupMenuItem(value: value, child: Text('$value')),
-            ],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$year',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(PiconsRegular.caretDown, size: 16),
-                ],
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Year in review'),
+          leading: BackButton(onPressed: () => context.pop()),
+          actions: [
+            PopupMenuButton<int>(
+              tooltip: 'Choose year',
+              initialValue: year,
+              onSelected: (value) => setState(() => _selectedYear = value),
+              itemBuilder: (_) => [
+                for (final value in _years)
+                  PopupMenuItem(value: value, child: Text('$value')),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$year',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(PiconsRegular.caretDown, size: 16),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+        body: RefreshIndicator(onRefresh: _refresh, child: _buildBody(summary)),
       ),
-      body: RefreshIndicator(onRefresh: _refresh, child: _buildBody(summary)),
     );
   }
 

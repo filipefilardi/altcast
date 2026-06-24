@@ -6,6 +6,7 @@ import 'package:picons/picons.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/dio_error_message.dart';
 import 'package:altcast/core/utils/navigation.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
@@ -70,33 +71,35 @@ class _WatchHistoryScreenState extends ConsumerState<WatchHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Watch history'),
-        leading: BackButton(onPressed: () => context.pop()),
-        actions: [
-          PopupMenuButton<_HistoryType>(
-            enabled: !_inflight,
-            tooltip: 'Filter',
-            initialValue: _type,
-            icon: const Icon(PiconsRegular.funnelSimple),
-            onSelected: (type) {
-              if (type == _type) return;
-              setState(() => _type = type);
-              _reload();
-            },
-            itemBuilder: (_) => [
-              for (final type in _HistoryType.values)
-                PopupMenuItem(value: type, child: Text(type.label)),
-            ],
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Watch history'),
+          leading: BackButton(onPressed: () => context.pop()),
+          actions: [
+            PopupMenuButton<_HistoryType>(
+              enabled: !_inflight,
+              tooltip: 'Filter',
+              initialValue: _type,
+              icon: const Icon(PiconsRegular.funnelSimple),
+              onSelected: (type) {
+                if (type == _type) return;
+                setState(() => _type = type);
+                _reload();
+              },
+              itemBuilder: (_) => [
+                for (final type in _HistoryType.values)
+                  PopupMenuItem(value: type, child: Text(type.label)),
+              ],
+            ),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _reload,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: _buildBody(),
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _reload,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: _buildBody(),
         ),
       ),
     );
