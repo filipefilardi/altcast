@@ -532,7 +532,6 @@ class _NotificationGroup extends ConsumerWidget {
                         .libraryCheckInterval ==
                     interval;
                 return ListTile(
-                  leading: const Icon(PiconsRegular.clock),
                   title: Text(interval.label),
                   trailing: selected
                       ? const Icon(
