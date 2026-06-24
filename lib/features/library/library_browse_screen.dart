@@ -10,6 +10,8 @@ import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/filter_chips_row.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
+import 'package:altcast/core/widgets/glass_sheet_controls.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
 import 'package:altcast/data/jellyfin/models/browse_item.dart';
 import 'package:altcast/features/home/widgets/poster_card.dart';
@@ -237,9 +239,8 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
     final repo = ref.read(jellyfinRepositoryProvider);
     final genres = await repo.getGenres(itemType: widget.itemType);
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showGlassBottomSheet<void>(
       context: context,
-      showDragHandle: true,
       builder: (context) {
         String? localGenre = _genre;
         int? localYear = _year;
@@ -250,105 +251,110 @@ class _LibraryBrowseScreenState extends ConsumerState<LibraryBrowseScreen> {
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Filters',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<LibrarySort>(
-                      initialValue: localSort,
-                      decoration: const InputDecoration(labelText: 'Sort'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: LibrarySort.recentlyAdded,
-                          child: Text('Recently added'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.nameAsc,
-                          child: Text('Name A-Z'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.nameDesc,
-                          child: Text('Name Z-A'),
-                        ),
-                        DropdownMenuItem(
-                          value: LibrarySort.yearDesc,
-                          child: Text('Year (newest first)'),
-                        ),
-                      ],
-                      onChanged: (v) =>
-                          setModalState(() => localSort = v ?? localSort),
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String?>(
-                      initialValue: localGenre,
-                      decoration: const InputDecoration(labelText: 'Genre'),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Any'),
-                        ),
-                        ...genres.map(
-                          (g) => DropdownMenuItem<String?>(
-                            value: g,
-                            child: Text(g),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Filters',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 16),
+                      GlassSheetDropdown<LibrarySort>(
+                        label: 'Sort',
+                        value: localSort,
+                        items: const [
+                          DropdownMenuItem(
+                            value: LibrarySort.recentlyAdded,
+                            child: Text('Recently added'),
                           ),
-                        ),
-                      ],
-                      onChanged: (v) => setModalState(() => localGenre = v),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      initialValue: localYear?.toString() ?? '',
-                      decoration: const InputDecoration(labelText: 'Year'),
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      onChanged: (v) => localYear = int.tryParse(v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Unwatched only'),
-                      value: localUnwatched,
-                      onChanged: (v) => setModalState(() => localUnwatched = v),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _genre = null;
-                              _year = null;
-                              _unwatchedOnly = false;
-                              _sort = LibrarySort.recentlyAdded;
-                            });
-                            Navigator.of(context).pop();
-                            _reload();
-                          },
-                          child: const Text('Clear'),
-                        ),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: () {
-                            setState(() {
-                              _genre = localGenre;
-                              _year = localYear;
-                              _unwatchedOnly = localUnwatched;
-                              _sort = localSort;
-                            });
-                            Navigator.of(context).pop();
-                            _reload();
-                          },
-                          child: const Text('Apply'),
-                        ),
-                      ],
-                    ),
-                  ],
+                          DropdownMenuItem(
+                            value: LibrarySort.nameAsc,
+                            child: Text('Name A-Z'),
+                          ),
+                          DropdownMenuItem(
+                            value: LibrarySort.nameDesc,
+                            child: Text('Name Z-A'),
+                          ),
+                          DropdownMenuItem(
+                            value: LibrarySort.yearDesc,
+                            child: Text('Year (newest first)'),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setModalState(() => localSort = v ?? localSort),
+                      ),
+                      const SizedBox(height: 14),
+                      GlassSheetDropdown<String?>(
+                        label: 'Genre',
+                        value: localGenre,
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Any'),
+                          ),
+                          ...genres.map(
+                            (g) => DropdownMenuItem<String?>(
+                              value: g,
+                              child: Text(g),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setModalState(() => localGenre = v),
+                      ),
+                      const SizedBox(height: 14),
+                      GlassSheetTextField(
+                        label: 'Year',
+                        initialValue: localYear?.toString() ?? '',
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: (v) => localYear = int.tryParse(v),
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Unwatched only'),
+                        value: localUnwatched,
+                        onChanged: (v) =>
+                            setModalState(() => localUnwatched = v),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _genre = null;
+                                _year = null;
+                                _unwatchedOnly = false;
+                                _sort = LibrarySort.recentlyAdded;
+                              });
+                              Navigator.of(context).pop();
+                              _reload();
+                            },
+                            child: const Text('Clear'),
+                          ),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: () {
+                              setState(() {
+                                _genre = localGenre;
+                                _year = localYear;
+                                _unwatchedOnly = localUnwatched;
+                                _sort = localSort;
+                              });
+                              Navigator.of(context).pop();
+                              _reload();
+                            },
+                            child: const Text('Apply'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );

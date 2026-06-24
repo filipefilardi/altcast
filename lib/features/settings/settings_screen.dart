@@ -13,8 +13,9 @@ import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/platform/android_background_settings.dart';
 import 'package:altcast/core/utils/language.dart';
-import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/app_snackbar.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
@@ -257,7 +258,7 @@ class _DownloadGroup extends ConsumerWidget {
   }
 
   void _showLocationPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
+    showGlassBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -290,7 +291,7 @@ class _DownloadGroup extends ConsumerWidget {
   }
 
   void _showOfflineQualityPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
+    showGlassBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -518,10 +519,8 @@ class _NotificationGroup extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) {
-    return showModalBottomSheet<void>(
+    return showGlassBottomSheet<void>(
       context: context,
-      showDragHandle: true,
-      backgroundColor: AppColors.surfaceElevated,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -796,9 +795,8 @@ Future<void> _showAccountSheet(
   String username,
   String serverUrl,
 ) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final info = ref.watch(_serverInfoProvider);
@@ -994,9 +992,8 @@ class _VersionFooter extends ConsumerWidget {
 }
 
 Future<void> _showAutoplayCountdownSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final current = ref
@@ -1047,9 +1044,8 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
 }
 
 Future<void> _showStreamingQualitySheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final current = ref.watch(playbackPreferencesProvider).streamingQuality;
@@ -1093,9 +1089,8 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
 }
 
 Future<void> _showDefaultAudioSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
@@ -1165,9 +1160,8 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
 }
 
 Future<void> _showDefaultSubtitleSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
@@ -1286,9 +1280,8 @@ Widget _scrollableSheet({
 }
 
 Future<void> _showSubtitleAppearanceSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => const _SubtitleAppearanceSheet(),
   );

@@ -10,6 +10,8 @@ import 'package:altcast/core/utils/navigation.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
 import 'package:altcast/core/widgets/filter_chips_row.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
+import 'package:altcast/core/widgets/glass_sheet_controls.dart';
 import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/core/widgets/skeleton.dart';
 import 'package:altcast/data/jellyfin/jellyfin_repository.dart';
@@ -109,9 +111,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _showFilters() async {
     if (!mounted) return;
     final current = ref.read(searchFiltersProvider);
-    await showModalBottomSheet<void>(
+    await showGlassBottomSheet<void>(
       context: context,
-      showDragHandle: true,
       // Required so the sheet can grow tall enough to host the keyboard
       // when a filter text field gains focus.
       isScrollControlled: true,
@@ -142,9 +143,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<LibrarySort>(
-                        initialValue: sort,
-                        decoration: const InputDecoration(labelText: 'Sort'),
+                      GlassSheetDropdown<LibrarySort>(
+                        label: 'Sort',
+                        value: sort,
                         items: const [
                           DropdownMenuItem(
                             value: LibrarySort.recentlyAdded,
@@ -165,17 +166,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         ],
                         onChanged: (v) => setModalState(() => sort = v ?? sort),
                       ),
-                      const SizedBox(height: 10),
-                      TextFormField(
+                      const SizedBox(height: 14),
+                      GlassSheetTextField(
+                        label: 'Genre',
                         initialValue: genre ?? '',
-                        decoration: const InputDecoration(labelText: 'Genre'),
                         onChanged: (v) =>
                             genre = v.trim().isEmpty ? null : v.trim(),
                       ),
-                      const SizedBox(height: 10),
-                      TextFormField(
+                      const SizedBox(height: 14),
+                      GlassSheetTextField(
+                        label: 'Year',
                         controller: yearController,
-                        decoration: const InputDecoration(labelText: 'Year'),
                         keyboardType: TextInputType.number,
                         maxLength: 4,
                         inputFormatters: [
