@@ -651,20 +651,6 @@ class _PlaybackGroup extends ConsumerWidget {
             ),
             onTap: () => _showAutoplayCountdownSheet(context),
           ),
-        if (Platform.isAndroid)
-          SwitchListTile(
-            title: const Text('Software video decoding'),
-            subtitle: const Text(
-              'Turn on if some titles show glitchy picture on this device '
-              '(uses more CPU and battery).',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            value: prefs.androidSoftwareVideoDecode,
-            onChanged: (v) => ref
-                .read(playbackPreferencesProvider.notifier)
-                .setAndroidSoftwareVideoDecode(v),
-            activeThumbColor: AppColors.primary,
-          ),
       ],
     );
   }

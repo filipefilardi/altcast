@@ -223,9 +223,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // specific font setup on Android and can diverge between devices.
     _player = Player(configuration: const PlayerConfiguration(libass: false));
     final useAndroidSoftwareDecode =
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.android &&
-        ref.read(playbackPreferencesProvider).androidSoftwareVideoDecode;
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
     _controller = VideoController(
       _player,
       configuration: useAndroidSoftwareDecode
