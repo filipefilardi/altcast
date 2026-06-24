@@ -28,6 +28,8 @@ enum _HistoryType {
   final String itemTypes;
 }
 
+const _watchHistoryContentMaxWidth = 720.0;
+
 class WatchHistoryScreen extends ConsumerStatefulWidget {
   const WatchHistoryScreen({super.key});
 
@@ -94,11 +96,19 @@ class _WatchHistoryScreenState extends ConsumerState<WatchHistoryScreen> {
             ),
           ],
         ),
-        body: RefreshIndicator(
-          onRefresh: _reload,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _onScroll,
-            child: _buildBody(),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: _watchHistoryContentMaxWidth,
+            ),
+            child: RefreshIndicator(
+              onRefresh: _reload,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScroll,
+                child: _buildBody(),
+              ),
+            ),
           ),
         ),
       ),
