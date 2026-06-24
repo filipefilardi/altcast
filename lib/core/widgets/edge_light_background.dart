@@ -54,6 +54,21 @@ class _EdgeLightPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final backgroundRect = Offset.zero & size;
+    final diagonalPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [
+          AppColors.primary.withValues(alpha: 0.16),
+          AppColors.primaryDark.withValues(alpha: 0.07),
+          Colors.transparent,
+          Colors.transparent,
+          AppColors.primaryDark.withValues(alpha: 0.06),
+          AppColors.accent.withValues(alpha: 0.12),
+        ],
+        stops: const [0.0, 0.22, 0.42, 0.6, 0.8, 1.0],
+      ).createShader(backgroundRect);
     final center = Offset(
       size.width + glowDiameter * 0.08,
       -glowDiameter * 0.18,
@@ -64,6 +79,8 @@ class _EdgeLightPainter extends CustomPainter {
     final highlightPaint = Paint()
       ..color = AppColors.accent.withValues(alpha: 0.12)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowDiameter * 0.12);
+
+    canvas.drawRect(backgroundRect, diagonalPaint);
 
     canvas.drawOval(
       Rect.fromCenter(
