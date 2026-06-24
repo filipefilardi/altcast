@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/theme/app_theme.dart';
+import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/notification_preferences.dart';
+import 'package:altcast/data/local/onboarding_preferences.dart';
 import 'package:altcast/data/notifications/library_notification_scheduler.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/app/router.dart';
@@ -18,10 +20,15 @@ class AltCastApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final auth = ref.watch(authControllerProvider);
+    final onboarding = ref.watch(onboardingPreferencesProvider);
     final notificationPreferences = ref.watch(notificationPreferencesProvider);
+    final downloadPreferences = ref.watch(downloadPreferencesProvider);
     if (notificationPreferences.isRestored) {
       unawaited(
-        LibraryNotificationScheduler.configure(notificationPreferences),
+        LibraryNotificationScheduler.configure(
+          notificationPreferences,
+          downloadPreferences: downloadPreferences,
+        ),
       );
     }
 
@@ -31,12 +38,14 @@ class AltCastApp extends ConsumerWidget {
       theme: AppTheme.dark(),
       routerConfig: router,
       builder: (context, child) {
-        if (auth is AuthInitial) {
+        if (auth is AuthInitial || !onboarding.isRestored) {
           return const _SplashScreen();
         }
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => flushPendingNotificationRoute(),
-        );
+        if (onboarding.hasCompleted) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => flushPendingNotificationRoute(),
+          );
+        }
         return child ?? const SizedBox.shrink();
       },
     );

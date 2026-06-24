@@ -117,6 +117,14 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clamped = value.clamp(0.0, 1.0);
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final horizontalPadding = tokens.gestureIndicatorHorizontalPadding;
+    final leftPadding = alignment.x < 0
+        ? mediaPadding.left + horizontalPadding
+        : horizontalPadding;
+    final rightPadding = alignment.x > 0
+        ? mediaPadding.right + horizontalPadding
+        : horizontalPadding;
     final textShadow = Shadow(
       color: Colors.black.withValues(alpha: 0.42),
       blurRadius: 6,
@@ -125,9 +133,7 @@ class AltCastVerticalGestureIndicator extends StatelessWidget {
     return Align(
       alignment: alignment,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: tokens.gestureIndicatorHorizontalPadding,
-        ),
+        padding: EdgeInsets.only(left: leftPadding, right: rightPadding),
         child: SizedBox(
           width: tokens.gestureIndicatorWidth,
           height: tokens.gestureIndicatorHeight,

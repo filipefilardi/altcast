@@ -441,6 +441,28 @@ class JellyfinRepository {
     );
   }
 
+  Future<List<BrowseItem>> favoriteSeries({int limit = 200}) async {
+    final s = _session;
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/Users/${s.userId}/Items',
+      queryParameters: {
+        'IncludeItemTypes': 'Series',
+        'Recursive': true,
+        'Limit': limit,
+        'Fields': 'UserData,ProductionYear',
+        'EnableImages': true,
+        'Filters': 'IsFavorite',
+        'SortBy': 'SortName',
+        'SortOrder': 'Ascending',
+      },
+    );
+    return ((res.data?['Items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BrowseItem.fromJson)
+        .where((item) => item.kind == MediaKind.series)
+        .toList(growable: false);
+  }
+
   /// Completed movies and episodes ordered by the current user's latest
   /// playback date. Jellyfin stores one latest-played timestamp per item,
   /// rather than a separate event for every rewatch.

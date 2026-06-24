@@ -21,7 +21,6 @@ class PlaybackPreferences {
     this.streamingQuality = StreamingQuality.auto,
     this.autoplayNextTvEpisode = true,
     this.autoplayCountdownSeconds = 8,
-    this.androidSoftwareVideoDecode = true,
     this.defaultAudioMode = DefaultAudioMode.fixedLanguage,
     this.defaultAudioLanguage = 'en',
     this.defaultSubtitleMode = DefaultSubtitleMode.off,
@@ -41,10 +40,6 @@ class PlaybackPreferences {
   /// [autoplayNextTvEpisode] is on. Allowed presets live in
   /// [autoplayCountdownPresets]; values outside it round to the nearest one.
   final int autoplayCountdownSeconds;
-
-  /// When true on Android, libmpv uses software decode (`hwdec=no`) instead of
-  /// MediaCodec. Helps with glitchy HEVC/HDR on some devices; higher CPU use.
-  final bool androidSoftwareVideoDecode;
 
   final DefaultAudioMode defaultAudioMode;
 
@@ -75,7 +70,6 @@ class PlaybackPreferences {
     StreamingQuality? streamingQuality,
     bool? autoplayNextTvEpisode,
     int? autoplayCountdownSeconds,
-    bool? androidSoftwareVideoDecode,
     DefaultAudioMode? defaultAudioMode,
     String? defaultAudioLanguage,
     bool clearDefaultAudioLanguage = false,
@@ -91,8 +85,6 @@ class PlaybackPreferences {
           autoplayNextTvEpisode ?? this.autoplayNextTvEpisode,
       autoplayCountdownSeconds:
           autoplayCountdownSeconds ?? this.autoplayCountdownSeconds,
-      androidSoftwareVideoDecode:
-          androidSoftwareVideoDecode ?? this.androidSoftwareVideoDecode,
       defaultAudioMode: defaultAudioMode ?? this.defaultAudioMode,
       defaultAudioLanguage: clearDefaultAudioLanguage
           ? null
@@ -110,7 +102,6 @@ class PlaybackPreferences {
     'streamingQuality': streamingQuality.name,
     'autoplayNextTvEpisode': autoplayNextTvEpisode,
     'autoplayCountdownSeconds': autoplayCountdownSeconds,
-    'androidSoftwareVideoDecode': androidSoftwareVideoDecode,
     'defaultAudioMode': defaultAudioMode.name,
     'defaultAudioLanguage': defaultAudioLanguage,
     'defaultSubtitleMode': defaultSubtitleMode.name,
@@ -163,8 +154,6 @@ class PlaybackPreferences {
       autoplayCountdownSeconds: _normalizeAutoplayCountdown(
         json['autoplayCountdownSeconds'] as int?,
       ),
-      androidSoftwareVideoDecode:
-          json['androidSoftwareVideoDecode'] as bool? ?? true,
       defaultAudioMode: effectiveAudioMode,
       defaultAudioLanguage: effectiveAudioLang,
       defaultSubtitleMode: effectiveSubtitleMode,
@@ -281,11 +270,6 @@ class PlaybackPreferencesNotifier extends Notifier<PlaybackPreferences> {
     state = state.copyWith(
       autoplayCountdownSeconds: _normalizeAutoplayCountdown(seconds),
     );
-    await _persist();
-  }
-
-  Future<void> setAndroidSoftwareVideoDecode(bool enabled) async {
-    state = state.copyWith(androidSoftwareVideoDecode: enabled);
     await _persist();
   }
 

@@ -17,33 +17,31 @@ class AppTheme {
       displayColor: AppColors.textPrimary,
     );
 
-    final display = GoogleFonts.spaceGroteskTextTheme();
-
     final textTheme = body.copyWith(
-      displayLarge: display.displayLarge?.copyWith(
+      displayLarge: body.displayLarge?.copyWith(
         fontSize: 44,
         fontWeight: FontWeight.w700,
-        letterSpacing: -1.2,
+        letterSpacing: 0,
         color: AppColors.textPrimary,
         height: 1.05,
       ),
-      displayMedium: display.displayMedium?.copyWith(
+      displayMedium: body.displayMedium?.copyWith(
         fontSize: 32,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.6,
+        letterSpacing: 0,
         color: AppColors.textPrimary,
         height: 1.1,
       ),
-      headlineLarge: display.headlineLarge?.copyWith(
+      headlineLarge: body.headlineLarge?.copyWith(
         fontSize: 28,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.4,
+        letterSpacing: 0,
         color: AppColors.textPrimary,
       ),
-      headlineMedium: display.headlineMedium?.copyWith(
+      headlineMedium: body.headlineMedium?.copyWith(
         fontSize: 22,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.2,
+        letterSpacing: 0,
         color: AppColors.textPrimary,
       ),
       headlineSmall: body.headlineSmall?.copyWith(

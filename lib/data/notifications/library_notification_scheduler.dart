@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'package:altcast/data/jellyfin/auth_repository.dart';
+import 'package:altcast/data/local/download_preferences.dart';
 import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/secure_storage.dart';
 import 'package:altcast/data/notifications/app_notifications.dart';
@@ -41,10 +42,15 @@ class LibraryNotificationScheduler {
     }
   }
 
-  static Future<void> configure(NotificationPreferences prefs) async {
+  static Future<void> configure(
+    NotificationPreferences prefs, {
+    DownloadPreferences downloadPreferences = const DownloadPreferences(),
+  }) async {
     if (!isSupported) return;
 
-    final enabled = prefs.shouldCheckLibraryInBackground;
+    final enabled =
+        prefs.shouldCheckLibraryInBackground ||
+        downloadPreferences.keepFavoriteShowsReady;
     final interval = prefs.libraryCheckInterval;
     if (_requestedEnabled == enabled && _requestedInterval == interval) {
       return _configurationQueue;
@@ -113,7 +119,11 @@ class LibraryNotificationScheduler {
 
       final storage = container.read(secureStorageProvider);
       final prefs = await NotificationPreferences.load(storage);
-      if (!prefs.shouldCheckLibraryInBackground) {
+      final downloadPrefs = await DownloadPreferences.load(storage);
+      final shouldCheck =
+          prefs.shouldCheckLibraryInBackground ||
+          downloadPrefs.keepFavoriteShowsReady;
+      if (!shouldCheck) {
         debugPrint('Library notification check skipped: disabled');
         return true;
       }

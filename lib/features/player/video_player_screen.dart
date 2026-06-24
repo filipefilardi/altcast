@@ -12,6 +12,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
 import 'package:altcast/core/utils/language.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
 import 'package:altcast/core/widgets/glass_popover.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/downloads/downloaded_item.dart';
@@ -222,9 +223,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     // specific font setup on Android and can diverge between devices.
     _player = Player(configuration: const PlayerConfiguration(libass: false));
     final useAndroidSoftwareDecode =
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.android &&
-        ref.read(playbackPreferencesProvider).androidSoftwareVideoDecode;
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
     _controller = VideoController(
       _player,
       configuration: useAndroidSoftwareDecode
@@ -1101,6 +1100,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (completed) {
         _cancelAutoplay();
         _stopScrobblerAndRefreshContinueWatching();
+        unawaited(
+          ref
+              .read(downloadManagerProvider.notifier)
+              .maybeDeleteWatchedDownload(widget.itemId),
+        );
         if (_nextEpisode != null) {
           final autoplay = ref
               .read(playbackPreferencesProvider)
@@ -1666,10 +1670,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
   void _showTracksSheet(BuildContext context) {
     _hideControlOverlay();
-    showModalBottomSheet<void>(
+    showGlassBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceElevated,
-      showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => TracksSheet(
         player: _player,

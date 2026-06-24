@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,8 @@ import 'package:altcast/core/theme/app_gradients.dart';
 import 'package:altcast/core/platform/android_background_settings.dart';
 import 'package:altcast/core/utils/language.dart';
 import 'package:altcast/core/widgets/app_snackbar.dart';
+import 'package:altcast/core/widgets/edge_light_background.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
 import 'package:altcast/data/downloads/download_manager.dart';
 import 'package:altcast/data/jellyfin/auth_repository.dart';
 import 'package:altcast/data/local/download_preferences.dart';
@@ -41,6 +44,8 @@ final _packageInfoProvider = FutureProvider<PackageInfo>(
   (_) => PackageInfo.fromPlatform(),
 );
 
+const _settingsContentMaxWidth = 720.0;
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -49,36 +54,46 @@ class SettingsScreen extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
     final session = auth is AuthAuthenticated ? auth.session : null;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-        children: [
-          if (session != null) ...[
-            _AccountCard(
-              username: session.username,
-              serverUrl: session.serverUrl,
+    return EdgeLightBackground(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Settings')),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: _settingsContentMaxWidth,
             ),
-            const SizedBox(height: 28),
-          ],
-          const _DownloadGroup(),
-          const SizedBox(height: 24),
-          const _NotificationGroup(),
-          if (AndroidBackgroundSettings.isSupported) ...[
-            const SizedBox(height: 24),
-            const _BackgroundActivityGroup(),
-          ],
-          const SizedBox(height: 24),
-          const _PlaybackGroup(),
-          const SizedBox(height: 24),
-          const _AudioSubtitleGroup(),
-          if (session != null) ...[
-            const SizedBox(height: 28),
-            const _SessionActionsGroup(),
-          ],
-          const SizedBox(height: 28),
-          const _VersionFooter(),
-        ],
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
+              children: [
+                if (session != null) ...[
+                  _AccountCard(
+                    username: session.username,
+                    serverUrl: session.serverUrl,
+                  ),
+                  const SizedBox(height: 28),
+                ],
+                const _DownloadGroup(),
+                const SizedBox(height: 24),
+                const _NotificationGroup(),
+                if (AndroidBackgroundSettings.isSupported) ...[
+                  const SizedBox(height: 24),
+                  const _BackgroundActivityGroup(),
+                ],
+                const SizedBox(height: 24),
+                const _PlaybackGroup(),
+                const SizedBox(height: 24),
+                const _AudioSubtitleGroup(),
+                if (session != null) ...[
+                  const SizedBox(height: 28),
+                  const _SessionActionsGroup(),
+                ],
+                const SizedBox(height: 28),
+                const _VersionFooter(),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -111,96 +126,108 @@ class _DownloadGroup extends ConsumerWidget {
         downloads.progress.isNotEmpty ||
         downloads.failures.isNotEmpty;
 
-    return _SettingsGroup(
-      label: 'Library',
+    return Column(
       children: [
-        ListTile(
-          leading: const Icon(PiconsRegular.clock),
-          title: const Text('Watch history'),
-          subtitle: const Text('Movies and episodes you finished.'),
-          trailing: const Icon(
-            PiconsRegular.caretRight,
-            color: AppColors.textSecondary,
-          ),
-          onTap: () => context.push('/watch-history'),
-        ),
-        ListTile(
-          leading: const Icon(PiconsRegular.downloadSimple),
-          title: const Text('Downloads'),
-          subtitle: Text(
-            SettingsScreen._downloadsSubtitle(downloads),
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          trailing: const Icon(
-            PiconsRegular.caretRight,
-            color: AppColors.textSecondary,
-          ),
-          onTap: () => context.push('/downloads'),
-        ),
-        SwitchListTile(
-          secondary: const Icon(PiconsRegular.wifiHigh),
-          title: const Text('Wi-Fi only downloads'),
-          subtitle: const Text('Avoid downloading videos on mobile data.'),
-          value: prefs.wifiOnlyDownloads,
-          onChanged: notifier.setWifiOnlyDownloads,
-          activeThumbColor: AppColors.primary,
-        ),
-        SwitchListTile(
-          secondary: const Icon(PiconsRegular.arrowsClockwise),
-          title: const Text('Auto-download next'),
-          subtitle: const Text('New episodes arrive while you watch'),
-          value: prefs.autoDownloadNextEpisode,
-          onChanged: notifier.setAutoDownloadNextEpisode,
-          activeThumbColor: AppColors.primary,
-        ),
-        ListTile(
-          leading: const Icon(PiconsRegular.highDefinition),
-          title: const Text('Offline video quality'),
-          subtitle: Text(
-            prefs.offlineVideoQuality.label,
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          trailing: const Icon(
-            PiconsRegular.caretDown,
-            color: AppColors.textSecondary,
-          ),
-          onTap: () => _showOfflineQualityPicker(context, ref),
-        ),
-        if (Platform.isAndroid)
-          ListTile(
-            leading: const Icon(PiconsRegular.hardDrives),
-            title: const Text('Storage location'),
-            subtitle: Text(
-              prefs.downloadLocation.label,
-              style: const TextStyle(color: AppColors.textSecondary),
+        _SettingsGroup(
+          label: 'Library',
+          children: [
+            ListTile(
+              title: const Text('Watch history'),
+              subtitle: const Text('Movies and episodes you finished.'),
+              trailing: const Icon(
+                PiconsRegular.caretRight,
+                color: AppColors.textSecondary,
+              ),
+              onTap: () => context.push('/watch-history'),
             ),
-            trailing: const Icon(
-              PiconsRegular.caretDown,
-              color: AppColors.textSecondary,
+            ListTile(
+              title: const Text('Downloads'),
+              subtitle: Text(
+                SettingsScreen._downloadsSubtitle(downloads),
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              trailing: const Icon(
+                PiconsRegular.caretRight,
+                color: AppColors.textSecondary,
+              ),
+              onTap: () => context.push('/downloads'),
             ),
-            onTap: () => _showLocationPicker(context, ref),
-          ),
-        ListTile(
-          leading: Icon(
-            PiconsRegular.trash,
-            color: hasDownloads
-                ? AppColors.textSecondary
-                : AppColors.textTertiary,
-          ),
-          title: Text(
-            'Delete all downloads',
-            style: TextStyle(
-              color: hasDownloads
-                  ? AppColors.textPrimary
-                  : AppColors.textTertiary,
+          ],
+        ),
+        const SizedBox(height: 24),
+        _SettingsGroup(
+          label: 'Offline Downloads',
+          children: [
+            SwitchListTile(
+              title: const Text('Keep favorites ready'),
+              subtitle: const Text(
+                'Download unwatched episodes from favorite shows.',
+              ),
+              value: prefs.keepFavoriteShowsReady,
+              onChanged: (enabled) async {
+                await notifier.setKeepFavoriteShowsReady(enabled);
+                if (enabled) {
+                  unawaited(
+                    ref
+                        .read(downloadManagerProvider.notifier)
+                        .syncFavoriteShowsReady(),
+                  );
+                }
+              },
+              activeThumbColor: AppColors.primary,
             ),
-          ),
-          subtitle: const Text(
-            'Remove all offline videos and queued downloads from this device.',
-          ),
-          onTap: hasDownloads
-              ? () => _confirmDeleteAllDownloads(context, ref)
-              : null,
+            SwitchListTile(
+              title: const Text('Remove watched downloads'),
+              subtitle: const Text(
+                'Free up space after downloaded videos are marked watched.',
+              ),
+              value: prefs.removeWatchedDownloads,
+              onChanged: notifier.setRemoveWatchedDownloads,
+              activeThumbColor: AppColors.primary,
+            ),
+            SwitchListTile(
+              title: const Text('Wi-Fi only downloads'),
+              subtitle: const Text('Avoid downloading videos on mobile data.'),
+              value: prefs.wifiOnlyDownloads,
+              onChanged: notifier.setWifiOnlyDownloads,
+              activeThumbColor: AppColors.primary,
+            ),
+            ListTile(
+              title: const Text('Offline video quality'),
+              subtitle: Text(
+                prefs.offlineVideoQuality.label,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              trailing: const Icon(
+                PiconsRegular.caretDown,
+                color: AppColors.textSecondary,
+              ),
+              onTap: () => _showOfflineQualityPicker(context, ref),
+            ),
+            if (Platform.isAndroid)
+              ListTile(
+                title: const Text('Storage location'),
+                subtitle: Text(
+                  prefs.downloadLocation.label,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                trailing: const Icon(
+                  PiconsRegular.caretDown,
+                  color: AppColors.textSecondary,
+                ),
+                onTap: () => _showLocationPicker(context, ref),
+              ),
+            ListTile(
+              title: const Text('Delete all downloads'),
+              subtitle: const Text(
+                'Remove all offline videos and queued downloads from this device.',
+              ),
+              enabled: hasDownloads,
+              onTap: hasDownloads
+                  ? () => _confirmDeleteAllDownloads(context, ref)
+                  : null,
+            ),
+          ],
         ),
       ],
     );
@@ -238,7 +265,7 @@ class _DownloadGroup extends ConsumerWidget {
   }
 
   void _showLocationPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
+    showGlassBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -271,7 +298,7 @@ class _DownloadGroup extends ConsumerWidget {
   }
 
   void _showOfflineQualityPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
+    showGlassBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -313,11 +340,6 @@ class _NotificationGroup extends ConsumerWidget {
       label: 'Notifications',
       children: [
         SwitchListTile(
-          secondary: Icon(
-            prefs.notificationsEnabled
-                ? PiconsRegular.bellSimpleRinging
-                : PiconsRegular.bellSimpleSlash,
-          ),
           title: const Text('Notifications'),
           subtitle: const Text(
             'Allow AltCast to send notifications.',
@@ -329,7 +351,6 @@ class _NotificationGroup extends ConsumerWidget {
           activeThumbColor: AppColors.primary,
         ),
         SwitchListTile(
-          secondary: const Icon(PiconsRegular.downloadSimple),
           title: const Text('Download notifications'),
           subtitle: const Text(
             'Alert when downloads finish or need attention.',
@@ -343,7 +364,6 @@ class _NotificationGroup extends ConsumerWidget {
         ),
         if (LibraryNotificationScheduler.isSupported) ...[
           SwitchListTile(
-            secondary: const Icon(PiconsRegular.heart),
             title: const Text('New episodes from favorite series'),
             subtitle: const Text(
               'Alert when a favorited show gets a new episode.',
@@ -362,7 +382,6 @@ class _NotificationGroup extends ConsumerWidget {
             activeThumbColor: AppColors.primary,
           ),
           SwitchListTile(
-            secondary: const Icon(PiconsRegular.filmSlate),
             title: const Text('New movies added'),
             subtitle: const Text(
               'Alert when a movie appears in your Jellyfin library.',
@@ -380,7 +399,6 @@ class _NotificationGroup extends ConsumerWidget {
             activeThumbColor: AppColors.primary,
           ),
           SwitchListTile(
-            secondary: const Icon(PiconsRegular.televisionSimple),
             title: const Text('New episodes added'),
             subtitle: const Text(
               'Alert for any new episode added to Jellyfin.',
@@ -398,7 +416,6 @@ class _NotificationGroup extends ConsumerWidget {
             activeThumbColor: AppColors.primary,
           ),
           ListTile(
-            leading: const Icon(PiconsRegular.clock),
             title: const Text('Library check interval'),
             subtitle: Text(
               prefs.libraryCheckInterval.label,
@@ -509,10 +526,8 @@ class _NotificationGroup extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) {
-    return showModalBottomSheet<void>(
+    return showGlassBottomSheet<void>(
       context: context,
-      showDragHandle: true,
-      backgroundColor: AppColors.surfaceElevated,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -524,7 +539,6 @@ class _NotificationGroup extends ConsumerWidget {
                         .libraryCheckInterval ==
                     interval;
                 return ListTile(
-                  leading: const Icon(PiconsRegular.clock),
                   title: Text(interval.label),
                   trailing: selected
                       ? const Icon(
@@ -569,7 +583,6 @@ class _BackgroundActivityGroup extends StatelessWidget {
       label: 'Background activity',
       children: [
         ListTile(
-          leading: const Icon(PiconsRegular.batteryWarning),
           title: const Text('Battery optimization'),
           subtitle: const Text(
             'Set AltCast to Unrestricted to make background notifications to work',
@@ -602,7 +615,6 @@ class _PlaybackGroup extends ConsumerWidget {
       label: 'Playback',
       children: [
         ListTile(
-          leading: const Icon(PiconsRegular.highDefinition),
           title: const Text('Streaming quality'),
           subtitle: Text(
             prefs.streamingQuality.label,
@@ -615,7 +627,6 @@ class _PlaybackGroup extends ConsumerWidget {
           onTap: () => _showStreamingQualitySheet(context),
         ),
         SwitchListTile(
-          secondary: const Icon(PiconsRegular.playCircle),
           title: const Text('Autoplay next episode'),
           subtitle: const Text(
             'After an episode ends, continue to the next one automatically.',
@@ -629,7 +640,6 @@ class _PlaybackGroup extends ConsumerWidget {
         ),
         if (prefs.autoplayNextTvEpisode)
           ListTile(
-            leading: const Icon(PiconsRegular.clock),
             title: const Text('Autoplay countdown'),
             subtitle: Text(
               '${prefs.autoplayCountdownSeconds} seconds',
@@ -640,21 +650,6 @@ class _PlaybackGroup extends ConsumerWidget {
               color: AppColors.textSecondary,
             ),
             onTap: () => _showAutoplayCountdownSheet(context),
-          ),
-        if (Platform.isAndroid)
-          SwitchListTile(
-            secondary: const Icon(PiconsRegular.cpu),
-            title: const Text('Software video decoding'),
-            subtitle: const Text(
-              'Turn on if some titles show glitchy picture on this device '
-              '(uses more CPU and battery).',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            value: prefs.androidSoftwareVideoDecode,
-            onChanged: (v) => ref
-                .read(playbackPreferencesProvider.notifier)
-                .setAndroidSoftwareVideoDecode(v),
-            activeThumbColor: AppColors.primary,
           ),
       ],
     );
@@ -671,7 +666,6 @@ class _AudioSubtitleGroup extends ConsumerWidget {
       label: 'Audio & Subtitles',
       children: [
         ListTile(
-          leading: const Icon(PiconsRegular.speakerHigh),
           title: const Text('Default audio'),
           subtitle: Text(
             _audioDefaultLabel(prefs),
@@ -684,7 +678,6 @@ class _AudioSubtitleGroup extends ConsumerWidget {
           onTap: () => _showDefaultAudioSheet(context),
         ),
         ListTile(
-          leading: const Icon(PiconsRegular.closedCaptioning),
           title: const Text('Default subtitles'),
           subtitle: Text(
             _subtitleDefaultLabel(
@@ -700,7 +693,6 @@ class _AudioSubtitleGroup extends ConsumerWidget {
           onTap: () => _showDefaultSubtitleSheet(context),
         ),
         ListTile(
-          leading: const Icon(PiconsRegular.slidersHorizontal),
           title: const Text('Subtitle appearance'),
           subtitle: Text(
             _subtitleAppearanceSummary(
@@ -735,10 +727,10 @@ class _AccountCard extends ConsumerWidget {
       error: (_, _) => false,
     );
 
-    return Material(
-      color: AppColors.surfaceElevated,
+    return _SettingsGlassSurface(
       borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
+      opacity: 0.22,
+      borderOpacity: 0.16,
       child: InkWell(
         onTap: () => _showAccountSheet(context, username, serverUrl),
         child: Padding(
@@ -795,9 +787,8 @@ Future<void> _showAccountSheet(
   String username,
   String serverUrl,
 ) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final info = ref.watch(_serverInfoProvider);
@@ -935,10 +926,9 @@ class _SessionActionsGroup extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Material(
-      color: AppColors.surfaceElevated,
+    return _SettingsGlassSurface(
       borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
+      opacity: 0.16,
       child: ListTile(
         leading: const Icon(PiconsRegular.signOut, color: AppColors.error),
         title: const Text('Log out', style: TextStyle(color: AppColors.error)),
@@ -994,9 +984,8 @@ class _VersionFooter extends ConsumerWidget {
 }
 
 Future<void> _showAutoplayCountdownSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final current = ref
@@ -1047,9 +1036,8 @@ Future<void> _showAutoplayCountdownSheet(BuildContext context) {
 }
 
 Future<void> _showStreamingQualitySheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final current = ref.watch(playbackPreferencesProvider).streamingQuality;
@@ -1093,9 +1081,8 @@ Future<void> _showStreamingQualitySheet(BuildContext context) {
 }
 
 Future<void> _showDefaultAudioSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
@@ -1165,9 +1152,8 @@ Future<void> _showDefaultAudioSheet(BuildContext context) {
 }
 
 Future<void> _showDefaultSubtitleSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
         final prefs = ref.watch(playbackPreferencesProvider);
@@ -1286,9 +1272,8 @@ Widget _scrollableSheet({
 }
 
 Future<void> _showSubtitleAppearanceSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => const _SubtitleAppearanceSheet(),
   );
@@ -1586,7 +1571,7 @@ class _SettingsGroup extends StatelessWidget {
     for (var i = 0; i < children.length; i++) {
       tiles.add(children[i]);
       if (i < children.length - 1) {
-        tiles.add(const Divider(height: 1, indent: 56));
+        tiles.add(const Divider(height: 1, indent: 16));
       }
     }
 
@@ -1600,13 +1585,61 @@ class _SettingsGroup extends StatelessWidget {
             style: Theme.of(context).textTheme.labelLarge,
           ),
         ),
-        Material(
-          color: AppColors.surfaceElevated,
+        _SettingsGlassSurface(
           borderRadius: BorderRadius.circular(16),
-          clipBehavior: Clip.antiAlias,
-          child: Column(children: tiles),
+          opacity: 0.22,
+          borderOpacity: 0.16,
+          child: ListTileTheme(
+            data: ListTileThemeData(
+              titleTextStyle: Theme.of(context).textTheme.titleMedium,
+              subtitleTextStyle: Theme.of(context).textTheme.bodyMedium,
+              iconColor: AppColors.textSecondary,
+            ),
+            child: Column(children: tiles),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsGlassSurface extends StatelessWidget {
+  const _SettingsGlassSurface({
+    required this.child,
+    required this.borderRadius,
+    this.opacity = 0.18,
+    this.borderOpacity = 0.12,
+  });
+
+  final Widget child;
+  final BorderRadius borderRadius;
+  final double opacity;
+  final double borderOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: opacity),
+            borderRadius: borderRadius,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: borderOpacity),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22),
+                blurRadius: 26,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Material(type: MaterialType.transparency, child: child),
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:picons/picons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
 import 'package:altcast/features/syncplay/syncplay_controller.dart';
 
 Future<void> showSyncPlaySheet(
@@ -11,10 +12,8 @@ Future<void> showSyncPlaySheet(
   Duration startPosition = Duration.zero,
   bool isPlaying = false,
 }) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.surfaceElevated,
-    showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => _SyncPlaySheet(
       itemId: itemId,

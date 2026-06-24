@@ -74,6 +74,7 @@ class DownloadManager extends Notifier<DownloadsState> {
   final Set<String> _runningNotificationShown = <String>{};
   final Set<String> _userCancelled = <String>{};
   bool _draining = false;
+  Future<int>? _favoriteShowsSync;
   DownloadTask? _activeDownloadTask;
   String? _activeItemId;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
@@ -303,6 +304,63 @@ class DownloadManager extends Notifier<DownloadsState> {
     _userCancelled.remove(itemId);
     state = state.copyWith(items: newItems);
     await _persist();
+  }
+
+  Future<bool> maybeDeleteWatchedDownload(String itemId) async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!prefs.removeWatchedDownloads) return false;
+    if (!state.items.containsKey(itemId)) return false;
+    try {
+      await delete(itemId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<int> syncFavoriteShowsReady({
+    int favoriteLimit = 200,
+    bool force = false,
+  }) {
+    final running = _favoriteShowsSync;
+    if (running != null) return running;
+
+    final future = _syncFavoriteShowsReady(
+      favoriteLimit: favoriteLimit,
+      force: force,
+    );
+    _favoriteShowsSync = future.whenComplete(() => _favoriteShowsSync = null);
+    return _favoriteShowsSync!;
+  }
+
+  Future<int> _syncFavoriteShowsReady({
+    required int favoriteLimit,
+    required bool force,
+  }) async {
+    final prefs = ref.read(downloadPreferencesProvider);
+    if (!force && !prefs.keepFavoriteShowsReady) return 0;
+
+    final repo = ref.read(jellyfinRepositoryProvider);
+    final favoriteShows = await repo.favoriteSeries(limit: favoriteLimit);
+    var queued = 0;
+
+    for (final show in favoriteShows) {
+      final seasons = await repo.getSeasons(show.id);
+      for (final season in seasons) {
+        final episodes = await repo.getEpisodes(show.id, season.id);
+        final unwatched = episodes
+            .where((episode) => !(episode.userData?.played ?? false))
+            .toList(growable: false);
+        if (unwatched.isEmpty) continue;
+        queued += await enqueueEpisodes(
+          unwatched,
+          seriesName: show.name,
+          seriesPosterTag: show.imageTag,
+        );
+      }
+    }
+
+    return queued;
   }
 
   Future<void> deleteAll() async {
@@ -686,7 +744,6 @@ class DownloadManager extends Notifier<DownloadsState> {
     await _deleteNativeTaskRecord(entry.itemId);
     await _showDownloadCompleteNotification(entry);
 
-    _maybeAutoDownloadNext(entry);
     return const _DownloadOutcome.success();
   }
 
@@ -1111,34 +1168,6 @@ class DownloadManager extends Notifier<DownloadsState> {
     final seconds = _baseRetryDelay.inSeconds * multiplier;
     final clamped = seconds.clamp(3, 60);
     return Duration(seconds: clamped);
-  }
-
-  Future<void> _maybeAutoDownloadNext(_QueueEntry entry) async {
-    final prefs = ref.read(downloadPreferencesProvider);
-    if (!prefs.autoDownloadNextEpisode) return;
-    if (entry.kind != DownloadedItemKind.episode) return;
-
-    final seriesId = entry.seriesId;
-    final seasonNum = entry.seasonNumber;
-    final episodeNum = entry.episodeNumber;
-    if (seriesId == null || seasonNum == null || episodeNum == null) return;
-
-    try {
-      final repo = ref.read(jellyfinRepositoryProvider);
-      final next = await repo.getNextEpisode(
-        seriesId: seriesId,
-        seasonNumber: seasonNum,
-        episodeNumber: episodeNum,
-      );
-
-      if (next != null) {
-        await enqueueEpisode(
-          next,
-          seriesName: entry.seriesName ?? 'Series',
-          seriesPosterTag: entry.imageTag,
-        );
-      }
-    } catch (_) {}
   }
 
   Future<void> _persist() async {

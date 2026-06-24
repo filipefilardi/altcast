@@ -9,6 +9,7 @@ import 'package:altcast/core/utils/format.dart';
 import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
 import 'package:altcast/core/widgets/error_state.dart';
+import 'package:altcast/core/widgets/glass_bottom_sheet.dart';
 import 'package:altcast/data/jellyfin/models/remote_session.dart';
 import 'package:altcast/data/jellyfin/remote_sessions_repository.dart';
 import 'package:altcast/features/remote/remote_providers.dart';
@@ -24,10 +25,8 @@ Future<void> showRemoteSessionsSheet(
   int? startPositionTicks,
   Future<void> Function(String sessionId)? onCastStarted,
 }) {
-  return showModalBottomSheet<void>(
+  return showGlassBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.surfaceElevated,
-    showDragHandle: true,
     isScrollControlled: true,
     builder: (_) => _RemoteSessionsSheet(
       itemId: itemId,

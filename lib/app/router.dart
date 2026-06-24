@@ -15,6 +15,8 @@ import 'package:altcast/features/library/library_screen.dart';
 import 'package:altcast/features/library/library_browse_screen.dart';
 import 'package:altcast/features/library/library_genres_screen.dart';
 import 'package:altcast/features/movie/movie_screen.dart';
+import 'package:altcast/data/local/onboarding_preferences.dart';
+import 'package:altcast/features/onboarding/onboarding_screen.dart';
 import 'package:altcast/features/person/person_screen.dart';
 import 'package:altcast/features/player/video_player_screen.dart';
 import 'package:altcast/features/search/search_screen.dart';
@@ -123,27 +125,34 @@ String? _itemLocation(String prefix, String? itemId) {
   return '$prefix/$id';
 }
 
-class _AuthListenable extends ChangeNotifier {
-  _AuthListenable(this._ref) {
-    _sub = _ref.listen<AuthState>(
+class _RouterListenable extends ChangeNotifier {
+  _RouterListenable(this._ref) {
+    _authSub = _ref.listen<AuthState>(
       authControllerProvider,
+      (_, _) => notifyListeners(),
+      fireImmediately: false,
+    );
+    _onboardingSub = _ref.listen<OnboardingPreferences>(
+      onboardingPreferencesProvider,
       (_, _) => notifyListeners(),
       fireImmediately: false,
     );
   }
 
   final Ref _ref;
-  late final ProviderSubscription<AuthState> _sub;
+  late final ProviderSubscription<AuthState> _authSub;
+  late final ProviderSubscription<OnboardingPreferences> _onboardingSub;
 
   @override
   void dispose() {
-    _sub.close();
+    _authSub.close();
+    _onboardingSub.close();
     super.dispose();
   }
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final listenable = _AuthListenable(ref);
+  final listenable = _RouterListenable(ref);
   ref.onDispose(listenable.dispose);
 
   return GoRouter(
@@ -152,9 +161,26 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: listenable,
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
-      if (auth is AuthInitial) return null;
+      final onboarding = ref.read(onboardingPreferencesProvider);
+      if (auth is AuthInitial || !onboarding.isRestored) return null;
+
+      final atOnboarding = state.matchedLocation == '/onboarding';
+      if (!onboarding.hasCompleted) {
+        return atOnboarding ? null : '/onboarding';
+      }
+
       final loggedIn = auth is AuthAuthenticated;
       final atLogin = state.matchedLocation == '/login';
+      if (atOnboarding) {
+        if (loggedIn) return '/';
+        final serverUrl = auth is AuthUnauthenticated ? auth.serverUrl : null;
+        return Uri(
+          path: '/login',
+          queryParameters: serverUrl == null || serverUrl.isEmpty
+              ? null
+              : {'serverUrl': serverUrl},
+        ).toString();
+      }
       if (!loggedIn && !atLogin) {
         final serverUrl = auth is AuthUnauthenticated ? auth.serverUrl : null;
         return Uri(
@@ -168,6 +194,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(
         path: '/login',
         builder: (_, st) =>

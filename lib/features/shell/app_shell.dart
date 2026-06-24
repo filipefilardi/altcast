@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:altcast/core/widgets/edge_light_background.dart';
+
 class AppShell extends StatelessWidget {
   const AppShell({required this.navigationShell, super.key});
 
@@ -8,6 +10,8 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(body: SafeArea(bottom: false, child: navigationShell));
+    return EdgeLightBackground(
+      child: Scaffold(body: SafeArea(bottom: false, child: navigationShell)),
+    );
   }
 }
