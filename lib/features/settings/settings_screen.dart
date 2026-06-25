@@ -23,6 +23,8 @@ import 'package:altcast/data/local/notification_preferences.dart';
 import 'package:altcast/data/local/playback_preferences.dart';
 import 'package:altcast/data/notifications/app_notifications.dart';
 import 'package:altcast/data/notifications/library_notification_scheduler.dart';
+import 'package:altcast/data/seerr/models.dart';
+import 'package:altcast/data/seerr/seerr_repository.dart';
 import 'package:altcast/features/auth/auth_controller.dart';
 import 'package:altcast/features/player/subtitle_style.dart';
 
@@ -71,6 +73,8 @@ class SettingsScreen extends ConsumerWidget {
                     username: session.username,
                     serverUrl: session.serverUrl,
                   ),
+                  const SizedBox(height: 24),
+                  _SeerrGroup(username: session.username),
                   const SizedBox(height: 28),
                 ],
                 const _DownloadGroup(),
@@ -779,6 +783,228 @@ class _AccountCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _SeerrGroup extends ConsumerWidget {
+  const _SeerrGroup({required this.username});
+
+  final String username;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connection = ref.watch(seerrConnectionProvider);
+    final session = connection.maybeWhen(
+      data: (session) => session,
+      orElse: () => null,
+    );
+    final connected = session != null;
+    final subtitle = connection.isLoading
+        ? 'Checking...'
+        : connected
+        ? session.serverUrl
+        : 'Connect to request movies and shows';
+
+    return _SettingsGroup(
+      label: 'Seerr',
+      children: [
+        ListTile(
+          leading: Icon(
+            connected ? PiconsRegular.checkCircle : PiconsRegular.sparkle,
+            color: connected ? AppColors.success : AppColors.textSecondary,
+          ),
+          title: Text(connected ? 'Connected' : 'Connect Seerr'),
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: Icon(
+            connected ? PiconsRegular.caretRight : PiconsRegular.plus,
+            color: AppColors.textSecondary,
+          ),
+          onTap: () => _showSeerrSheet(context, ref, username, session),
+        ),
+        ListTile(
+          enabled: connected,
+          leading: Icon(
+            PiconsRegular.queue,
+            color: connected ? AppColors.textPrimary : AppColors.textTertiary,
+          ),
+          title: const Text('Requests'),
+          subtitle: const Text('Pending, approved, and available requests.'),
+          trailing: const Icon(
+            PiconsRegular.caretRight,
+            color: AppColors.textSecondary,
+          ),
+          onTap: connected ? () => context.push('/requests') : null,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showSeerrSheet(
+    BuildContext context,
+    WidgetRef ref,
+    String username,
+    SeerrSession? session,
+  ) {
+    final connected = session != null;
+    final urlController = TextEditingController(text: session?.serverUrl ?? '');
+    final passwordController = TextEditingController();
+    var loading = false;
+    var obscure = true;
+
+    return showGlassBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 24 + bottomInset),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seerr',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Use your Jellyfin password once to create a Seerr session.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: urlController,
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Seerr URL',
+                        hintText: 'https://seerr.example.com',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscure,
+                      textInputAction: TextInputAction.done,
+                      decoration: InputDecoration(
+                        labelText: 'Jellyfin password',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscure ? PiconsRegular.eye : PiconsRegular.x,
+                          ),
+                          onPressed: () =>
+                              setModalState(() => obscure = !obscure),
+                        ),
+                      ),
+                      onSubmitted: (_) => _connectSeerr(
+                        context,
+                        ref,
+                        username,
+                        urlController.text,
+                        passwordController.text,
+                        setModalState,
+                        () => loading = true,
+                        () => loading = false,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        if (connected)
+                          TextButton(
+                            onPressed: loading
+                                ? null
+                                : () async {
+                                    setModalState(() => loading = true);
+                                    await ref
+                                        .read(seerrConnectionProvider.notifier)
+                                        .disconnect();
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                      showAppSnackBar(
+                                        context,
+                                        'Seerr disconnected.',
+                                      );
+                                    }
+                                  },
+                            child: const Text('Disconnect'),
+                          ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: loading
+                              ? null
+                              : () => _connectSeerr(
+                                  context,
+                                  ref,
+                                  username,
+                                  urlController.text,
+                                  passwordController.text,
+                                  setModalState,
+                                  () => loading = true,
+                                  () => loading = false,
+                                ),
+                          child: loading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(connected ? 'Reconnect' : 'Connect'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _connectSeerr(
+    BuildContext context,
+    WidgetRef ref,
+    String username,
+    String url,
+    String password,
+    StateSetter setModalState,
+    VoidCallback markLoading,
+    VoidCallback clearLoading,
+  ) async {
+    if (url.trim().isEmpty || password.isEmpty) {
+      showAppSnackBar(context, 'Enter your Seerr URL and Jellyfin password.');
+      return;
+    }
+    setModalState(markLoading);
+    await ref
+        .read(seerrConnectionProvider.notifier)
+        .connect(
+          seerrUrl: url,
+          jellyfinUsername: username,
+          jellyfinPassword: password,
+        );
+    if (!context.mounted) return;
+    final state = ref.read(seerrConnectionProvider);
+    setModalState(clearLoading);
+    if (state.hasError) {
+      showAppSnackBar(context, 'Seerr connection failed: ${state.error}');
+      return;
+    }
+    Navigator.of(context).pop();
+    showAppSnackBar(context, 'Seerr connected.');
   }
 }
 

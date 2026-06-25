@@ -19,6 +19,7 @@ import 'package:altcast/data/local/onboarding_preferences.dart';
 import 'package:altcast/features/onboarding/onboarding_screen.dart';
 import 'package:altcast/features/person/person_screen.dart';
 import 'package:altcast/features/player/video_player_screen.dart';
+import 'package:altcast/features/requests/requests_screen.dart';
 import 'package:altcast/features/search/search_screen.dart';
 import 'package:altcast/features/season/season_screen.dart';
 import 'package:altcast/features/series/series_screen.dart';
@@ -26,6 +27,7 @@ import 'package:altcast/features/settings/settings_screen.dart';
 import 'package:altcast/features/shell/app_shell.dart';
 import 'package:altcast/features/watch_history/watch_history_screen.dart';
 import 'package:altcast/features/year_review/year_review_screen.dart';
+import 'package:altcast/data/seerr/seerr_repository.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 String? _pendingNotificationLocation;
@@ -253,6 +255,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(path: '/requests', builder: (_, _) => const RequestsScreen()),
+      GoRoute(
+        path: '/discover/:shelf',
+        builder: (_, st) {
+          final shelf = SeerrDiscoverShelfMeta.fromRouteValue(
+            st.pathParameters['shelf'] ?? '',
+          );
+          return DiscoverShelfScreen(
+            shelf: shelf ?? SeerrDiscoverShelf.trending,
+          );
+        },
+      ),
       GoRoute(
         path: '/watch-history',
         builder: (_, _) => const WatchHistoryScreen(),
