@@ -35,6 +35,7 @@ Bring your movies and TV shows back into a focused viewing app. AltCast connects
 
 - A [Jellyfin server](https://jellyfin.org/docs/general/installation/) with a movies or TV library.
 - The server's URL and your Jellyfin credentials.
+- Optional: a [Seerr](https://github.com/seerr-team/seerr) server for discovery and media requests.
 
 That's it. Your credentials stay in the device's secure storage, and the app only talks to your own server.
 
@@ -50,6 +51,13 @@ That's it. Your credentials stay in the device's secure storage, and the app onl
 - Notifications for download results and newly added media in your Jellyfin library
 - Remote control of other Jellyfin player sessions
 - SyncPlay for synchronized watching across devices
+- Optional Seerr integration for trending discovery, title search, season requests, and request queue tracking
+
+## Seerr discovery and requests
+
+AltCast can connect to Seerr when your server uses Jellyfin sign-in. Once connected from Settings, the Discover tab can show trending titles, popular movies, and popular series, with expandable shelves and full search for requestable media.
+
+You can request movies or individual TV seasons from the title page, then follow pending, processing, failed, and available requests from the request queue. Available items open directly in AltCast when they already exist in your Jellyfin library.
 
 ## Notifications
 
