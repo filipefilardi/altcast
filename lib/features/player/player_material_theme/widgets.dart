@@ -272,26 +272,33 @@ class AltCastPrimaryControls extends StatelessWidget {
           },
         ),
         Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AltCastSeekRelativeButton(
-                delta: Duration.zero - tokens.seekBackwardStep,
-                icon: Icons.replay_10,
-                tokens: tokens,
-              ),
-              SizedBox(width: tokens.primaryControlGap),
-              AltCastPlayPauseButton(
-                iconSize: tokens.playPausePrimaryIconSize,
-                tokens: tokens,
-              ),
-              SizedBox(width: tokens.primaryControlGap),
-              AltCastSeekRelativeButton(
-                delta: tokens.seekForwardStep,
-                icon: Icons.forward_10,
-                tokens: tokens,
-              ),
-            ],
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal:
+                  tokens.gestureIndicatorWidth +
+                  tokens.gestureIndicatorHorizontalPadding,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AltCastSeekRelativeButton(
+                  delta: Duration.zero - tokens.seekBackwardStep,
+                  icon: Icons.replay_10,
+                  tokens: tokens,
+                ),
+                Flexible(child: SizedBox(width: tokens.primaryControlGap)),
+                AltCastPlayPauseButton(
+                  iconSize: tokens.playPausePrimaryIconSize,
+                  tokens: tokens,
+                ),
+                Flexible(child: SizedBox(width: tokens.primaryControlGap)),
+                AltCastSeekRelativeButton(
+                  delta: tokens.seekForwardStep,
+                  icon: Icons.forward_10,
+                  tokens: tokens,
+                ),
+              ],
+            ),
           ),
         ),
         ValueListenableBuilder<double>(
