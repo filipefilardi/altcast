@@ -177,7 +177,9 @@ class _MovieBody extends ConsumerWidget {
 
   void _play(BuildContext context, Movie movie, {required bool fromStart}) {
     final ticks = fromStart ? 0 : (movie.userData?.playbackPositionTicks ?? 0);
-    final query = <String, String>{if (ticks > 0) 'resumeTicks': '$ticks'};
+    final query = <String, String>{
+      if (fromStart || ticks > 0) 'resumeTicks': '$ticks',
+    };
     final uri = Uri(
       path: '/play/${movie.id}',
       queryParameters: query.isEmpty ? null : query,

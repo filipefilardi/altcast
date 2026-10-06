@@ -240,6 +240,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           return VideoPlayerScreen(
             itemId: st.pathParameters['id']!,
             resumeTicks: ticks,
+            startTicks: int.tryParse(
+              st.uri.queryParameters['startTicks'] ?? '',
+            ),
             syncPlayStartPlaying:
                 st.uri.queryParameters['syncPlayPlaying'] == null
                 ? null

@@ -478,7 +478,7 @@ class _SeriesSkeleton extends StatelessWidget {
 void _playEpisode(BuildContext context, Episode ep, {bool fromStart = false}) {
   final ticks = fromStart ? 0 : (ep.userData?.playbackPositionTicks ?? 0);
   final query = <String, String>{
-    if (ticks > 0) 'resumeTicks': '$ticks',
+    if (fromStart || ticks > 0) 'resumeTicks': '$ticks',
     if (ep.seriesId.isNotEmpty) 'seriesId': ep.seriesId,
     if (ep.parentIndexNumber != null) 'seasonNumber': '${ep.parentIndexNumber}',
     if (ep.indexNumber != null) 'episodeNumber': '${ep.indexNumber}',

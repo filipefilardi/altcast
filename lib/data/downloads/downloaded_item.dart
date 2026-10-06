@@ -29,6 +29,7 @@ class DownloadedItem {
     this.introEndTicks,
     this.creditsStartTicks,
     this.creditsEndTicks,
+    this.playbackPositionTicks,
     this.externalSubtitles = const [],
     this.offlineTrickplay,
   });
@@ -60,11 +61,20 @@ class DownloadedItem {
   final int? introEndTicks;
   final int? creditsStartTicks;
   final int? creditsEndTicks;
+
+  /// Last locally-known playback position. This is persisted with the
+  /// download so interrupted playback can resume without reaching Jellyfin.
+  /// Null means no local progress has been saved yet; zero means start over.
+  final int? playbackPositionTicks;
+
   final List<DownloadedExternalSubtitle> externalSubtitles;
   final OfflineTrickplayData? offlineTrickplay;
 
   Duration? get runTime =>
       runTimeTicks == null ? null : Duration(microseconds: runTimeTicks! ~/ 10);
+
+  Duration get playbackPosition =>
+      Duration(microseconds: (playbackPositionTicks ?? 0) ~/ 10);
 
   /// "S01·E03" style label for an episode, or null for movies.
   String? get episodeLabel {
@@ -91,6 +101,8 @@ class DownloadedItem {
     if (introEndTicks != null) 'introEndTicks': introEndTicks,
     if (creditsStartTicks != null) 'creditsStartTicks': creditsStartTicks,
     if (creditsEndTicks != null) 'creditsEndTicks': creditsEndTicks,
+    if (playbackPositionTicks != null)
+      'playbackPositionTicks': playbackPositionTicks,
     if (externalSubtitles.isNotEmpty)
       'externalSubtitles': externalSubtitles.map((s) => s.toJson()).toList(),
     if (offlineTrickplay != null)
@@ -115,6 +127,7 @@ class DownloadedItem {
       introEndTicks: json['introEndTicks'] as int?,
       creditsStartTicks: json['creditsStartTicks'] as int?,
       creditsEndTicks: json['creditsEndTicks'] as int?,
+      playbackPositionTicks: (json['playbackPositionTicks'] as num?)?.toInt(),
       externalSubtitles: ((json['externalSubtitles'] as List?) ?? const [])
           .cast<Map<String, dynamic>>()
           .map(DownloadedExternalSubtitle.fromJson)
@@ -124,6 +137,30 @@ class DownloadedItem {
               Map<String, dynamic>.from(json['offlineTrickplay'] as Map),
             )
           : null,
+    );
+  }
+
+  DownloadedItem copyWithPlaybackPosition(Duration position) {
+    return DownloadedItem(
+      id: id,
+      name: name,
+      filePath: filePath,
+      kind: kind,
+      year: year,
+      runTimeTicks: runTimeTicks,
+      imageTag: imageTag,
+      serverItemId: serverItemId,
+      seriesId: seriesId,
+      seriesName: seriesName,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      introStartTicks: introStartTicks,
+      introEndTicks: introEndTicks,
+      creditsStartTicks: creditsStartTicks,
+      creditsEndTicks: creditsEndTicks,
+      playbackPositionTicks: position.inMicroseconds * 10,
+      externalSubtitles: externalSubtitles,
+      offlineTrickplay: offlineTrickplay,
     );
   }
 }

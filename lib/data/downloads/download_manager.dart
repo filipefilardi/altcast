@@ -318,6 +318,18 @@ class DownloadManager extends Notifier<DownloadsState> {
     }
   }
 
+  /// Persists resume progress alongside a downloaded item so local playback
+  /// remains resumable when Jellyfin cannot be reached.
+  Future<void> savePlaybackPosition(String itemId, Duration position) async {
+    final item = state.items[itemId];
+    if (item == null) return;
+    final normalized = position.isNegative ? Duration.zero : position;
+    final updated = item.copyWithPlaybackPosition(normalized);
+    if (updated.playbackPositionTicks == item.playbackPositionTicks) return;
+    state = state.copyWith(items: {...state.items, itemId: updated});
+    await _persist();
+  }
+
   Future<int> syncFavoriteShowsReady({
     int favoriteLimit = 200,
     bool force = false,
