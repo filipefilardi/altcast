@@ -463,8 +463,7 @@ class _ReviewHeroState extends State<_ReviewHero> {
             const SizedBox(height: 8),
             Semantics(
               button: true,
-              label:
-                  'Toggle estimated watch time between hours, minutes, and days',
+              label: 'Toggle estimated watch time between hours, minutes, and days',
               child: InkWell(
                 onTap: () => setState(() {
                   final next =

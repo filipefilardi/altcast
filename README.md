@@ -24,12 +24,12 @@ Bring your movies and TV shows back into a focused viewing app. AltCast connects
 
 ### Other platforms
 
-- **macOS** — download the unsigned `.app` from the [latest GitHub Release](https://github.com/filipefilardi/altcast/releases/latest), then drag it into `/Applications`. Because the build is unsigned and unnotarized, macOS Gatekeeper will block the first launch with a *"Apple cannot check it for malicious software"* warning. To open it:
+- **macOS 12 or newer** — download the unsigned `.app` from the [latest GitHub Release](https://github.com/filipefilardi/altcast/releases/latest), then drag it into `/Applications`. Because the build is unsigned and unnotarized, macOS Gatekeeper will block the first launch with a *"Apple cannot check it for malicious software"* warning. To open it:
     - **macOS 14 Sonoma and earlier:** right-click the app → *Open* → confirm in the dialog.
     - **macOS 15 Sequoia and newer:** double-click the app once (it will be blocked), then go to *System Settings → Privacy & Security*, scroll to the bottom, and click *Open Anyway*. Alternatively, run `xattr -dr com.apple.quarantine /Applications/AltCast.app` in Terminal.
 
   You only need to do this once. No re-signing or expiry.
-- **iOS** — iOS support is already working, and I want to ship AltCast on the Apple App Store in the future. Right now, I do not have an active Apple Developer account. The yearly developer fee is currently too expensive for me, so App Store distribution is paused for now.
+- **iOS 15 or newer** — iOS support is already working, and I want to ship AltCast on the Apple App Store in the future. Right now, I do not have an active Apple Developer account. The yearly developer fee is currently too expensive for me, so App Store distribution is paused for now.
 
 ## What you need
 

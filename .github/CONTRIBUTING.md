@@ -18,7 +18,8 @@ By participating in this project, you agree to follow our [Code of Conduct](./CO
 
 ### Prerequisites
 
-- Flutter SDK (stable) with Dart `^3.8.1`
+- Flutter SDK 3.47.0 or newer (stable), with Dart `^3.13.0`
+  - CI uses Flutter 3.47.6; use the same version for reproducible checks.
 - A running Jellyfin server with a movies or TV library for manual testing
 - Platform tooling as needed:
   - Xcode for iOS/macOS

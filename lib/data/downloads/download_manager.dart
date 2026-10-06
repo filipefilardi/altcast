@@ -479,7 +479,7 @@ class DownloadManager extends Notifier<DownloadsState> {
 
     try {
       if (File(finalPath).existsSync()) {
-        return _finishDownloadedVideo(
+        return await _finishDownloadedVideo(
           entry: entry,
           finalPath: finalPath,
           sidecarSubs: sidecarSubs,
@@ -568,7 +568,7 @@ class DownloadManager extends Notifier<DownloadsState> {
         }
       }
 
-      return _finishDownloadedVideo(
+      return await _finishDownloadedVideo(
         entry: entry,
         finalPath: finalPath,
         sidecarSubs: sidecarSubs,

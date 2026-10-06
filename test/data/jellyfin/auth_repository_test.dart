@@ -35,15 +35,15 @@ void main() {
         );
 
         expect(session.username, 'Alice');
-        final stored =
-            jsonDecode(storage.store['jellyfin_session_v1']!)
-                as Map<String, dynamic>;
+        final stored = jsonDecode(
+          storage.store['jellyfin_session_v1']!,
+        ) as Map<String, dynamic>;
         expect(stored['accessToken'], 'tok');
         expect(stored['serverUrl'], 'https://media.example.org');
 
-        final servers =
-            jsonDecode(storage.store['jellyfin_saved_servers_v1']!)
-                as List<dynamic>;
+        final servers = jsonDecode(
+          storage.store['jellyfin_saved_servers_v1']!,
+        ) as List<dynamic>;
         expect(servers, hasLength(1));
         final savedServer = servers.single as Map<String, dynamic>;
         expect(savedServer['serverUrl'], 'https://media.example.org');

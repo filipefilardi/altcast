@@ -1485,9 +1485,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       valueListenable: _overlaySnapshots,
       builder: (context, snap, _) {
         final pad = MediaQuery.paddingOf(context);
-        final controlsTheme = MaterialVideoControlsTheme.maybeOf(
-          context,
-        )?.normal;
+        final controlsTheme = MaterialVideoControlsTheme.maybeOf(context)
+            ?.normal;
         final resolvedControlsBottomMargin =
             controlsTheme?.bottomButtonBarMargin
                 .resolve(Directionality.of(context))

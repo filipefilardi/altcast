@@ -103,46 +103,43 @@ void main() {
   });
 
   group('JellyfinApi.authenticate', () {
-    test(
-      'POSTs username/password to /Users/AuthenticateByName, parses session, binds Authorization',
-      () async {
-        final adapter = _RecordingAdapter((options) async {
-          expect(
-            options.uri.toString(),
-            'https://media.example.org/Users/AuthenticateByName',
-          );
-          expect(options.method, 'POST');
-          expect(options.data, {'Username': 'alice', 'Pw': 'hunter2'});
-          // Pre-auth Authorization header must NOT carry a token.
-          final auth = options.headers['Authorization'] as String;
-          expect(auth, contains('Client="AltCast"'));
-          expect(auth, isNot(contains('Token=')));
-          return _jsonResponse({
-            'AccessToken': 'tok-1',
-            'ServerId': 'server-1',
-            'User': {'Id': 'user-1', 'Name': 'Alice'},
-          });
-        });
-        final dio = Dio()..httpClientAdapter = adapter;
-        final api = JellyfinApi(dio: dio, deviceId: 'dev-1');
-
-        final session = await api.authenticate(
-          serverUrl: 'media.example.org/',
-          username: 'alice',
-          password: 'hunter2',
+    test('POSTs username/password to /Users/AuthenticateByName, parses session, binds Authorization', () async {
+      final adapter = _RecordingAdapter((options) async {
+        expect(
+          options.uri.toString(),
+          'https://media.example.org/Users/AuthenticateByName',
         );
+        expect(options.method, 'POST');
+        expect(options.data, {'Username': 'alice', 'Pw': 'hunter2'});
+        // Pre-auth Authorization header must NOT carry a token.
+        final auth = options.headers['Authorization'] as String;
+        expect(auth, contains('Client="AltCast"'));
+        expect(auth, isNot(contains('Token=')));
+        return _jsonResponse({
+          'AccessToken': 'tok-1',
+          'ServerId': 'server-1',
+          'User': {'Id': 'user-1', 'Name': 'Alice'},
+        });
+      });
+      final dio = Dio()..httpClientAdapter = adapter;
+      final api = JellyfinApi(dio: dio, deviceId: 'dev-1');
 
-        expect(session.serverUrl, 'https://media.example.org');
-        expect(session.accessToken, 'tok-1');
-        expect(session.userId, 'user-1');
-        expect(session.serverId, 'server-1');
-        expect(session.username, 'Alice');
+      final session = await api.authenticate(
+        serverUrl: 'media.example.org/',
+        username: 'alice',
+        password: 'hunter2',
+      );
 
-        // bind() should have wired Authorization onto the shared Dio.
-        expect(dio.options.baseUrl, 'https://media.example.org');
-        expect(dio.options.headers['Authorization'], contains('Token="tok-1"'));
-      },
-    );
+      expect(session.serverUrl, 'https://media.example.org');
+      expect(session.accessToken, 'tok-1');
+      expect(session.userId, 'user-1');
+      expect(session.serverId, 'server-1');
+      expect(session.username, 'Alice');
+
+      // bind() should have wired Authorization onto the shared Dio.
+      expect(dio.options.baseUrl, 'https://media.example.org');
+      expect(dio.options.headers['Authorization'], contains('Token="tok-1"'));
+    });
 
     test(
       'falls back to provided username when server omits User.Name',

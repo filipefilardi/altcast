@@ -167,9 +167,8 @@ class _SyncPlaySheetState extends ConsumerState<_SyncPlaySheet> {
         const SizedBox(height: 4),
         Text(
           participants,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 16),
         if (widget.itemId != null)

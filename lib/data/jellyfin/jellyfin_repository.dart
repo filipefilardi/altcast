@@ -200,8 +200,7 @@ class JellyfinRepository {
         'IncludeItemTypes': 'Episode',
         'GroupItems': false,
         'Limit': limit,
-        'Fields':
-            'UserData,SeriesId,SeriesName,SeasonId,ParentIndexNumber,IndexNumber,RunTimeTicks',
+        'Fields': 'UserData,SeriesId,SeriesName,SeasonId,ParentIndexNumber,IndexNumber,RunTimeTicks',
         'EnableImages': true,
       },
     );
@@ -479,8 +478,7 @@ class JellyfinRepository {
         'Recursive': true,
         'StartIndex': startIndex,
         'Limit': limit,
-        'Fields':
-            'UserData,ProductionYear,SeriesPrimaryImage,PrimaryImageAspectRatio,Genres,People',
+        'Fields': 'UserData,ProductionYear,SeriesPrimaryImage,PrimaryImageAspectRatio,Genres,People',
         'EnableImages': true,
         'Filters': 'IsPlayed',
         'SortBy': 'DatePlayed',
@@ -981,8 +979,7 @@ class JellyfinRepository {
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$episodeId',
       queryParameters: const {
-        'Fields':
-            'Overview,UserData,RunTimeTicks,SeriesId,SeasonId,People,PremiereDate,CommunityRating',
+        'Fields': 'Overview,UserData,RunTimeTicks,SeriesId,SeasonId,People,PremiereDate,CommunityRating',
       },
     );
     final data = res.data;
@@ -998,8 +995,7 @@ class JellyfinRepository {
     final res = await _api.dio.get<Map<String, dynamic>>(
       '/Users/${s.userId}/Items/$itemId',
       queryParameters: const {
-        'Fields':
-            'SeriesName,ParentIndexNumber,IndexNumber,ProductionYear,PremiereDate',
+        'Fields': 'SeriesName,ParentIndexNumber,IndexNumber,ProductionYear,PremiereDate',
       },
     );
     final data = res.data;

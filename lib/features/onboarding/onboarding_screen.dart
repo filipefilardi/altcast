@@ -159,8 +159,7 @@ class _IntroPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return _OnboardingPage(
       title: 'Your Jellyfin library, anywhere',
-      body:
-          'AltCast streams your movies and shows, saves downloads for offline playback, and keeps your media sync’d in the background.',
+      body: 'AltCast streams your movies and shows, saves downloads for offline playback, and keeps your media sync’d in the background.',
       children: const [
         _FeatureRow(
           title: 'Stream from your server',
@@ -168,18 +167,15 @@ class _IntroPage extends StatelessWidget {
         ),
         _FeatureRow(
           title: 'Take videos offline',
-          subtitle:
-              'Download episodes and movies for flights, commutes, or patchy networks.',
+          subtitle: 'Download episodes and movies for flights, commutes, or patchy networks.',
         ),
         _FeatureRow(
           title: 'Stay up to date',
-          subtitle:
-              'Get optional notifications for completed downloads and fresh media.',
+          subtitle: 'Get optional notifications for completed downloads and fresh media.',
         ),
         _FeatureRow(
           title: 'Private and personal',
-          subtitle:
-              'Your playback history, settings, and downloaded files stay securely on this device.',
+          subtitle: 'Your playback history, settings, and downloaded files stay securely on this device.',
         ),
       ],
     );
@@ -194,8 +190,7 @@ class _NotificationSetupPage extends ConsumerWidget {
     final prefs = ref.watch(notificationPreferencesProvider);
     return _OnboardingPage(
       title: 'Stay in the loop',
-      body:
-          'Get notified when your favorite titles finish downloading or when new episodes drop.',
+      body: 'Get notified when your favorite titles finish downloading or when new episodes drop.',
       children: [
         _SetupPanel(
           title: prefs.notificationsEnabled
@@ -274,8 +269,7 @@ class _AndroidBackgroundPageState extends State<_AndroidBackgroundPage>
     final unrestricted = _isUnrestricted == true;
     return _OnboardingPage(
       title: 'Get fresh content instantly',
-      body:
-          'Android\'s battery saver can delay background updates, meaning new movie or episode alerts won\'t show up until you manually open the app.',
+      body: 'Android\'s battery saver can delay background updates, meaning new movie or episode alerts won\'t show up until you manually open the app.',
       children: [
         _SetupPanel(
           title: unrestricted
@@ -443,9 +437,8 @@ class _SetupPanel extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               Text(

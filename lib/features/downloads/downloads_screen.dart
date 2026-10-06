@@ -62,8 +62,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 child: EmptyState(
                   icon: PiconsRegular.downloadSimple,
                   title: 'Nothing downloaded yet',
-                  message:
-                      'Tap the download icon on a movie or episode to keep it offline.',
+                  message: 'Tap the download icon on a movie or episode to keep it offline.',
                 ),
               )
             : ListView(
@@ -225,10 +224,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title.toUpperCase(),
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        letterSpacing: 1.0,
-        color: AppColors.textSecondary,
-      ),
+      style: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(letterSpacing: 1.0, color: AppColors.textSecondary),
     );
   }
 }

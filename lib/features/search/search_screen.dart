@@ -1387,9 +1387,8 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           count.toString(),
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: AppColors.textTertiary),
+          style: Theme.of(context).textTheme.labelLarge
+              ?.copyWith(color: AppColors.textTertiary),
         ),
       ],
     );
