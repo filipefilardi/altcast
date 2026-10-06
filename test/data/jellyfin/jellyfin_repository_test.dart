@@ -38,9 +38,8 @@ void main() {
       ),
     );
 
-    final episodes = await JellyfinRepository(
-      api,
-    ).recentlyAddedEpisodes(limit: 30);
+    final episodes = await JellyfinRepository(api)
+        .recentlyAddedEpisodes(limit: 30);
 
     expect(episodes, hasLength(1));
     expect(episodes.single.id, 'episode-7');
@@ -151,9 +150,8 @@ void main() {
         ),
       );
 
-      final ids = await JellyfinRepository(
-        api,
-      ).favoriteSeriesIds(seriesIds: const ['series-1', 'series-2']);
+      final ids = await JellyfinRepository(api)
+          .favoriteSeriesIds(seriesIds: const ['series-1', 'series-2']);
 
       expect(ids, {'series-1'});
     },
@@ -197,9 +195,8 @@ void main() {
       ),
     );
 
-    final page = await JellyfinRepository(
-      api,
-    ).watchHistory(startIndex: 30, limit: 30);
+    final page = await JellyfinRepository(api)
+        .watchHistory(startIndex: 30, limit: 30);
 
     expect(page.items.single.id, 'movie-1');
     expect(page.items.single.userData?.lastPlayedDate, isNotNull);

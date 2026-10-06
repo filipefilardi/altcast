@@ -146,10 +146,8 @@ class _PersonHeader extends ConsumerWidget {
               SizedBox(height: isDesktop ? 20 : 14),
               ExpandableText(
                 text: person.overview!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontSize: isDesktop ? 14 : null,
-                  height: 1.5,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(fontSize: isDesktop ? 14 : null, height: 1.5),
               ),
             ],
           ],
@@ -209,9 +207,8 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
         value,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: AppColors.textSecondary),
       ),
     );
   }

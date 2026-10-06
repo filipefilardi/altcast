@@ -390,9 +390,8 @@ class _LoginBrand extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium!.copyWith(color: AppColors.textSecondary),
+          style: Theme.of(context).textTheme.bodyMedium!
+              .copyWith(color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
       ],

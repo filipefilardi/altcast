@@ -57,9 +57,8 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayTitle = Theme.of(
-      context,
-    ).textTheme.displayMedium!.copyWith(color: Colors.white);
+    final displayTitle = Theme.of(context).textTheme.displayMedium!
+        .copyWith(color: Colors.white);
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(gradient: AppGradients.loginBackdrop),

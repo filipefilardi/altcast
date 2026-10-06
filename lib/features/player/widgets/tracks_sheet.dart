@@ -611,9 +611,8 @@ class _SectionHeader extends StatelessWidget {
         shaderCallback: (bounds) => AppGradients.accent.createShader(bounds),
         child: Text(
           label.toUpperCase(),
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: Colors.white),
+          style: Theme.of(context).textTheme.labelLarge
+              ?.copyWith(color: Colors.white),
         ),
       ),
     );

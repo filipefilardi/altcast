@@ -128,11 +128,8 @@ void main() {
         '5 items',
       );
       expect(
-        BrowseItem.fromJson({
-          'Id': 'x',
-          'Name': 'N',
-          'Type': 'BoxSet',
-        }).subtitle,
+        BrowseItem.fromJson({'Id': 'x', 'Name': 'N', 'Type': 'BoxSet'})
+            .subtitle,
         isNull,
       );
     });
@@ -177,19 +174,16 @@ void main() {
       expect(item.backdropTag, isNull);
     });
 
-    test(
-      'accepts ChildCount as a non-int num (Jellyfin sometimes returns doubles)',
-      () {
-        final item = BrowseItem.fromJson({
-          'Id': 'x',
-          'Name': 'N',
-          'Type': 'BoxSet',
-          'ChildCount': 4.0,
-        });
-        expect(item.childCount, 4);
-        expect(item.subtitle, '4 items');
-      },
-    );
+    test('accepts ChildCount as a non-int num (Jellyfin sometimes returns doubles)', () {
+      final item = BrowseItem.fromJson({
+        'Id': 'x',
+        'Name': 'N',
+        'Type': 'BoxSet',
+        'ChildCount': 4.0,
+      });
+      expect(item.childCount, 4);
+      expect(item.subtitle, '4 items');
+    });
 
     test('RunTimeTicks converts to a Duration', () {
       // 1 second = 10_000_000 ticks (100ns units).

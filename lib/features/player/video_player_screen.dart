@@ -33,6 +33,7 @@ import 'package:altcast/features/syncplay/syncplay_controller.dart';
 import 'package:altcast/features/syncplay/syncplay_sheet.dart';
 import 'package:altcast/features/player/player_material_theme.dart';
 import 'package:altcast/features/player/scrobbler.dart';
+import 'package:altcast/features/player/playback_resume.dart';
 import 'package:altcast/features/player/subtitle_style.dart';
 import 'package:altcast/features/player/widgets/next_up_card.dart';
 import 'package:altcast/features/player/widgets/playback_error.dart';
@@ -94,7 +95,8 @@ class _PlayerOverlaysSnapshot {
 
 /// Full-screen video player. Routes here are entered via
 /// `/play/:id?resumeTicks=N` — the optional `resumeTicks` (Jellyfin tick
-/// count, 100 ns) is applied with [Player.seek] right after open.
+/// count, 100 ns) is a server fallback for locally saved progress.
+/// `startTicks` requests an explicit position, including remote playback sync.
 ///
 /// Uses [MaterialVideoControls] with AltCast theming: −10s / +30s seek
 /// buttons, brightness and volume (edge gestures + sheet sliders), and
@@ -104,6 +106,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
     super.key,
     required this.itemId,
     this.resumeTicks,
+    this.startTicks,
     this.seriesId,
     this.seasonNumber,
     this.episodeNumber,
@@ -115,6 +118,7 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   /// Jellyfin tick count (100 ns units) — converts to a [Duration] via
   /// `microseconds = ticks ~/ 10`.
   final int? resumeTicks;
+  final int? startTicks;
 
   final String? seriesId;
   final int? seasonNumber;
@@ -127,12 +131,15 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   late final Player _player;
+  late final DownloadManager _downloadManager;
   late final VideoController _controller;
   late ProviderContainer _providerContainer;
   Scrobbler? _scrobbler;
   Object? _openError;
   String _playerTitle = '';
   bool _isReloadingSource = false;
+  bool _playingLocalDownload = false;
+  bool _playbackCompleted = false;
   double _playbackRate = 1.0;
   Duration _subtitleOffset = Duration.zero;
   final ValueNotifier<_PlayerControlOverlay> _controlOverlayNotifier =
@@ -204,8 +211,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// pattern so the sheet's "selected" highlight reacts immediately.
   final ValueNotifier<String?> _selectedExternalSubNotifier =
       ValueNotifier<String?>(null);
-  final ValueNotifier<TrickplayOverlayData?> _trickplayOverlayNotifier =
-      ValueNotifier<TrickplayOverlayData?>(null);
+  final TrickplayOverlayNotifier _trickplayOverlayNotifier =
+      TrickplayOverlayNotifier();
 
   StreamSource? get _source => _sourceNotifier.value;
 
@@ -218,6 +225,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _downloadManager = ref.read(downloadManagerProvider.notifier);
     // Keep subtitle rendering in Flutter for consistent behavior across
     // Android, iOS, and desktop. Native mpv/libass rendering needs platform
     // specific font setup on Android and can diverge between devices.
@@ -347,6 +355,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       // round-trip and lets playback work fully offline.
       final localItem = downloads.items[widget.itemId];
       final localPath = localItem?.filePath;
+      _playingLocalDownload = localPath != null;
       final StreamSource source;
       if (localPath != null) {
         source = StreamSource(
@@ -385,16 +394,27 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (!mounted) return;
       _sourceNotifier.value = source;
       final auth = api.dio.options.headers['Authorization'];
+      final initialPosition =
+          startPosition ?? _resumePosition(localItem: localItem);
+      final openAtPosition =
+          localPath != null && initialPosition > Duration.zero;
       await _player.open(
         Media(
           source.url,
           httpHeaders: auth is String && auth.isNotEmpty
               ? {'Authorization': auth}
               : null,
+          // Let mpv load downloaded files directly at their resume point.
+          // Repeated post-open seeks are expensive on Android software decode.
+          start: openAtPosition ? initialPosition : null,
         ),
         play: play,
       );
-      await _seekToStartPosition(startPosition ?? _resumePositionFromRoute());
+      if (openAtPosition) {
+        _lastPosition = initialPosition;
+      } else {
+        await _seekToStartPosition(initialPosition);
+      }
       await _applyPlaybackRate(_playbackRate);
       await _applySubtitleOffset(_subtitleOffset);
       _attachScrobbler();
@@ -412,10 +432,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     }
   }
 
-  Duration _resumePositionFromRoute() {
-    final ticks = widget.resumeTicks ?? 0;
-    if (ticks <= 0) return Duration.zero;
-    return Duration(microseconds: ticks ~/ 10);
+  Duration _resumePosition({DownloadedItem? localItem}) {
+    return resolvePlaybackResumePosition(
+      startTicks: widget.startTicks,
+      resumeTicks: widget.resumeTicks,
+      localTicks: localItem?.playbackPositionTicks,
+    );
   }
 
   Future<void> _seekToStartPosition(Duration target) async {
@@ -1085,7 +1107,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             isPaused: false,
             eventName: 'TimeUpdate',
           );
+          _saveLocalPlaybackPosition();
         });
+      } else {
+        _saveLocalPlaybackPosition();
       }
       if (!_applyingSyncPlayCommand && !_remoteCastMirrorActive) {
         unawaited(_publishSyncPlayPlaying(playing));
@@ -1098,6 +1123,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _completedSub = _player.stream.completed.listen((completed) {
       if (_remoteCastMirrorActive) return;
       if (completed) {
+        _playbackCompleted = true;
+        _saveLocalPlaybackPosition(position: Duration.zero);
         _cancelAutoplay();
         _stopScrobblerAndRefreshContinueWatching();
         unawaited(
@@ -1133,6 +1160,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       if (!_remoteCastMirrorActive) _maybeShowNextUp();
       if (mounted) _syncIntroSkipperOverlay(p);
     });
+  }
+
+  void _saveLocalPlaybackPosition({Duration? position}) {
+    if (!_playingLocalDownload) return;
+    unawaited(
+      _downloadManager.savePlaybackPosition(
+        widget.itemId,
+        position ?? _lastPosition,
+      ),
+    );
   }
 
   bool get _syncPlayActive =>
@@ -1259,7 +1296,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         Uri(
           path: '/play/$remoteItemId',
           queryParameters: {
-            'resumeTicks': '${position.inMilliseconds * _ticksPerMs}',
+            'startTicks': '${position.inMilliseconds * _ticksPerMs}',
           },
         ).toString(),
       );
@@ -1410,6 +1447,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     if (!_remoteCastMirrorActive) {
       _stopScrobblerAndRefreshContinueWatching();
     }
+    _saveLocalPlaybackPosition(
+      position: _playbackCompleted ? Duration.zero : _lastPosition,
+    );
     // Release the server-side transcoder if we were transcoding. Fire-and-
     // forget — `_player.dispose` doesn't wait for it, but we don't need to
     // either; the server times out idle encodings anyway.
@@ -1445,9 +1485,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       valueListenable: _overlaySnapshots,
       builder: (context, snap, _) {
         final pad = MediaQuery.paddingOf(context);
-        final controlsTheme = MaterialVideoControlsTheme.maybeOf(
-          context,
-        )?.normal;
+        final controlsTheme = MaterialVideoControlsTheme.maybeOf(context)
+            ?.normal;
         final resolvedControlsBottomMargin =
             controlsTheme?.bottomButtonBarMargin
                 .resolve(Directionality.of(context))
@@ -1775,7 +1814,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       final uri = Uri(
         path: '/play/${event.itemId}',
         queryParameters: {
-          'resumeTicks': '${event.position.inMilliseconds * _ticksPerMs}',
+          'startTicks': '${event.position.inMilliseconds * _ticksPerMs}',
           'syncPlayPlaying': event.isPlaying ? '1' : '0',
         },
       );

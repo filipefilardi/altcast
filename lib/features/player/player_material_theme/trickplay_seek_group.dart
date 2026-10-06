@@ -11,7 +11,7 @@ class AltCastTrickplaySeekGroup extends ConsumerStatefulWidget {
 
   final String itemId;
   final ValueListenable<StreamSource?> sourceListenable;
-  final ValueNotifier<TrickplayOverlayData?> trickplayOverlayNotifier;
+  final TrickplayOverlayNotifier trickplayOverlayNotifier;
   final PlayerMaterialTokens tokens;
 
   @override
@@ -22,6 +22,7 @@ class AltCastTrickplaySeekGroup extends ConsumerStatefulWidget {
 class _AltCastTrickplaySeekGroupState
     extends ConsumerState<AltCastTrickplaySeekGroup> {
   TrickplaySession? _trickplay;
+  TrickplayOverlayData? _publishedOverlay;
   Object? _lastManifestKey;
   bool _isScrubbing = false;
   double _scrubPercent = 0.0;
@@ -36,9 +37,14 @@ class _AltCastTrickplaySeekGroupState
 
   @override
   void dispose() {
-    widget.trickplayOverlayNotifier.value = null;
+    widget.trickplayOverlayNotifier.clearAfterFrame(_publishedOverlay);
     widget.sourceListenable.removeListener(_loadTrickplay);
     super.dispose();
+  }
+
+  void _publishOverlay(TrickplayOverlayData? overlay) {
+    _publishedOverlay = overlay;
+    widget.trickplayOverlayNotifier.value = overlay;
   }
 
   Future<void> _loadTrickplay() async {
@@ -171,13 +177,14 @@ class _AltCastTrickplaySeekGroupState
                                 duration * percent,
                                 duration,
                               );
-                              widget.trickplayOverlayNotifier.value =
-                                  TrickplayOverlayData(
-                                    session: _trickplay!,
-                                    position: duration * percent,
-                                    totalDuration: duration,
-                                    alignPercent: percent,
-                                  );
+                              _publishOverlay(
+                                TrickplayOverlayData(
+                                  session: _trickplay!,
+                                  position: duration * percent,
+                                  totalDuration: duration,
+                                  alignPercent: percent,
+                                ),
+                              );
                             }
                           },
                           onScrubUpdate: (percent) {
@@ -190,13 +197,14 @@ class _AltCastTrickplaySeekGroupState
                                 duration * percent,
                                 duration,
                               );
-                              widget.trickplayOverlayNotifier.value =
-                                  TrickplayOverlayData(
-                                    session: _trickplay!,
-                                    position: duration * percent,
-                                    totalDuration: duration,
-                                    alignPercent: percent,
-                                  );
+                              _publishOverlay(
+                                TrickplayOverlayData(
+                                  session: _trickplay!,
+                                  position: duration * percent,
+                                  totalDuration: duration,
+                                  alignPercent: percent,
+                                ),
+                              );
                             }
                           },
                           onScrubEnd: (percent) async {
@@ -205,7 +213,7 @@ class _AltCastTrickplaySeekGroupState
                               _isScrubbing = false;
                               _scrubPercent = percent;
                             });
-                            widget.trickplayOverlayNotifier.value = null;
+                            _publishOverlay(null);
                             unawaited(player.seek(target));
                           },
                           onHoverPreview: (percent) {
@@ -214,7 +222,7 @@ class _AltCastTrickplaySeekGroupState
                             }
                             if (percent == null) {
                               setState(() => _hoverPercent = null);
-                              widget.trickplayOverlayNotifier.value = null;
+                              _publishOverlay(null);
                               return;
                             }
                             setState(() => _hoverPercent = percent);
@@ -224,13 +232,14 @@ class _AltCastTrickplaySeekGroupState
                                 duration * percent,
                                 duration,
                               );
-                              widget.trickplayOverlayNotifier.value =
-                                  TrickplayOverlayData(
-                                    session: _trickplay!,
-                                    position: duration * percent,
-                                    totalDuration: duration,
-                                    alignPercent: percent,
-                                  );
+                              _publishOverlay(
+                                TrickplayOverlayData(
+                                  session: _trickplay!,
+                                  position: duration * percent,
+                                  totalDuration: duration,
+                                  alignPercent: percent,
+                                ),
+                              );
                             }
                           },
                         ),
