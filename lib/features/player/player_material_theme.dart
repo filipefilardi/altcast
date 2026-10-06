@@ -55,6 +55,26 @@ class TrickplayOverlayData {
   final double alignPercent;
 }
 
+/// Owns the shared preview and safely clears it after controls are removed.
+class TrickplayOverlayNotifier extends ValueNotifier<TrickplayOverlayData?> {
+  TrickplayOverlayNotifier() : super(null);
+
+  bool _disposed = false;
+
+  void clearAfterFrame(TrickplayOverlayData? expected) {
+    if (_disposed || expected == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed && identical(value, expected)) value = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
 /// Material mobile controls: −10s / +10s, close + CC (tracks sheet) in the top
 /// bar (visible in media_kit fullscreen), **brightness on the left** and
 /// **volume on the right** via vertical drag only (no extra icon buttons).
@@ -62,7 +82,7 @@ MaterialVideoControlsThemeData buildAltCastMaterialVideoControlsTheme({
   required Player player,
   required String itemId,
   required ValueListenable<StreamSource?> sourceListenable,
-  required ValueNotifier<TrickplayOverlayData?> trickplayOverlayNotifier,
+  required TrickplayOverlayNotifier trickplayOverlayNotifier,
   required ValueListenable<double> volumeLevelListenable,
   required ValueListenable<double> brightnessLevelListenable,
   required Future<void> Function() onClosePlayer,

@@ -211,8 +211,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   /// pattern so the sheet's "selected" highlight reacts immediately.
   final ValueNotifier<String?> _selectedExternalSubNotifier =
       ValueNotifier<String?>(null);
-  final ValueNotifier<TrickplayOverlayData?> _trickplayOverlayNotifier =
-      ValueNotifier<TrickplayOverlayData?>(null);
+  final TrickplayOverlayNotifier _trickplayOverlayNotifier =
+      TrickplayOverlayNotifier();
 
   StreamSource? get _source => _sourceNotifier.value;
 
