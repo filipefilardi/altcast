@@ -16,7 +16,7 @@ dependencies:
   go_router: ^17.3.0
   dio: ^5.11.1
   flutter_secure_storage: ^10.3.0
-  cached_network_image: ^3.4.1
+  cached_network_image: ^4.0.4
   flutter_cache_manager: ^3.4.5
   uuid: ^4.5.3
   rxdart: ^0.28.0
