@@ -205,7 +205,8 @@ class SeerrMediaItem {
   String? get posterUrl =>
       posterPath == null ? null : 'https://image.tmdb.org/t/p/w342$posterPath';
 
-  String? get backdropUrl => backdropPath == null
+  String? get backdropUrl =>
+      backdropPath == null || backdropPath!.trim().isEmpty
       ? null
       : 'https://image.tmdb.org/t/p/w780$backdropPath';
 
@@ -342,6 +343,7 @@ class SeerrRequest {
     this.backdropPath,
     this.requestedByName,
     this.jellyfinItemId,
+    this.failureReason,
     this.downloads = const [],
     this.createdAt,
     this.updatedAt,
@@ -358,6 +360,7 @@ class SeerrRequest {
   final String? backdropPath;
   final String? requestedByName;
   final String? jellyfinItemId;
+  final String? failureReason;
   final List<SeerrDownloadStatus> downloads;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -379,6 +382,8 @@ class SeerrRequest {
       (mediaStatus == SeerrMediaStatus.available ||
           status == SeerrRequestStatus.completed);
 
+  bool get hasActiveDownload => downloads.any((download) => download.isActive);
+
   double? get progress {
     if (status == SeerrRequestStatus.pending) return 0;
     if (mediaStatus == SeerrMediaStatus.available ||
@@ -389,35 +394,55 @@ class SeerrRequest {
         status == SeerrRequestStatus.declined) {
       return null;
     }
-    if (downloads.isEmpty) return null;
-    final totalSize = downloads.fold<int>(0, (sum, item) => sum + item.size);
-    final totalLeft = downloads.fold<int>(
-      0,
-      (sum, item) => sum + item.sizeLeft,
-    );
-    if (totalSize <= 0) return null;
-    return ((totalSize - totalLeft) / totalSize).clamp(0.0, 1.0).toDouble();
+    final bytes = downloadBytes;
+    return bytes == null ? null : bytes.received / bytes.total;
   }
 
-  String? get processingDetail {
-    if (downloads.isEmpty) return null;
-    final first = downloads.first;
-    final timeLeft = first.timeLeft.trim();
-    final percent = progress == null ? null : '${(progress! * 100).round()}%';
-    if (percent != null && timeLeft.isNotEmpty) {
-      return '$percent downloaded • ETA $timeLeft';
+  ({int received, int total})? get downloadBytes {
+    final measured = measuredDownloadBytes;
+    if (measured.count == 0 || measured.count != downloads.length) return null;
+    return (received: measured.received, total: measured.total);
+  }
+
+  ({int received, int total, int count}) get measuredDownloadBytes {
+    var totalSize = 0;
+    var totalLeft = 0;
+    var count = 0;
+    for (final download in downloads) {
+      final remaining = download.sizeLeft;
+      if (remaining == null ||
+          remaining < 0 ||
+          download.size <= 0 ||
+          remaining > download.size) {
+        continue;
+      }
+      count++;
+      totalSize += download.size;
+      totalLeft += remaining;
     }
-    if (percent != null) return '$percent downloaded';
-    if (timeLeft.isNotEmpty) return 'ETA $timeLeft';
-    return null;
+    return (received: totalSize - totalLeft, total: totalSize, count: count);
+  }
+
+  int? get totalDownloadSize {
+    if (downloads.isEmpty || downloads.any((entry) => entry.size <= 0)) {
+      return null;
+    }
+    return downloads.fold<int>(0, (total, entry) => total + entry.size);
+  }
+
+  String? get downloadEta {
+    if (downloads.length != 1) return null;
+    final eta = downloads.single.timeLeft.trim();
+    return eta.isEmpty ? null : eta;
   }
 
   String? get posterUrl =>
       posterPath == null ? null : 'https://image.tmdb.org/t/p/w185$posterPath';
 
-  String? get backdropUrl => backdropPath == null
+  String? get backdropUrl =>
+      backdropPath == null || backdropPath!.trim().isEmpty
       ? null
-      : 'https://image.tmdb.org/t/p/w500$backdropPath';
+      : 'https://image.tmdb.org/t/p/w780$backdropPath';
 
   SeerrRequest copyWith({
     String? title,
@@ -438,6 +463,7 @@ class SeerrRequest {
       backdropPath: backdropPath ?? this.backdropPath,
       requestedByName: requestedByName ?? this.requestedByName,
       jellyfinItemId: jellyfinItemId ?? this.jellyfinItemId,
+      failureReason: failureReason,
       downloads: downloads ?? this.downloads,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -461,9 +487,36 @@ class SeerrRequest {
     final downloadStatus = media == null
         ? null
         : (is4k ? media['downloadStatus4k'] : media['downloadStatus']) as List?;
+    final mediaType = seerrMediaTypeFromJson(json['type'] as String?);
+    final seasons = ((json['seasons'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => _intFromJson(item['seasonNumber']))
+        .whereType<int>()
+        .toList(growable: false);
+    final downloads = <SeerrDownloadStatus>[];
+    final seenDownloadIds = <String>{};
+    for (final entry in (downloadStatus ?? const []).whereType<Map>()) {
+      if (mediaType == SeerrMediaType.tv) {
+        final episode = entry['episode'];
+        final season = episode is Map
+            ? _intFromJson(episode['seasonNumber'])
+            : null;
+        if (season != null && seasons.isNotEmpty && !seasons.contains(season)) {
+          continue;
+        }
+        // Sonarr repeats a season pack's transfer data on every episode row.
+        final id = entry['downloadId'];
+        if (id is String &&
+            id.trim().isNotEmpty &&
+            !seenDownloadIds.add(id.trim().toLowerCase())) {
+          continue;
+        }
+      }
+      downloads.add(SeerrDownloadStatus.fromJson(_stringMap(entry)));
+    }
     return SeerrRequest(
       id: _intFromJson(json['id']) ?? 0,
-      mediaType: seerrMediaTypeFromJson(json['type'] as String?),
+      mediaType: mediaType,
       status: seerrRequestStatusFromJson(json['status']),
       mediaStatus: seerrMediaStatusFromJson(
         is4k ? (media?['status4k']) : (media?['status']),
@@ -482,17 +535,14 @@ class SeerrRequest {
           requestedBy?['plexUsername'] as String? ??
           requestedBy?['email'] as String?,
       jellyfinItemId: jellyfinItemId,
-      downloads: (downloadStatus ?? const [])
-          .whereType<Map>()
-          .map((item) => SeerrDownloadStatus.fromJson(_stringMap(item)))
-          .toList(growable: false),
+      failureReason: switch (json['failureReason']) {
+        final String reason when reason.trim().isNotEmpty => reason.trim(),
+        _ => null,
+      },
+      downloads: downloads,
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
-      seasons: ((json['seasons'] as List?) ?? const [])
-          .whereType<Map>()
-          .map((item) => _intFromJson(item['seasonNumber']))
-          .whereType<int>()
-          .toList(growable: false),
+      seasons: seasons,
     );
   }
 }
@@ -507,15 +557,24 @@ class SeerrDownloadStatus {
   });
 
   final int size;
-  final int sizeLeft;
+  final int? sizeLeft;
   final String status;
   final String timeLeft;
   final String title;
 
+  bool get isActive {
+    final state = status.trim().toLowerCase();
+    if (state.isNotEmpty && state != 'unknown') return state == 'downloading';
+    // Some Seerr queues omit the transfer state but still report an ETA or bytes.
+    final remaining = sizeLeft;
+    return timeLeft.trim().isNotEmpty ||
+        (remaining != null && remaining > 0 && remaining < size);
+  }
+
   factory SeerrDownloadStatus.fromJson(Map<String, dynamic> json) {
     return SeerrDownloadStatus(
       size: _intFromJson(json['size']) ?? 0,
-      sizeLeft: _intFromJson(json['sizeLeft'] ?? json['sizeleft']) ?? 0,
+      sizeLeft: _intFromJson(json['sizeLeft'] ?? json['sizeleft']),
       status: json['status'] as String? ?? '',
       timeLeft:
           json['timeLeft'] as String? ?? json['timeleft'] as String? ?? '',

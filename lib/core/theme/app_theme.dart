@@ -12,10 +12,28 @@ class AppTheme {
   static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
 
-    final body = GoogleFonts.manropeTextTheme(base.textTheme).apply(
-      bodyColor: AppColors.textPrimary,
-      displayColor: AppColors.textPrimary,
-    );
+    final styles = base.textTheme;
+    final body =
+        TextTheme(
+          displayLarge: GoogleFonts.manrope(textStyle: styles.displayLarge),
+          displayMedium: GoogleFonts.manrope(textStyle: styles.displayMedium),
+          displaySmall: GoogleFonts.manrope(textStyle: styles.displaySmall),
+          headlineLarge: GoogleFonts.manrope(textStyle: styles.headlineLarge),
+          headlineMedium: GoogleFonts.manrope(textStyle: styles.headlineMedium),
+          headlineSmall: GoogleFonts.manrope(textStyle: styles.headlineSmall),
+          titleLarge: GoogleFonts.manrope(textStyle: styles.titleLarge),
+          titleMedium: GoogleFonts.manrope(textStyle: styles.titleMedium),
+          titleSmall: GoogleFonts.manrope(textStyle: styles.titleSmall),
+          bodyLarge: GoogleFonts.manrope(textStyle: styles.bodyLarge),
+          bodyMedium: GoogleFonts.manrope(textStyle: styles.bodyMedium),
+          bodySmall: GoogleFonts.manrope(textStyle: styles.bodySmall),
+          labelLarge: GoogleFonts.manrope(textStyle: styles.labelLarge),
+          labelMedium: GoogleFonts.manrope(textStyle: styles.labelMedium),
+          labelSmall: GoogleFonts.manrope(textStyle: styles.labelSmall),
+        ).apply(
+          bodyColor: AppColors.textPrimary,
+          displayColor: AppColors.textPrimary,
+        );
 
     final textTheme = body.copyWith(
       displayLarge: body.displayLarge?.copyWith(
