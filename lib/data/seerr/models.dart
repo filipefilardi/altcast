@@ -393,6 +393,11 @@ class SeerrRequest {
         status == SeerrRequestStatus.declined) {
       return null;
     }
+    final bytes = downloadBytes;
+    return bytes == null ? null : bytes.received / bytes.total;
+  }
+
+  ({int received, int total})? get downloadBytes {
     var totalSize = 0;
     var totalLeft = 0;
     for (final download in downloads) {
@@ -406,20 +411,22 @@ class SeerrRequest {
       totalSize += download.size;
       totalLeft += remaining;
     }
-    return totalSize == 0 ? null : (totalSize - totalLeft) / totalSize;
+    return totalSize == 0
+        ? null
+        : (received: totalSize - totalLeft, total: totalSize);
   }
 
-  String? get processingDetail {
-    if (downloads.isEmpty) return null;
-    final first = downloads.first;
-    final timeLeft = first.timeLeft.trim();
-    final percent = progress == null ? null : '${(progress! * 100).round()}%';
-    if (percent != null && timeLeft.isNotEmpty) {
-      return '$percent downloaded • ETA $timeLeft';
+  int? get totalDownloadSize {
+    if (downloads.isEmpty || downloads.any((entry) => entry.size <= 0)) {
+      return null;
     }
-    if (percent != null) return '$percent downloaded';
-    if (timeLeft.isNotEmpty) return 'ETA $timeLeft';
-    return null;
+    return downloads.fold<int>(0, (total, entry) => total + entry.size);
+  }
+
+  String? get downloadEta {
+    if (downloads.length != 1) return null;
+    final eta = downloads.single.timeLeft.trim();
+    return eta.isEmpty ? null : eta;
   }
 
   String? get posterUrl =>

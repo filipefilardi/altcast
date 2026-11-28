@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:picons/picons.dart';
 
 import 'package:altcast/core/theme/app_colors.dart';
+import 'package:altcast/core/utils/format.dart';
 import 'package:altcast/core/widgets/app_snackbar.dart';
 import 'package:altcast/core/widgets/edge_light_background.dart';
 import 'package:altcast/core/widgets/empty_state.dart';
@@ -181,7 +182,7 @@ enum _Section {
         item.status == SeerrRequestStatus.completed) {
       return available;
     }
-    if (item.hasActiveDownload) return downloading;
+    if (item.downloads.isNotEmpty) return downloading;
     if (item.status == SeerrRequestStatus.approved ||
         item.mediaStatus == SeerrMediaStatus.processing ||
         item.mediaStatus == SeerrMediaStatus.partiallyAvailable) {
@@ -263,9 +264,17 @@ class _RequestSectionState extends State<_RequestSection> {
   Widget build(BuildContext context) {
     final section = widget.section;
     final preview =
-        section == _Section.failed || section == _Section.processing;
+        section == _Section.downloading ||
+        section == _Section.failed ||
+        section == _Section.processing;
     final items = preview
-        ? (widget.items.toList()..sort(_newestFirst))
+        ? (widget.items.toList()..sort((a, b) {
+            if (section == _Section.downloading &&
+                a.hasActiveDownload != b.hasActiveDownload) {
+              return a.hasActiveDownload ? -1 : 1;
+            }
+            return _newestFirst(a, b);
+          }))
         : widget.items;
     final canExpand = preview && items.length > _previewCount;
     final visibleCount = canExpand && !_expanded ? _previewCount : items.length;
@@ -317,9 +326,11 @@ class _RequestSectionState extends State<_RequestSection> {
               },
               itemBuilder: (_, index) {
                 if (index == visibleCount) {
-                  final label = section == _Section.failed
-                      ? 'failed'
-                      : 'waiting';
+                  final label = switch (section) {
+                    _Section.downloading => 'downloads',
+                    _Section.failed => 'failed requests',
+                    _ => 'waiting requests',
+                  };
                   return Semantics(
                     expanded: _expanded,
                     child: TextButton.icon(
@@ -343,7 +354,7 @@ class _RequestSectionState extends State<_RequestSection> {
                       label: Text(
                         _expanded
                             ? 'Show fewer'
-                            : 'Show all ${items.length} $label requests',
+                            : 'Show all ${items.length} $label',
                       ),
                     ),
                   );
@@ -599,40 +610,7 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
         );
       case _Section.downloading:
       case _Section.processing:
-        final progress = request.progress;
-        final detail =
-            request.processingDetail ??
-            (widget.section == _Section.downloading
-                ? 'Downloading'
-                : 'Waiting for queue details');
-        return _StatusStrip(
-          section: widget.section,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                request.mediaStatus == SeerrMediaStatus.partiallyAvailable
-                    ? 'Partially available · $detail'
-                    : detail,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                ),
-              ),
-              if (progress != null) ...[
-                const SizedBox(height: 7),
-                LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 5,
-                  semanticsLabel: 'Download progress',
-                  borderRadius: BorderRadius.circular(8),
-                  color: AppColors.primary,
-                  backgroundColor: AppColors.divider,
-                ),
-              ],
-            ],
-          ),
-        );
+        return _TransferProgress(request: request);
       case _Section.pending:
         return Wrap(
           spacing: 8,
@@ -757,6 +735,192 @@ class _RequestActionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10),
       ),
     );
+  }
+}
+
+class _TransferProgress extends StatefulWidget {
+  const _TransferProgress({required this.request});
+
+  final SeerrRequest request;
+
+  @override
+  State<_TransferProgress> createState() => _TransferProgressState();
+}
+
+class _TransferProgressState extends State<_TransferProgress> {
+  bool _expanded = true;
+
+  static String _etaLabel(String eta) {
+    // Seerr may return either a clock duration or a human-readable estimate.
+    final clock = RegExp(r'^(?:(\d{1,6})\.)?(\d{1,6}):([0-5]\d):([0-5]\d)$')
+        .firstMatch(eta);
+    if (clock == null) return 'ETA $eta';
+    final duration = Duration(
+      days: int.parse(clock[1] ?? '0'),
+      hours: int.parse(clock[2]!),
+      minutes: int.parse(clock[3]!),
+      seconds: int.parse(clock[4]!),
+    );
+    if (duration.inMinutes == 0) return 'Under 1 min left';
+    final minutes = (duration.inSeconds / 60).ceil();
+    final hours = minutes ~/ 60;
+    final remainder = minutes % 60;
+    if (hours == 0) return '$minutes min left';
+    return remainder == 0 ? '${hours}h left' : '${hours}h ${remainder}m left';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final request = widget.request;
+    final bytes = request.downloadBytes;
+    final total = bytes?.total ?? request.totalDownloadSize;
+    final fraction = bytes == null ? null : bytes.received / bytes.total;
+    final percent = bytes == null
+        ? null
+        : _percent(bytes.received, bytes.total);
+    final eta = fraction == 1 ? null : request.downloadEta;
+    final count = request.downloads.length;
+    final contextLine = [
+      if (request.mediaType == SeerrMediaType.tv && count > 0)
+        'Series queue · $count ${count == 1 ? 'transfer' : 'transfers'}',
+      if (request.mediaStatus == SeerrMediaStatus.partiallyAvailable)
+        'Partially available',
+    ];
+    if (count == 0) {
+      return Text(
+        ['Waiting for queue details', ...contextLine].join(' · '),
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      );
+    }
+    final label = switch (fraction) {
+      1.0 => 'Transfer complete',
+      0.0 when request.hasActiveDownload => 'Starting download',
+      _ when request.hasActiveDownload => 'Downloading',
+      _
+          when request.downloads.every(
+            (d) => d.status.trim().toLowerCase() == 'paused',
+          ) =>
+        'Paused',
+      _ => 'In download queue',
+    };
+    const secondary = TextStyle(color: AppColors.textSecondary, fontSize: 12);
+    final hasDetails =
+        percent != null ||
+        eta != null ||
+        total != null ||
+        contextLine.isNotEmpty;
+    final heading = Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (hasDetails) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  _expanded ? PiconsRegular.caretUp : PiconsRegular.caretDown,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (percent != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            percent,
+            style: const TextStyle(
+              color: AppColors.accent,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 5,
+      children: [
+        if (hasDetails)
+          Semantics(
+            button: true,
+            expanded: _expanded,
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 40),
+                child: heading,
+              ),
+            ),
+          )
+        else
+          heading,
+        if (_expanded) ...[
+          if (fraction != null)
+            LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.primary,
+              backgroundColor: AppColors.divider,
+              trackGap: 0,
+              semanticsLabel: request.mediaType == SeerrMediaType.tv
+                  ? 'Series queue download progress'
+                  : 'Download progress',
+              semanticsValue: percent,
+            ),
+          if (eta != null || total != null)
+            Wrap(
+              spacing: 14,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (eta != null)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Icon(
+                            PiconsRegular.clock,
+                            size: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        TextSpan(text: '  ${_etaLabel(eta)}'),
+                      ],
+                    ),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                if (total != null)
+                  Text('${formatBytes(total)} total', style: secondary),
+              ],
+            ),
+          if (contextLine.isNotEmpty)
+            Text(contextLine.join(' · '), style: secondary),
+        ],
+      ],
+    );
+  }
+
+  static String _percent(int received, int total) {
+    final percent = received * 100 ~/ total;
+    return percent == 0 && received > 0 ? '<1%' : '$percent%';
   }
 }
 

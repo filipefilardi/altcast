@@ -63,7 +63,7 @@ void main() {
             'title': 'Downloading movie',
             'status': 3,
             'downloadStatus': [
-              {'size': 100, 'sizeLeft': 25},
+              {'size': 100, 'sizeLeft': 25, 'timeLeft': '01:03:50'},
             ],
           },
         }),
@@ -118,7 +118,8 @@ void main() {
       expect(find.text('Retry'), findsNWidgets(2));
       expect(find.text('Sonarr is unavailable.'), findsOneWidget);
       expect(find.textContaining('No failure details'), findsNothing);
-      expect(find.text('Waiting for queue details'), findsOneWidget);
+      expect(find.text('In download queue'), findsOneWidget);
+      expect(find.text('Processing'), findsNothing);
       expect(
         tester
             .widget<LinearProgressIndicator>(
@@ -127,6 +128,23 @@ void main() {
             .value,
         .75,
       );
+      expect(find.text('75%'), findsOneWidget);
+      expect(find.textContaining('1h 4m left'), findsOneWidget);
+      expect(find.text('100 B total'), findsNWidgets(2));
+      expect(find.textContaining('75 B of'), findsNothing);
+      final downloadLabel = find.descendant(
+        of: find.byKey(const ValueKey(3)),
+        matching: find.text('Downloading'),
+      );
+      expect(downloadLabel, findsOneWidget);
+      await tester.tap(downloadLabel);
+      await tester.pumpAndSettle();
+      expect(find.text('75%'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.textContaining('1h 4m left'), findsNothing);
+      await tester.tap(downloadLabel);
+      await tester.pumpAndSettle();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('Ready movie'), findsNothing);
       await tester.tap(find.text('Retry').first);
       await tester.pumpAndSettle();
@@ -284,12 +302,19 @@ void main() {
       expect(find.text('Queued 2'), findsNothing);
       expect(find.text('Queued 3'), findsOneWidget);
       expect(find.text('Failure 1'), findsNothing);
+      final downloadsToggle = find.text('Show all 4 downloads');
+      expect(find.text('Transfer 1'), findsNothing);
+      await tester.tap(downloadsToggle);
+      await tester.pumpAndSettle();
       for (var i = 1; i <= 4; i++) {
         expect(
           tester.getCenter(find.text('Transfer $i')).dy,
           lessThan(tester.getCenter(find.text('Failed requests')).dy),
         );
       }
+      await tester.tap(find.text('Show fewer'));
+      await tester.pumpAndSettle();
+      expect(downloadsToggle, findsOneWidget);
       await tester.tap(waitingToggle);
       await tester.pumpAndSettle();
       expect(find.text('Queued 1'), findsOneWidget);
@@ -307,7 +332,7 @@ void main() {
           SeerrDownloadStatus(
             size: 0,
             sizeLeft: null,
-            status: 'downloading',
+            status: 'queued',
             timeLeft: '',
             title: '',
           ),
@@ -315,6 +340,12 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 15));
       await tester.pumpAndSettle();
+      expect(find.text('Show all 5 downloads'), findsOneWidget);
+      expect(find.text('Queued 1'), findsNothing);
+      await tester.tap(find.text('Show all 5 downloads'));
+      await tester.pumpAndSettle();
+      expect(find.text('Queued 1'), findsOneWidget);
+      expect(find.text('In download queue'), findsOneWidget);
       expect(
         tester.getCenter(find.text('Queued 1')).dy,
         lessThan(tester.getCenter(find.text('Failed requests')).dy),
@@ -322,6 +353,59 @@ void main() {
       expect(find.text('Show all 4 waiting requests'), findsOneWidget);
       expect(find.text('Queued 2'), findsNothing);
       expect(find.text('Failure 1'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'series progress covers the reported queue and omits an individual transfer ETA',
+    (tester) async {
+      final request = SeerrRequest.fromJson({
+        'id': 91,
+        'status': 2,
+        'type': 'tv',
+        'seasons': [
+          {'seasonNumber': 2},
+        ],
+        'media': {
+          'title': 'Series in progress',
+          'status': 4,
+          'downloadStatus': [
+            {
+              'size': 900,
+              'sizeLeft': 900,
+              'timeLeft': '5 min',
+              'status': 'downloading',
+            },
+            {'size': 100, 'sizeLeft': 0, 'status': 'completed'},
+          ],
+        },
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seerrConnectionProvider.overrideWith(_Connected.new),
+            seerrRequestsProvider.overrideWith((_) async => [request]),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const RequestsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Season 2'), findsOneWidget);
+      expect(find.text('10%'), findsOneWidget);
+      expect(find.textContaining('Series queue · 2 transfers'), findsOneWidget);
+      expect(find.textContaining('Partially available'), findsOneWidget);
+      expect(find.text('1000 B total'), findsOneWidget);
+      expect(find.textContaining('ETA'), findsNothing);
+      expect(
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byType(LinearProgressIndicator),
+            )
+            .value,
+        .1,
+      );
     },
   );
 }

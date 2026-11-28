@@ -80,7 +80,8 @@ void main() {
 
       expect(request.statusLabel, 'Processing');
       expect(request.progress, 0.75);
-      expect(request.processingDetail, '75% downloaded • ETA 10 minutes');
+      expect(request.downloadEta, '10 minutes');
+      expect(request.downloadBytes, (received: 750, total: 1000));
     });
 
     test('available requests expose Jellyfin item navigation id', () {
