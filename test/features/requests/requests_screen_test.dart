@@ -219,4 +219,109 @@ void main() {
       expect(find.text('Show 1'), findsNothing);
     },
   );
+  testWidgets(
+    'downloads stay above both independent, expandable previews as the queue refreshes',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(420, 4000);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final requests = [
+        for (var i = 1; i <= 4; i++)
+          SeerrRequest(
+            id: i,
+            mediaType: SeerrMediaType.tv,
+            status: SeerrRequestStatus.failed,
+            title: 'Failure $i',
+          ),
+        for (var i = 1; i <= 5; i++)
+          SeerrRequest(
+            id: 10 + i,
+            mediaType: SeerrMediaType.movie,
+            status: SeerrRequestStatus.approved,
+            title: 'Queued $i',
+            createdAt: DateTime(2026, 11, i),
+          ),
+        for (var i = 1; i <= 4; i++)
+          SeerrRequest.fromJson({
+            'id': 20 + i,
+            'type': 'movie',
+            'status': 2,
+            'media': {
+              'title': 'Transfer $i',
+              'status': 3,
+              'downloadStatus': [
+                if (i.isEven)
+                  {'size': 100, 'sizeLeft': 35}
+                else
+                  {'status': 'downloading'},
+              ],
+            },
+          }),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seerrConnectionProvider.overrideWith(_Connected.new),
+            seerrRequestsProvider.overrideWith((_) async => [...requests]),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const RequestsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final waitingToggle = find.text('Show all 5 waiting requests');
+      final failedToggle = find.text('Show all 4 failed requests');
+      for (final toggle in [waitingToggle, failedToggle]) {
+        expect(
+          find.ancestor(of: toggle, matching: find.byType(DecoratedSliver)),
+          findsOneWidget,
+        );
+      }
+      expect(find.text('Queued 2'), findsNothing);
+      expect(find.text('Queued 3'), findsOneWidget);
+      expect(find.text('Failure 1'), findsNothing);
+      for (var i = 1; i <= 4; i++) {
+        expect(
+          tester.getCenter(find.text('Transfer $i')).dy,
+          lessThan(tester.getCenter(find.text('Failed requests')).dy),
+        );
+      }
+      await tester.tap(waitingToggle);
+      await tester.pumpAndSettle();
+      expect(find.text('Queued 1'), findsOneWidget);
+      expect(failedToggle, findsOneWidget);
+      await tester.tap(find.text('Show fewer'));
+      await tester.pumpAndSettle();
+      await tester.tap(failedToggle);
+      await tester.pumpAndSettle();
+      expect(find.text('Failure 1'), findsOneWidget);
+      expect(waitingToggle, findsOneWidget);
+
+      final idx = requests.indexWhere((r) => r.title == 'Queued 1');
+      requests[idx] = requests[idx].copyWith(
+        downloads: const [
+          SeerrDownloadStatus(
+            size: 0,
+            sizeLeft: null,
+            status: 'downloading',
+            timeLeft: '',
+            title: '',
+          ),
+        ],
+      );
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getCenter(find.text('Queued 1')).dy,
+        lessThan(tester.getCenter(find.text('Failed requests')).dy),
+      );
+      expect(find.text('Show all 4 waiting requests'), findsOneWidget);
+      expect(find.text('Queued 2'), findsNothing);
+      expect(find.text('Failure 1'), findsOneWidget);
+    },
+  );
 }

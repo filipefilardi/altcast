@@ -222,7 +222,11 @@ class _RequestsList extends StatelessWidget {
           ),
         for (final section in _Section.values)
           if (groups[section] case final items?)
-            _RequestSection(key: ValueKey(section), section: section, items: items),
+            _RequestSection(
+              key: ValueKey(section),
+              section: section,
+              items: items,
+            ),
         const SliverToBoxAdapter(child: SizedBox(height: 96)),
       ],
     );
@@ -230,7 +234,11 @@ class _RequestsList extends StatelessWidget {
 }
 
 class _RequestSection extends StatefulWidget {
-  const _RequestSection({super.key, required this.section, required this.items});
+  const _RequestSection({
+    super.key,
+    required this.section,
+    required this.items,
+  });
   final _Section section;
   final List<SeerrRequest> items;
 
@@ -254,87 +262,109 @@ class _RequestSectionState extends State<_RequestSection> {
   @override
   Widget build(BuildContext context) {
     final section = widget.section;
-    final preview = section == _Section.failed || section == _Section.processing;
-    final items = preview ? (widget.items.toList()..sort(_newestFirst)) : widget.items;
+    final preview =
+        section == _Section.failed || section == _Section.processing;
+    final items = preview
+        ? (widget.items.toList()..sort(_newestFirst))
+        : widget.items;
     final canExpand = preview && items.length > _previewCount;
     final visibleCount = canExpand && !_expanded ? _previewCount : items.length;
     return SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              sliver: SliverMainAxisGroup(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Semantics(
-                        header: true,
-                        child: Row(
-                          children: [
-                            Icon(section.icon, size: 22, color: section.color),
-                            const SizedBox(width: 10),
-                            Flexible(
-                              child: Text(
-                                section.title,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${items.length}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      sliver: SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Semantics(
+                header: true,
+                child: Row(
+                  children: [
+                    Icon(section.icon, size: 22, color: section.color),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        section.title,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
-                  ),
-                  DecoratedSliver(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceElevated.withValues(alpha: .56),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.divider),
-                    ),
-                    sliver: SliverList.separated(
-                      itemCount: visibleCount + (canExpand ? 1 : 0),
-                      findItemIndexCallback: (key) {
-                        final index = items.indexWhere(
-                          (item) => ValueKey(item.id) == key,
-                        );
-                        return index < 0 || index >= visibleCount ? null : index;
-                      },
-                      itemBuilder: (_, index) {
-                        if (index == visibleCount) {
-                          final label = section == _Section.failed ? 'failed' : 'waiting';
-                          return Semantics(
-                            expanded: _expanded,
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.primary,
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(16))),
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                              onPressed: () => setState(() => _expanded = !_expanded),
-                              iconAlignment: IconAlignment.end,
-                              icon: Icon(_expanded ? PiconsRegular.caretUp : PiconsRegular.caretDown, size: 16),
-                              label: Text(_expanded ? 'Show fewer' : 'Show all ${items.length} $label requests'),
-                            ),
-                          );
-                        }
-                        return _RequestTile(key: ValueKey(items[index].id), request: items[index], section: section);
-                      },
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        indent: 14,
-                        endIndent: 14,
-                        color: AppColors.divider,
+                    const SizedBox(width: 8),
+                    Text(
+                      '${items.length}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            );
+            ),
+          ),
+          DecoratedSliver(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated.withValues(alpha: .56),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
+            ),
+            sliver: SliverList.separated(
+              itemCount: visibleCount + (canExpand ? 1 : 0),
+              findItemIndexCallback: (key) {
+                final index = items.indexWhere(
+                  (item) => ValueKey(item.id) == key,
+                );
+                return index < 0 || index >= visibleCount ? null : index;
+              },
+              itemBuilder: (_, index) {
+                if (index == visibleCount) {
+                  final label = section == _Section.failed
+                      ? 'failed'
+                      : 'waiting';
+                  return Semantics(
+                    expanded: _expanded,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            bottom: Radius.circular(16),
+                          ),
+                        ),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      iconAlignment: IconAlignment.end,
+                      icon: Icon(
+                        _expanded
+                            ? PiconsRegular.caretUp
+                            : PiconsRegular.caretDown,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _expanded
+                            ? 'Show fewer'
+                            : 'Show all ${items.length} $label requests',
+                      ),
+                    ),
+                  );
+                }
+                return _RequestTile(
+                  key: ValueKey(items[index].id),
+                  request: items[index],
+                  section: section,
+                );
+              },
+              separatorBuilder: (_, _) => const Divider(
+                height: 1,
+                indent: 14,
+                endIndent: 14,
+                color: AppColors.divider,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -570,7 +600,11 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
       case _Section.downloading:
       case _Section.processing:
         final progress = request.progress;
-        final detail = request.processingDetail ?? (widget.section == _Section.downloading ? 'Downloading' : 'Waiting for queue details');
+        final detail =
+            request.processingDetail ??
+            (widget.section == _Section.downloading
+                ? 'Downloading'
+                : 'Waiting for queue details');
         return _StatusStrip(
           section: widget.section,
           child: Column(
