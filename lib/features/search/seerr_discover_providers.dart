@@ -61,56 +61,22 @@ class SeerrDetailsKey {
   int get hashCode => Object.hash(id, mediaType);
 }
 
-class SeerrRequestsFilterNotifier extends Notifier<String> {
-  @override
-  String build() => 'all';
-
-  // ignore: use_setters_to_change_properties
-  void setFilter(String value) => state = value;
-}
-
-final seerrRequestsFilterProvider =
-    NotifierProvider<SeerrRequestsFilterNotifier, String>(
-      SeerrRequestsFilterNotifier.new,
-    );
-
 final seerrRequestsProvider = FutureProvider.autoDispose<List<SeerrRequest>>((
   ref,
 ) async {
   final connection = await ref.watch(seerrConnectionProvider.future);
-  if (connection == null) return const [];
-  final filter = ref.watch(seerrRequestsFilterProvider);
+  if (connection == null || !ref.mounted) return const [];
   final repo = ref.watch(seerrRepositoryProvider);
-  final result = await repo.requests(filter: filter, take: 30);
-  return Future.wait(
-    result.results.map((request) => _withRequestTitle(repo, request)),
-  );
+  const pageSize = 100;
+  final requests = <int, SeerrRequest>{};
+  var skip = 0;
+  while (ref.mounted) {
+    final page = await repo.requests(skip: skip, take: pageSize);
+    for (final request in page.results) {
+      requests[request.id] = request;
+    }
+    skip += page.results.length;
+    if (page.results.isEmpty || page.page >= page.totalPages) break;
+  }
+  return requests.values.toList(growable: false);
 });
-
-Future<SeerrRequest> _withRequestTitle(
-  SeerrRepository repo,
-  SeerrRequest request,
-) async {
-  final tmdbId = request.tmdbId;
-  if (tmdbId == null ||
-      (request.mediaType != SeerrMediaType.movie &&
-          request.mediaType != SeerrMediaType.tv)) {
-    return request;
-  }
-  final title = request.title;
-  if (request.posterPath != null &&
-      title != null &&
-      !title.startsWith('TMDb #')) {
-    return request;
-  }
-  try {
-    final detail = await repo.details(id: tmdbId, mediaType: request.mediaType);
-    return request.copyWith(
-      title: detail.title,
-      posterPath: detail.posterPath,
-      backdropPath: detail.backdropPath,
-    );
-  } catch (_) {
-    return request;
-  }
-}

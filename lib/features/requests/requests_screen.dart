@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +33,9 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
       final connected = ref
           .read(seerrConnectionProvider)
           .maybeWhen(data: (session) => session != null, orElse: () => false);
-      if (connected) ref.invalidate(seerrRequestsProvider);
+      if (connected && !ref.read(seerrRequestsProvider).isLoading) {
+        ref.invalidate(seerrRequestsProvider);
+      }
     });
   }
 
@@ -47,262 +48,321 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final connection = ref.watch(seerrConnectionProvider);
-    final filter = ref.watch(seerrRequestsFilterProvider);
-    final requests = ref.watch(seerrRequestsProvider);
 
     return EdgeLightBackground(
       child: Scaffold(
         appBar: AppBar(title: const Text('Requests')),
         body: connection.when(
-          data: (session) {
-            if (session == null) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: EmptyState(
-                  icon: PiconsRegular.queue,
-                  title: 'Connect Seerr',
-                  message:
-                      'Add your Seerr server in Settings to view requests.',
-                  action: TextButton.icon(
-                    onPressed: () => context.push('/settings'),
-                    icon: const Icon(PiconsRegular.gear),
-                    label: const Text('Open Settings'),
-                  ),
-                ),
-              );
-            }
-            return RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(seerrRequestsProvider);
-                await ref.read(seerrRequestsProvider.future);
-              },
-              child: requests.when(
-                skipLoadingOnReload: true,
-                data: (items) =>
-                    _RequestsList(items: items, selectedFilter: filter),
-                loading: () => ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
-                  children: [
-                    _RequestFilters(selected: filter),
-                    const SizedBox(height: 18),
-                    const _RequestsSkeleton(),
-                  ],
-                ),
-                error: (e, _) => ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+          data: (session) => session == null
+              ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.18),
-                    ErrorStateView(
-                      title: 'Requests failed',
-                      message: userFacingSeerrMessage(e),
-                      onRetry: () => ref.invalidate(seerrRequestsProvider),
+                  child: EmptyState(
+                    icon: PiconsRegular.queue,
+                    title: 'Connect Seerr',
+                    message:
+                        'Add your Seerr server in Settings to view requests.',
+                    action: TextButton.icon(
+                      onPressed: () => context.push('/settings'),
+                      icon: const Icon(PiconsRegular.gear),
+                      label: const Text('Open Settings'),
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
-          loading: () => ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
-            children: [
-              _RequestFilters(selected: filter),
-              const SizedBox(height: 18),
-              const _RequestsSkeleton(),
-            ],
-          ),
-          error: (e, _) => Padding(
+                  ),
+                )
+              : const _RequestTabs(),
+          loading: () => const _LoadingRequests(),
+          error: (error, _) => Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: ErrorStateView(
               title: 'Seerr failed',
-              message: userFacingSeerrMessage(e),
+              message: userFacingSeerrMessage(error),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _RequestTabs extends ConsumerWidget {
+  const _RequestTabs();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requests = ref.watch(seerrRequestsProvider);
+    return DefaultTabController(
+      length: 2,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: TabBar(
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  indicatorColor: AppColors.primary,
+                  labelColor: AppColors.textPrimary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  dividerHeight: 0,
+                  labelPadding: EdgeInsets.symmetric(horizontal: 12),
+                  tabs: [
+                    Tab(text: 'Active'),
+                    Tab(text: 'History'),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: requests.when(
+                  skipLoadingOnReload: true,
+                  data: (items) => TabBarView(
+                    children: [
+                      for (final history in [false, true])
+                        RefreshIndicator(
+                          onRefresh: () async {
+                            ref.invalidate(seerrRequestsProvider);
+                            await ref.read(seerrRequestsProvider.future);
+                          },
+                          child: _RequestsList(items: items, history: history),
+                        ),
+                    ],
+                  ),
+                  loading: () => const _LoadingRequests(),
+                  error: (error, _) => ErrorStateView(
+                    title: 'Requests failed',
+                    message: userFacingSeerrMessage(error),
+                    onRetry: () => ref.invalidate(seerrRequestsProvider),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _Section {
+  downloading('Downloading', PiconsRegular.downloadSimple, AppColors.primary),
+  failed('Failed requests', PiconsRegular.warningCircle, AppColors.error),
+  processing('Processing', PiconsRegular.pulse, AppColors.primary),
+  pending('Pending approval', PiconsRegular.clock, AppColors.primary),
+  other('Requested', PiconsRegular.queue, AppColors.textSecondary),
+  available(
+    'Available',
+    PiconsRegular.checkCircle,
+    AppColors.success,
+    history: true,
+  ),
+  declined('Declined', PiconsRegular.xCircle, AppColors.error, history: true),
+  removed(
+    'Removed',
+    PiconsRegular.clockCounterClockwise,
+    AppColors.textSecondary,
+    history: true,
+  );
+
+  const _Section(this.title, this.icon, this.color, {this.history = false});
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool history;
+
+  static _Section of(SeerrRequest item) {
+    if (item.canRetry) return failed;
+    if (item.status == SeerrRequestStatus.declined) return declined;
+    if (item.status == SeerrRequestStatus.pending) return pending;
+    if (item.mediaStatus == SeerrMediaStatus.deleted) return removed;
+    if (item.mediaStatus == SeerrMediaStatus.available ||
+        item.status == SeerrRequestStatus.completed) {
+      return available;
+    }
+    if (item.hasActiveDownload) return downloading;
+    if (item.status == SeerrRequestStatus.approved ||
+        item.mediaStatus == SeerrMediaStatus.processing ||
+        item.mediaStatus == SeerrMediaStatus.partiallyAvailable) {
+      return processing;
+    }
+    return other;
   }
 }
 
 class _RequestsList extends StatelessWidget {
-  const _RequestsList({required this.items, required this.selectedFilter});
-
+  const _RequestsList({required this.items, required this.history});
   final List<SeerrRequest> items;
-  final String selectedFilter;
+  final bool history;
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = items
-        .where((request) => _matchesFilter(request, selectedFilter))
-        .toList(growable: false);
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 96),
-          children: [
-            _RequestFilters(selected: selectedFilter),
-            const SizedBox(height: 18),
-            if (visibleItems.isEmpty)
-              const EmptyState(
-                icon: PiconsRegular.queue,
-                title: 'No requests',
-                message: 'Requested movies and shows will appear here.',
-              )
-            else
-              for (final request in visibleItems) ...[
-                _RequestTile(request: request),
-                const SizedBox(height: 12),
-              ],
-          ],
-        ),
-      ),
+    final groups = <_Section, List<SeerrRequest>>{};
+    for (final item in items) {
+      final section = _Section.of(item);
+      if (section.history == history) (groups[section] ??= []).add(item);
+    }
+    return CustomScrollView(
+      key: PageStorageKey(history),
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        if (groups.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: history
+                  ? PiconsRegular.clockCounterClockwise
+                  : PiconsRegular.queue,
+              title: history ? 'No request history' : 'No active requests',
+              message: history
+                  ? 'Finished requests will appear here.'
+                  : 'New and in-progress requests will appear here.',
+            ),
+          ),
+        for (final section in _Section.values)
+          if (groups[section] case final items?)
+            _RequestSection(key: ValueKey(section), section: section, items: items),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
+      ],
     );
-  }
-
-  bool _matchesFilter(SeerrRequest request, String filter) {
-    return switch (filter) {
-      'pending' => request.status == SeerrRequestStatus.pending,
-      'processing' =>
-        request.status == SeerrRequestStatus.approved &&
-            request.mediaStatus != SeerrMediaStatus.available &&
-            request.mediaStatus != SeerrMediaStatus.deleted,
-      'available' =>
-        request.mediaStatus == SeerrMediaStatus.available ||
-            request.status == SeerrRequestStatus.completed,
-      'failed' =>
-        request.status == SeerrRequestStatus.failed ||
-            request.status == SeerrRequestStatus.declined,
-      _ => true,
-    };
   }
 }
 
-class _GlassPanel extends StatelessWidget {
-  const _GlassPanel({required this.child, this.padding});
+class _RequestSection extends StatefulWidget {
+  const _RequestSection({super.key, required this.section, required this.items});
+  final _Section section;
+  final List<SeerrRequest> items;
 
-  final Widget child;
-  final EdgeInsetsGeometry? padding;
+  @override
+  State<_RequestSection> createState() => _RequestSectionState();
+}
+
+class _RequestSectionState extends State<_RequestSection> {
+  static const _previewCount = 3;
+  bool _expanded = false;
+
+  static int _newestFirst(SeerrRequest a, SeerrRequest b) {
+    final first = a.createdAt;
+    final second = b.createdAt;
+    if (first == null && second != null) return 1;
+    if (second == null && first != null) return -1;
+    final byDate = second?.compareTo(first!) ?? 0;
+    return byDate == 0 ? b.id.compareTo(a.id) : byDate;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.surfaceElevated.withValues(alpha: 0.56),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
-                blurRadius: 24,
-                offset: const Offset(0, 14),
+    final section = widget.section;
+    final preview = section == _Section.failed || section == _Section.processing;
+    final items = preview ? (widget.items.toList()..sort(_newestFirst)) : widget.items;
+    final canExpand = preview && items.length > _previewCount;
+    final visibleCount = canExpand && !_expanded ? _previewCount : items.length;
+    return SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              sliver: SliverMainAxisGroup(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Semantics(
+                        header: true,
+                        child: Row(
+                          children: [
+                            Icon(section.icon, size: 22, color: section.color),
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: Text(
+                                section.title,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${items.length}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  DecoratedSliver(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated.withValues(alpha: .56),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    sliver: SliverList.separated(
+                      itemCount: visibleCount + (canExpand ? 1 : 0),
+                      findItemIndexCallback: (key) {
+                        final index = items.indexWhere(
+                          (item) => ValueKey(item.id) == key,
+                        );
+                        return index < 0 || index >= visibleCount ? null : index;
+                      },
+                      itemBuilder: (_, index) {
+                        if (index == visibleCount) {
+                          final label = section == _Section.failed ? 'failed' : 'waiting';
+                          return Semantics(
+                            expanded: _expanded,
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(16))),
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              onPressed: () => setState(() => _expanded = !_expanded),
+                              iconAlignment: IconAlignment.end,
+                              icon: Icon(_expanded ? PiconsRegular.caretUp : PiconsRegular.caretDown, size: 16),
+                              label: Text(_expanded ? 'Show fewer' : 'Show all ${items.length} $label requests'),
+                            ),
+                          );
+                        }
+                        return _RequestTile(key: ValueKey(items[index].id), request: items[index], section: section);
+                      },
+                      separatorBuilder: (_, _) => const Divider(
+                        height: 1,
+                        indent: 14,
+                        endIndent: 14,
+                        color: AppColors.divider,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            );
+  }
+}
+
+class _LoadingRequests extends StatelessWidget {
+  const _LoadingRequests();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(20),
+    children: [
+      Skeleton.group(
+        child: Column(
+          children: [
+            for (var i = 0; i < 3; i++) ...[
+              Skeleton.box(width: double.infinity, height: 100),
+              const SizedBox(height: 12),
             ],
-          ),
-          child: Padding(
-            padding: padding ?? const EdgeInsets.all(14),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RequestFilters extends ConsumerWidget {
-  const _RequestFilters({required this.selected});
-
-  final String selected;
-
-  static const _filters = <(String, String)>[
-    ('all', 'All'),
-    ('pending', 'Pending'),
-    ('processing', 'Processing'),
-    ('available', 'Available'),
-    ('failed', 'Failed'),
-  ];
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final filter in _filters) ...[
-            _FilterPill(
-              label: filter.$2,
-              selected: selected == filter.$1,
-              onTap: () => ref
-                  .read(seerrRequestsFilterProvider.notifier)
-                  .setFilter(filter.$1),
-            ),
-            const SizedBox(width: 8),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.17)
-          : Colors.white.withValues(alpha: 0.055),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: selected ? null : onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 38),
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? AppColors.primary.withValues(alpha: 0.44)
-                  : Colors.white.withValues(alpha: 0.09),
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? AppColors.primary : AppColors.textSecondary,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
         ),
       ),
-    );
-  }
+    ],
+  );
 }
 
 class _RequestTile extends ConsumerStatefulWidget {
-  const _RequestTile({required this.request});
-
+  const _RequestTile({super.key, required this.request, required this.section});
   final SeerrRequest request;
+  final _Section section;
 
   @override
   ConsumerState<_RequestTile> createState() => _RequestTileState();
@@ -311,204 +371,262 @@ class _RequestTile extends ConsumerStatefulWidget {
 class _RequestTileState extends ConsumerState<_RequestTile> {
   bool _retrying = false;
   String? _updatingStatus;
+  String? _retryError;
 
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
-    final created = request.createdAt;
-    final seasons = request.seasons.isEmpty
-        ? null
-        : 'S${request.seasons.map((s) => s.toString()).join(', S')}';
-    final shortDate = created == null ? null : _shortDate(created);
-    final requester = request.requestedByName == null
-        ? null
-        : 'Requested by ${request.requestedByName}';
-    final meta = [
-      request.mediaType.label,
-      ?seasons,
-      ?requester,
-      ?shortDate,
-    ].join(' • ');
-    final statusColor = _statusColor(request);
-    final progress = request.progress;
-    final processingDetail = request.processingDetail;
-    final canTap = request.canOpenInLibrary;
+    final tmdbId = request.tmdbId;
+    final missingTitle =
+        request.title == null || request.title!.startsWith('TMDb #');
+    SeerrMediaDetails? detail;
+    if (tmdbId != null &&
+        (request.mediaType == SeerrMediaType.tv ||
+            request.mediaType == SeerrMediaType.movie) &&
+        (request.posterPath == null || missingTitle)) {
+      detail = ref
+          .watch(
+            seerrDetailsProvider(
+              SeerrDetailsKey(id: tmdbId, mediaType: request.mediaType),
+            ),
+          )
+          .asData
+          ?.value;
+    }
+    final title =
+        (missingTitle ? detail?.title : null) ??
+        request.title ??
+        'Request #${request.id}';
+    final poster =
+        request.posterUrl ??
+        detail?.posterUrl ??
+        request.backdropUrl ??
+        detail?.backdropUrl;
+    final date = request.createdAt?.toLocal();
+    final requester = request.requestedByName?.trim();
+    final canOpen =
+        widget.section == _Section.available && request.canOpenInLibrary;
+    final status = _statusContent(request);
 
-    return _GlassPanel(
-      padding: EdgeInsets.zero,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: canTap ? _openTitle : null,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
-                    width: 52,
-                    height: 76,
-                    child: ColoredBox(
-                      color: statusColor.withValues(alpha: 0.12),
-                      child: LocalOrNetworkImage(
-                        source: request.posterUrl ?? request.backdropUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_) => Icon(
-                          request.mediaType == SeerrMediaType.movie
-                              ? PiconsRegular.televisionSimple
-                              : PiconsRegular.sparkle,
-                          color: statusColor,
-                          size: 23,
-                        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: canOpen ? _openTitle : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: SizedBox(
+                  width: 44,
+                  height: 66,
+                  child: ColoredBox(
+                    color: AppColors.surfaceHighlight,
+                    child: LocalOrNetworkImage(
+                      source: poster,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_) => Icon(
+                        request.mediaType == SeerrMediaType.tv
+                            ? PiconsRegular.televisionSimple
+                            : PiconsRegular.filmStrip,
+                        size: 22,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              request.title ?? 'Request #${request.id}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          _RequestStatusPill(request: request),
-                          if (canTap) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              PiconsRegular.caretRight,
-                              color: AppColors.textSecondary,
-                              size: 17,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 7),
-                      Row(
-                        children: [
-                          if (request.requestedByName != null) ...[
-                            Icon(
-                              PiconsRegular.user,
-                              size: 13,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.9,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                          ],
-                          Expanded(
+                        ),
+                        if (date != null) ...[
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: MaterialLocalizations.of(context)
+                                .formatFullDate(date),
                             child: Text(
-                              meta,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              MaterialLocalizations.of(context)
+                                  .formatShortMonthDay(date),
                               style: const TextStyle(
-                                color: AppColors.textSecondary,
                                 fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
                         ],
-                      ),
-                      if (processingDetail != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          processingDetail,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _scope(request),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              if (requester != null &&
+                                  requester.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      PiconsRegular.user,
+                                      size: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        requester,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        semanticsLabel:
+                                            'Requested by $requester',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                      ],
-                      if (request.status == SeerrRequestStatus.pending) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            _RequestActionButton(
-                              label: 'Approve',
-                              icon: PiconsRegular.check,
-                              color: AppColors.success,
-                              loading: _updatingStatus == 'approve',
-                              onPressed: _updatingStatus == null
-                                  ? () => _updateStatus('approve')
-                                  : null,
-                            ),
-                            _RequestActionButton(
-                              label: 'Reject',
-                              icon: PiconsRegular.x,
-                              color: AppColors.error,
-                              loading: _updatingStatus == 'decline',
-                              onPressed: _updatingStatus == null
-                                  ? () => _updateStatus('decline')
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ] else if (request.canRetry) ...[
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _RetryButton(
+                        if (request.canRetry) ...[
+                          const SizedBox(width: 8),
+                          _RequestActionButton(
+                            label: 'Retry',
+                            icon: PiconsRegular.arrowsClockwise,
+                            color: AppColors.error,
                             loading: _retrying,
-                            onPressed: _retry,
+                            onPressed: _retrying ? null : _retry,
                           ),
-                        ),
+                        ],
+                        if (canOpen)
+                          const Icon(
+                            PiconsRegular.caretRight,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
                       ],
-                      if (progress != null) ...[
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 3,
-                            backgroundColor: Colors.white.withValues(
-                              alpha: 0.08,
-                            ),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              statusColor,
-                            ),
-                          ),
-                        ),
-                      ] else if (request.mediaStatus ==
-                          SeerrMediaStatus.processing) ...[
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Waiting for Seerr queue details',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ] else
-                        const SizedBox(height: 2),
-                    ],
-                  ),
+                    ),
+                    if (status != null) ...[const SizedBox(height: 9), status],
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  String _scope(SeerrRequest request) {
+    if (request.seasons.isEmpty) return request.mediaType.label;
+    final seasons = request.seasons.toSet().toList()..sort();
+    if (seasons.length == 1) return 'Season ${seasons.single}';
+    if (seasons.last - seasons.first == seasons.length - 1) {
+      return 'Seasons ${seasons.first}–${seasons.last}';
+    }
+    return 'Seasons ${seasons.join(', ')}';
+  }
+
+  Widget? _statusContent(SeerrRequest request) {
+    switch (widget.section) {
+      case _Section.failed:
+        final reason = _retryError ?? request.failureReason;
+        if (reason == null || reason.trim().isEmpty) return null;
+        return _StatusStrip(
+          section: widget.section,
+          child: Text(
+            reason,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          ),
+        );
+      case _Section.downloading:
+      case _Section.processing:
+        final progress = request.progress;
+        final detail = request.processingDetail ?? (widget.section == _Section.downloading ? 'Downloading' : 'Waiting for queue details');
+        return _StatusStrip(
+          section: widget.section,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                request.mediaStatus == SeerrMediaStatus.partiallyAvailable
+                    ? 'Partially available · $detail'
+                    : detail,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                ),
+              ),
+              if (progress != null) ...[
+                const SizedBox(height: 7),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 5,
+                  semanticsLabel: 'Download progress',
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.divider,
+                ),
+              ],
+            ],
+          ),
+        );
+      case _Section.pending:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            _RequestActionButton(
+              label: 'Approve',
+              icon: PiconsRegular.check,
+              color: AppColors.success,
+              loading: _updatingStatus == 'approve',
+              onPressed: _updatingStatus == null
+                  ? () => _updateStatus('approve')
+                  : null,
+            ),
+            _RequestActionButton(
+              label: 'Reject',
+              icon: PiconsRegular.x,
+              color: AppColors.error,
+              loading: _updatingStatus == 'decline',
+              onPressed: _updatingStatus == null
+                  ? () => _updateStatus('decline')
+                  : null,
+            ),
+          ],
+        );
+      default:
+        return null;
+    }
   }
 
   void _openTitle() {
@@ -520,11 +638,6 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
     context.push(path);
   }
 
-  String _shortDate(DateTime date) {
-    final local = date.toLocal();
-    return '${local.month}/${local.day}/${local.year}';
-  }
-
   Future<void> _updateStatus(String status) async {
     if (_updatingStatus != null) return;
     setState(() => _updatingStatus = status);
@@ -532,8 +645,8 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
       await ref
           .read(seerrRepositoryProvider)
           .updateRequestStatus(requestId: widget.request.id, status: status);
-      ref.invalidate(seerrRequestsProvider);
       if (!mounted) return;
+      ref.invalidate(seerrRequestsProvider);
       showAppSnackBar(
         context,
         status == 'approve' ? 'Request approved.' : 'Request rejected.',
@@ -551,49 +664,23 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
 
   Future<void> _retry() async {
     if (_retrying) return;
-    setState(() => _retrying = true);
+    setState(() {
+      _retrying = true;
+      _retryError = null;
+    });
     try {
       await ref.read(seerrRepositoryProvider).retryRequest(widget.request.id);
-      ref.invalidate(seerrRequestsProvider);
       if (!mounted) return;
+      ref.invalidate(seerrRequestsProvider);
       showAppSnackBar(context, 'Retry sent to Seerr.');
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(
-        context,
-        'Retry failed: ${userFacingSeerrMessage(error)}',
+      setState(
+        () => _retryError = 'Retry failed: ${userFacingSeerrMessage(error)}',
       );
     } finally {
       if (mounted) setState(() => _retrying = false);
     }
-  }
-}
-
-class _RetryButton extends StatelessWidget {
-  const _RetryButton({required this.loading, required this.onPressed});
-
-  final bool loading;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: loading ? null : onPressed,
-      icon: loading
-          ? const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(PiconsRegular.arrowsClockwise, size: 16),
-      label: const Text('Retry'),
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.error,
-        minimumSize: const Size(0, 34),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-      ),
-    );
   }
 }
 
@@ -626,84 +713,38 @@ class _RequestActionButton extends StatelessWidget {
       label: Text(label),
       style: TextButton.styleFrom(
         foregroundColor: color,
-        minimumSize: const Size(0, 34),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: color.withValues(alpha: 0.10),
+        textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
+        minimumSize: const Size(0, 44),
         padding: const EdgeInsets.symmetric(horizontal: 10),
       ),
     );
   }
 }
 
-class _RequestStatusPill extends StatelessWidget {
-  const _RequestStatusPill({required this.request});
-
-  final SeerrRequest request;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _statusColor(request);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        child: Text(
-          request.statusLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Color _statusColor(SeerrRequest request) {
-  if (request.status == SeerrRequestStatus.failed ||
-      request.status == SeerrRequestStatus.declined) {
-    return AppColors.error;
-  }
-  if (request.status == SeerrRequestStatus.pending) {
-    return AppColors.primary;
-  }
-  if (request.mediaStatus == SeerrMediaStatus.available) {
-    return AppColors.success;
-  }
-  if (request.mediaStatus == SeerrMediaStatus.processing ||
-      request.mediaStatus == SeerrMediaStatus.partiallyAvailable) {
-    return AppColors.primary;
-  }
-  return switch (request.status) {
-    SeerrRequestStatus.pending => AppColors.primary,
-    SeerrRequestStatus.approved => AppColors.success,
-    SeerrRequestStatus.completed => AppColors.success,
-    SeerrRequestStatus.declined => AppColors.error,
-    SeerrRequestStatus.failed => AppColors.error,
-    SeerrRequestStatus.unknown => AppColors.textTertiary,
-  };
-}
-
-class _RequestsSkeleton extends StatelessWidget {
-  const _RequestsSkeleton();
+class _StatusStrip extends StatelessWidget {
+  const _StatusStrip({required this.section, required this.child});
+  final _Section section;
+  final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return Skeleton.group(
-      child: Column(
-        children: [
-          for (var i = 0; i < 6; i++) ...[
-            Skeleton.box(width: double.infinity, height: 82),
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: section.color.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(section.icon, color: section.color, size: 17),
+        const SizedBox(width: 7),
+        Expanded(child: child),
+      ],
+    ),
+  );
 }

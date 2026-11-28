@@ -342,6 +342,7 @@ class SeerrRequest {
     this.backdropPath,
     this.requestedByName,
     this.jellyfinItemId,
+    this.failureReason,
     this.downloads = const [],
     this.createdAt,
     this.updatedAt,
@@ -358,6 +359,7 @@ class SeerrRequest {
   final String? backdropPath;
   final String? requestedByName;
   final String? jellyfinItemId;
+  final String? failureReason;
   final List<SeerrDownloadStatus> downloads;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -379,6 +381,8 @@ class SeerrRequest {
       (mediaStatus == SeerrMediaStatus.available ||
           status == SeerrRequestStatus.completed);
 
+  bool get hasActiveDownload => downloads.any((download) => download.isActive);
+
   double? get progress {
     if (status == SeerrRequestStatus.pending) return 0;
     if (mediaStatus == SeerrMediaStatus.available ||
@@ -389,14 +393,20 @@ class SeerrRequest {
         status == SeerrRequestStatus.declined) {
       return null;
     }
-    if (downloads.isEmpty) return null;
-    final totalSize = downloads.fold<int>(0, (sum, item) => sum + item.size);
-    final totalLeft = downloads.fold<int>(
-      0,
-      (sum, item) => sum + item.sizeLeft,
-    );
-    if (totalSize <= 0) return null;
-    return ((totalSize - totalLeft) / totalSize).clamp(0.0, 1.0).toDouble();
+    var totalSize = 0;
+    var totalLeft = 0;
+    for (final download in downloads) {
+      final remaining = download.sizeLeft;
+      if (remaining == null ||
+          remaining < 0 ||
+          download.size <= 0 ||
+          remaining > download.size) {
+        return null;
+      }
+      totalSize += download.size;
+      totalLeft += remaining;
+    }
+    return totalSize == 0 ? null : (totalSize - totalLeft) / totalSize;
   }
 
   String? get processingDetail {
@@ -438,6 +448,7 @@ class SeerrRequest {
       backdropPath: backdropPath ?? this.backdropPath,
       requestedByName: requestedByName ?? this.requestedByName,
       jellyfinItemId: jellyfinItemId ?? this.jellyfinItemId,
+      failureReason: failureReason,
       downloads: downloads ?? this.downloads,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -482,6 +493,10 @@ class SeerrRequest {
           requestedBy?['plexUsername'] as String? ??
           requestedBy?['email'] as String?,
       jellyfinItemId: jellyfinItemId,
+      failureReason: switch (json['failureReason']) {
+        final String reason when reason.trim().isNotEmpty => reason.trim(),
+        _ => null,
+      },
       downloads: (downloadStatus ?? const [])
           .whereType<Map>()
           .map((item) => SeerrDownloadStatus.fromJson(_stringMap(item)))
@@ -507,15 +522,24 @@ class SeerrDownloadStatus {
   });
 
   final int size;
-  final int sizeLeft;
+  final int? sizeLeft;
   final String status;
   final String timeLeft;
   final String title;
 
+  bool get isActive {
+    final state = status.trim().toLowerCase();
+    if (state.isNotEmpty && state != 'unknown') return state == 'downloading';
+    // Some Seerr queues omit the transfer state but still report an ETA or bytes.
+    final remaining = sizeLeft;
+    return timeLeft.trim().isNotEmpty ||
+        (remaining != null && remaining > 0 && remaining < size);
+  }
+
   factory SeerrDownloadStatus.fromJson(Map<String, dynamic> json) {
     return SeerrDownloadStatus(
       size: _intFromJson(json['size']) ?? 0,
-      sizeLeft: _intFromJson(json['sizeLeft'] ?? json['sizeleft']) ?? 0,
+      sizeLeft: _intFromJson(json['sizeLeft'] ?? json['sizeleft']),
       status: json['status'] as String? ?? '',
       timeLeft:
           json['timeLeft'] as String? ?? json['timeleft'] as String? ?? '',
