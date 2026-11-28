@@ -399,22 +399,28 @@ class SeerrRequest {
   }
 
   ({int received, int total})? get downloadBytes {
+    final measured = measuredDownloadBytes;
+    if (measured.count == 0 || measured.count != downloads.length) return null;
+    return (received: measured.received, total: measured.total);
+  }
+
+  ({int received, int total, int count}) get measuredDownloadBytes {
     var totalSize = 0;
     var totalLeft = 0;
+    var count = 0;
     for (final download in downloads) {
       final remaining = download.sizeLeft;
       if (remaining == null ||
           remaining < 0 ||
           download.size <= 0 ||
           remaining > download.size) {
-        return null;
+        continue;
       }
+      count++;
       totalSize += download.size;
       totalLeft += remaining;
     }
-    return totalSize == 0
-        ? null
-        : (received: totalSize - totalLeft, total: totalSize);
+    return (received: totalSize - totalLeft, total: totalSize, count: count);
   }
 
   int? get totalDownloadSize {
@@ -481,9 +487,36 @@ class SeerrRequest {
     final downloadStatus = media == null
         ? null
         : (is4k ? media['downloadStatus4k'] : media['downloadStatus']) as List?;
+    final mediaType = seerrMediaTypeFromJson(json['type'] as String?);
+    final seasons = ((json['seasons'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => _intFromJson(item['seasonNumber']))
+        .whereType<int>()
+        .toList(growable: false);
+    final downloads = <SeerrDownloadStatus>[];
+    final seenDownloadIds = <String>{};
+    for (final entry in (downloadStatus ?? const []).whereType<Map>()) {
+      if (mediaType == SeerrMediaType.tv) {
+        final episode = entry['episode'];
+        final season = episode is Map
+            ? _intFromJson(episode['seasonNumber'])
+            : null;
+        if (season != null && seasons.isNotEmpty && !seasons.contains(season)) {
+          continue;
+        }
+        // Sonarr repeats a season pack's transfer data on every episode row.
+        final id = entry['downloadId'];
+        if (id is String &&
+            id.trim().isNotEmpty &&
+            !seenDownloadIds.add(id.trim().toLowerCase())) {
+          continue;
+        }
+      }
+      downloads.add(SeerrDownloadStatus.fromJson(_stringMap(entry)));
+    }
     return SeerrRequest(
       id: _intFromJson(json['id']) ?? 0,
-      mediaType: seerrMediaTypeFromJson(json['type'] as String?),
+      mediaType: mediaType,
       status: seerrRequestStatusFromJson(json['status']),
       mediaStatus: seerrMediaStatusFromJson(
         is4k ? (media?['status4k']) : (media?['status']),
@@ -506,17 +539,10 @@ class SeerrRequest {
         final String reason when reason.trim().isNotEmpty => reason.trim(),
         _ => null,
       },
-      downloads: (downloadStatus ?? const [])
-          .whereType<Map>()
-          .map((item) => SeerrDownloadStatus.fromJson(_stringMap(item)))
-          .toList(growable: false),
+      downloads: downloads,
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
-      seasons: ((json['seasons'] as List?) ?? const [])
-          .whereType<Map>()
-          .map((item) => _intFromJson(item['seasonNumber']))
-          .whereType<int>()
-          .toList(growable: false),
+      seasons: seasons,
     );
   }
 }

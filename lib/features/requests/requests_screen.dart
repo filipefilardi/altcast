@@ -801,17 +801,18 @@ class _TransferProgressState extends State<_TransferProgress> {
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
-    final bytes = request.downloadBytes;
-    final total = bytes?.total ?? request.totalDownloadSize;
-    final fraction = bytes == null ? null : bytes.received / bytes.total;
-    final percent = bytes == null
+    final bytes = request.measuredDownloadBytes;
+    final count = request.downloads.length;
+    final partial = bytes.count > 0 && bytes.count < count;
+    final total = request.totalDownloadSize;
+    final fraction = bytes.total > 0 ? bytes.received / bytes.total : null;
+    final percent = fraction == null
         ? null
         : _percent(bytes.received, bytes.total);
     final eta = fraction == 1 ? null : request.downloadEta;
-    final count = request.downloads.length;
+    final isSeries = request.mediaType == SeerrMediaType.tv;
+    final scopedProgress = percent != null && (isSeries || partial);
     final contextLine = [
-      if (request.mediaType == SeerrMediaType.tv && count > 0)
-        'Series queue · $count ${count == 1 ? 'transfer' : 'transfers'}',
       if (request.mediaStatus == SeerrMediaStatus.partiallyAvailable)
         'Partially available',
     ];
@@ -822,8 +823,8 @@ class _TransferProgressState extends State<_TransferProgress> {
       );
     }
     final label = switch (fraction) {
-      1.0 => 'Transfer complete',
-      0.0 when request.hasActiveDownload => 'Starting download',
+      1.0 when !partial && !isSeries => 'Transfer complete',
+      0.0 when !partial && request.hasActiveDownload => 'Starting download',
       _ when request.hasActiveDownload => 'Downloading',
       _
           when request.downloads.every(
@@ -838,6 +839,14 @@ class _TransferProgressState extends State<_TransferProgress> {
         eta != null ||
         total != null ||
         contextLine.isNotEmpty;
+    final percentageText = Text(
+      percent ?? '',
+      style: const TextStyle(
+        color: AppColors.accent,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+    );
     final heading = Row(
       children: [
         Expanded(
@@ -864,16 +873,9 @@ class _TransferProgressState extends State<_TransferProgress> {
             ],
           ),
         ),
-        if (percent != null) ...[
+        if (percent != null && !scopedProgress) ...[
           const SizedBox(width: 8),
-          Text(
-            percent,
-            style: const TextStyle(
-              color: AppColors.accent,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          percentageText,
         ],
       ],
     );
@@ -896,6 +898,21 @@ class _TransferProgressState extends State<_TransferProgress> {
         else
           heading,
         if (_expanded) ...[
+          if (scopedProgress)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    partial
+                        ? 'Progress for ${bytes.count} of $count reported downloads'
+                        : '$count reported ${count == 1 ? 'download' : 'downloads'}',
+                    style: secondary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                percentageText,
+              ],
+            ),
           if (fraction != null)
             LinearProgressIndicator(
               value: fraction,
@@ -904,8 +921,10 @@ class _TransferProgressState extends State<_TransferProgress> {
               color: AppColors.primary,
               backgroundColor: AppColors.divider,
               trackGap: 0,
-              semanticsLabel: request.mediaType == SeerrMediaType.tv
-                  ? 'Series queue download progress'
+              semanticsLabel: partial
+                  ? 'Download progress for ${bytes.count} of $count transfers'
+                  : request.mediaType == SeerrMediaType.tv
+                  ? 'Progress of reported downloads'
                   : 'Download progress',
               semanticsValue: percent,
             ),

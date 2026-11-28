@@ -371,10 +371,25 @@ void main() {
           'status': 4,
           'downloadStatus': [
             {
+              'episode': {'seasonNumber': 2, 'episodeNumber': 1},
+              'downloadId': 'season-pack',
               'size': 900,
               'sizeLeft': 900,
               'timeLeft': '5 min',
               'status': 'downloading',
+            },
+            {
+              'episode': {'seasonNumber': 2, 'episodeNumber': 2},
+              'downloadId': 'season-pack',
+              'size': 900,
+              'sizeLeft': 900,
+              'status': 'downloading',
+            },
+            {
+              'episode': {'seasonNumber': 3},
+              'downloadId': 'another-season',
+              'size': 500,
+              'sizeLeft': 20,
             },
             {'size': 100, 'sizeLeft': 0, 'status': 'completed'},
           ],
@@ -395,7 +410,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Season 2'), findsOneWidget);
       expect(find.text('10%'), findsOneWidget);
-      expect(find.textContaining('Series queue · 2 transfers'), findsOneWidget);
+      expect(find.text('2 reported downloads'), findsOneWidget);
       expect(find.textContaining('Partially available'), findsOneWidget);
       expect(find.text('1000 B total'), findsOneWidget);
       expect(find.textContaining('ETA'), findsNothing);
@@ -407,6 +422,87 @@ void main() {
             .value,
         .1,
       );
+    },
+  );
+  testWidgets(
+    'series with incomplete telemetry scopes its bar to reporting transfers',
+    (tester) async {
+      final requests = [
+        for (final withData in [true, false])
+          SeerrRequest.fromJson({
+            'id': withData ? 95 : 96,
+            'type': 'tv',
+            'status': 2,
+            'media': {
+              'status': 3,
+              'title': withData ? 'Some sizes' : 'No sizes',
+              'downloadStatus': [
+                if (withData) ...[
+                  {'size': 100, 'sizeLeft': 0},
+                  {'size': 300, 'sizeLeft': 100},
+                ],
+                if (withData) ...[
+                  {'size': 0, 'status': 'downloading'},
+                  {'size': 200},
+                ] else
+                  for (var episode = 1; episode <= 10; episode++)
+                    {
+                      'size': 0,
+                      'sizeLeft': 0,
+                      'status': 'queued',
+                      'downloadId': 'transfer-$episode',
+                    },
+              ],
+            },
+          }),
+      ];
+      expect(requests.first.progress, isNull);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seerrConnectionProvider.overrideWith(_Connected.new),
+            seerrRequestsProvider.overrideWith((_) async => requests),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const RequestsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Progress for 2 of 4 reported downloads'),
+        findsOneWidget,
+      );
+      expect(find.text('75%'), findsOneWidget);
+      expect(find.textContaining('Waiting for byte counts'), findsNothing);
+      expect(
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byType(LinearProgressIndicator),
+            )
+            .value,
+        .75,
+      );
+      final queued = find.byKey(const ValueKey(96));
+      expect(
+        find.descendant(of: queued, matching: find.text('In download queue')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: queued,
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsNothing,
+      );
+      final first = find.byKey(const ValueKey(95));
+      await tester.tap(
+        find.descendant(of: first, matching: find.text('Downloading')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('75%'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     },
   );
   testWidgets(
