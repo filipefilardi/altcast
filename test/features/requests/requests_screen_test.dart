@@ -1,3 +1,4 @@
+import 'package:altcast/core/widgets/local_or_network_image.dart';
 import 'package:altcast/data/seerr/models.dart';
 import 'package:altcast/data/seerr/seerr_repository.dart';
 import 'package:altcast/features/requests/requests_screen.dart';
@@ -406,6 +407,53 @@ void main() {
             .value,
         .1,
       );
+    },
+  );
+  testWidgets(
+    'poster-only requests resolve a landscape backdrop from Seerr details',
+    (tester) async {
+      final request = SeerrRequest.fromJson({
+        'id': 1,
+        'type': 'tv',
+        'status': 2,
+        'media': {
+          'status': 3,
+          'tmdbId': 42,
+          'name': 'Better Call Saul',
+          'posterPath': '/portrait.jpg',
+        },
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seerrConnectionProvider.overrideWith(_Connected.new),
+            seerrRequestsProvider.overrideWith((_) async => [request]),
+            seerrDetailsProvider.overrideWith(
+              (ref, key) async => SeerrMediaDetails(
+                id: key.id,
+                mediaType: key.mediaType,
+                title: 'Better Call Saul',
+                backdropPath: '/landscape.jpg',
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: const RequestsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final artwork = find.byType(LocalOrNetworkImage);
+      expect(
+        tester.widget<LocalOrNetworkImage>(artwork).source,
+        'https://image.tmdb.org/t/p/w780/landscape.jpg',
+      );
+      expect(
+        tester.getSize(artwork).width,
+        greaterThan(tester.getSize(artwork).height),
+      );
+      expect(find.text('Better Call Saul'), findsOneWidget);
     },
   );
 }

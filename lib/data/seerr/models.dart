@@ -205,7 +205,8 @@ class SeerrMediaItem {
   String? get posterUrl =>
       posterPath == null ? null : 'https://image.tmdb.org/t/p/w342$posterPath';
 
-  String? get backdropUrl => backdropPath == null
+  String? get backdropUrl =>
+      backdropPath == null || backdropPath!.trim().isEmpty
       ? null
       : 'https://image.tmdb.org/t/p/w780$backdropPath';
 
@@ -432,9 +433,10 @@ class SeerrRequest {
   String? get posterUrl =>
       posterPath == null ? null : 'https://image.tmdb.org/t/p/w185$posterPath';
 
-  String? get backdropUrl => backdropPath == null
+  String? get backdropUrl =>
+      backdropPath == null || backdropPath!.trim().isEmpty
       ? null
-      : 'https://image.tmdb.org/t/p/w500$backdropPath';
+      : 'https://image.tmdb.org/t/p/w780$backdropPath';
 
   SeerrRequest copyWith({
     String? title,

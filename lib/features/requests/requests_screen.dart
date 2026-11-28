@@ -363,6 +363,12 @@ class _RequestSectionState extends State<_RequestSection> {
                   key: ValueKey(items[index].id),
                   request: items[index],
                   section: section,
+                  borderRadius: BorderRadius.vertical(
+                    top: index == 0 ? const Radius.circular(15) : Radius.zero,
+                    bottom: index == visibleCount - 1 && !canExpand
+                        ? const Radius.circular(15)
+                        : Radius.zero,
+                  ),
                 );
               },
               separatorBuilder: (_, _) => const Divider(
@@ -401,7 +407,13 @@ class _LoadingRequests extends StatelessWidget {
 }
 
 class _RequestTile extends ConsumerStatefulWidget {
-  const _RequestTile({super.key, required this.request, required this.section});
+  const _RequestTile({
+    super.key,
+    required this.request,
+    required this.section,
+    required this.borderRadius,
+  });
+  final BorderRadius borderRadius;
   final SeerrRequest request;
   final _Section section;
 
@@ -424,7 +436,7 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
     if (tmdbId != null &&
         (request.mediaType == SeerrMediaType.tv ||
             request.mediaType == SeerrMediaType.movie) &&
-        (request.posterPath == null || missingTitle)) {
+        (request.backdropUrl == null || missingTitle)) {
       detail = ref
           .watch(
             seerrDetailsProvider(
@@ -438,149 +450,166 @@ class _RequestTileState extends ConsumerState<_RequestTile> {
         (missingTitle ? detail?.title : null) ??
         request.title ??
         'Request #${request.id}';
-    final poster =
-        request.posterUrl ??
-        detail?.posterUrl ??
-        request.backdropUrl ??
-        detail?.backdropUrl;
+    final backdrop = request.backdropUrl ?? detail?.backdropUrl;
     final date = request.createdAt?.toLocal();
     final requester = request.requestedByName?.trim();
     final canOpen =
         widget.section == _Section.available && request.canOpenInLibrary;
     final status = _statusContent(request);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: canOpen ? _openTitle : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: SizedBox(
-                  width: 44,
-                  height: 66,
-                  child: ColoredBox(
-                    color: AppColors.surfaceHighlight,
-                    child: LocalOrNetworkImage(
-                      source: poster,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_) => Icon(
-                        request.mediaType == SeerrMediaType.tv
-                            ? PiconsRegular.televisionSimple
-                            : PiconsRegular.filmStrip,
-                        size: 22,
-                        color: AppColors.textSecondary,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1),
+      child: ClipRRect(
+        borderRadius: widget.borderRadius,
+        child: Stack(
+          children: [
+            if (backdrop != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: [0, .28, 1],
+                      ).createShader(bounds),
+                      child: DecoratedBox(
+                        position: DecorationPosition.foreground,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xEF111820),
+                              Color(0xBB111820),
+                              Color(0x70111820),
+                              Color(0xAA111820),
+                            ],
+                            stops: [0, .32, .74, 1],
+                          ),
+                        ),
+                        child: LocalOrNetworkImage(
+                          source: backdrop,
+                          alignment: const Alignment(0, -.30),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (date != null) ...[
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: MaterialLocalizations.of(context)
-                                .formatFullDate(date),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: canOpen ? _openTitle : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
                             child: Text(
-                              MaterialLocalizations.of(context)
-                                  .formatShortMonthDay(date),
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _scope(request),
-                                style: Theme.of(context).textTheme.bodyMedium,
+                          if (date != null) ...[
+                            const SizedBox(width: 8),
+                            Tooltip(
+                              message: MaterialLocalizations.of(context)
+                                  .formatFullDate(date),
+                              child: Text(
+                                MaterialLocalizations.of(context)
+                                    .formatShortMonthDay(date),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                              if (requester != null &&
-                                  requester.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      PiconsRegular.user,
-                                      size: 13,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        requester,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        semanticsLabel:
-                                            'Requested by $requester',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _scope(request),
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                if (requester != null &&
+                                    requester.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        PiconsRegular.user,
+                                        size: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Expanded(
+                                        child: Text(
+                                          requester,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          semanticsLabel:
+                                              'Requested by $requester',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                        if (request.canRetry) ...[
-                          const SizedBox(width: 8),
-                          _RequestActionButton(
-                            label: 'Retry',
-                            icon: PiconsRegular.arrowsClockwise,
-                            color: AppColors.error,
-                            loading: _retrying,
-                            onPressed: _retrying ? null : _retry,
-                          ),
+                          if (request.canRetry) ...[
+                            const SizedBox(width: 8),
+                            _RequestActionButton(
+                              label: 'Retry',
+                              icon: PiconsRegular.arrowsClockwise,
+                              color: AppColors.error,
+                              loading: _retrying,
+                              onPressed: _retrying ? null : _retry,
+                            ),
+                          ],
+                          if (canOpen)
+                            const Icon(
+                              PiconsRegular.caretRight,
+                              size: 16,
+                              color: AppColors.textSecondary,
+                            ),
                         ],
-                        if (canOpen)
-                          const Icon(
-                            PiconsRegular.caretRight,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
+                      ),
+                      if (status != null) ...[
+                        const SizedBox(height: 9),
+                        status,
                       ],
-                    ),
-                    if (status != null) ...[const SizedBox(height: 9), status],
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
